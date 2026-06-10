@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { cache } from '../lib/cache';
+import { db } from '../lib/database';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -116,6 +118,8 @@ interface AppContextType {
   missRepayment: (amount: number) => void;
   repayParent: () => void;
   addTransaction: (t: Transaction) => void;
+  userId: string | null;
+  saveOnboardingToDb: () => Promise<void>;
 }
 
 const defaultCircle: CircleMember[] = [
@@ -198,6 +202,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [transactions, setTransactions] = useState<Transaction[]>(defaultTransactions);
   const [activeRequests, setActiveRequests] = useState<ActiveRequest[]>(defaultRequests);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>(defaultActivity);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Tracks whether the initial AsyncStorage hydration has completed.
+  // Cache writes are gated on this so the in-memory defaults never
+  // overwrite real cached data on the first render.
+  const hydrated = useRef(false);
+
+  // Hydrate from local cache on mount (instant), then background-sync from DB.
+  useEffect(() => {
+    const hydrate = async () => {
+      const [cachedParent, cachedChild, cachedUserId] = await Promise.all([
+        cache.loadParent<Partial<typeof parent>>(),
+        cache.loadChild<Partial<typeof child>>(),
+        cache.loadUserId(),
+      ]);
+      if (cachedParent) setParent(p => ({ ...p, ...cachedParent }));
+      if (cachedChild)  setChild(c => ({ ...c, ...cachedChild }));
+      if (cachedUserId) setUserId(cachedUserId);
+      hydrated.current = true;
+    };
+    hydrate();
+  }, []);
+
+  // Keep the local cache in sync after every state update.
+  useEffect(() => { if (hydrated.current) cache.saveParent(parent); }, [parent]);
+  useEffect(() => { if (hydrated.current) cache.saveChild(child);   }, [child]);
 
   const [child, setChild] = useState<ChildProfile>({
     displayName: 'Alex',
@@ -294,6 +324,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivityFeed(prev => [item, ...prev]);
   };
 
+  const saveOnboardingToDb = async () => {
+    const uid = await db.saveOnboarding({
+      email:    parent.email,
+      password: parent.password,
+      parent: {
+        displayName:     parent.displayName,
+        mobile:          parent.mobile,
+        address:         parent.address,
+        safetyPoolLimit: parent.safetyPoolLimit,
+        weeklyAllowance: parent.weeklyAllowance,
+      },
+      child: {
+        displayName:   child.displayName,
+        username:      child.username,
+        password:      child.password,
+        mobile:        child.mobile,
+        age:           child.age,
+        avatarEmoji:   child.avatarEmoji,
+        trustScore:    child.trustScore,
+        balance:       child.balance,
+        loanedOut:     child.loanedOut,
+        borrowed:      child.borrowed,
+        streak:        child.streak,
+        repaid:        child.repaid,
+        missed:        child.missed,
+        totalBorrowed: child.totalBorrowed,
+        totalLent:     child.totalLent,
+        points:        child.points,
+      },
+    });
+    setUserId(uid);
+    await cache.saveUserId(uid);
+  };
+
   return (
     <AppContext.Provider value={{
       paymentMethods, addPaymentMethod, removePaymentMethod, setDefaultPaymentMethod,
@@ -309,6 +373,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       adjustTrustScore,
       repayOnTime, lendMoney, missRepayment, repayParent,
       addTransaction,
+      userId,
+      saveOnboardingToDb,
     }}>
       {children}
     </AppContext.Provider>
