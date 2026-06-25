@@ -19,7 +19,7 @@ type Props = {
 
 export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { mode, pinToConfirm } = route.params;
-  const { parent, setParent } = useApp();
+  const { parent, setParent, savePasscodeToDb } = useApp();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
 
@@ -57,6 +57,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
     } else if (mode === 'confirm') {
       if (next === pinToConfirm) {
         setParent(p => ({ ...p, passcode: next }));
+        savePasscodeToDb(next).catch(err => console.warn('[Truzo] passcode save failed:', err));
         setTimeout(() => navigation.navigate('ParentTabs'), 150);
       } else {
         shake();

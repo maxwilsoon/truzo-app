@@ -47,10 +47,10 @@ export const TrustStatsScreen: React.FC = () => {
           {[
             { label: 'On-time repayments', value: child.repaid, emoji: '✅', color: colors.success },
             { label: 'Missed repayments', value: child.missed, emoji: '❌', color: colors.error },
-            { label: 'Times borrowed', value: Math.floor(child.totalBorrowed / 15), emoji: '📩', color: colors.primary },
-            { label: 'Times lent', value: Math.floor(child.totalLent / 12), emoji: '🤝', color: colors.cyan },
-            { label: 'Amount borrowed', value: `£${child.totalBorrowed}`, emoji: '💸', color: colors.warning },
-            { label: 'Amount lent', value: `£${child.totalLent}`, emoji: '💰', color: colors.success },
+            { label: 'Times borrowed', value: child.timesBorrowed, emoji: '📩', color: colors.primary },
+            { label: 'Times lent', value: child.timesLent, emoji: '🤝', color: colors.cyan },
+            { label: 'Amount borrowed', value: `£${child.totalBorrowed.toFixed(2)}`, emoji: '💸', color: colors.warning },
+            { label: 'Amount lent', value: `£${child.totalLent.toFixed(2)}`, emoji: '💰', color: colors.success },
           ].map(s => (
             <View key={s.label} style={styles.gridItem}>
               <Text style={styles.gridEmoji}>{s.emoji}</Text>

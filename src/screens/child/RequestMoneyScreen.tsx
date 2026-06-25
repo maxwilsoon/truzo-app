@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { colors } from '../../theme/colors';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useApp } from '../../context/AppContext';
 import { ActiveRequest } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import { sendPushNotification } from '../../lib/notifications';
 
 const DEADLINES = [
   { label: 'Tomorrow', value: '1d', days: 1 },
@@ -34,7 +36,7 @@ const REASONS = [
 
 export const RequestMoneyScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child, parent, activeRequests, setActiveRequests, addActivity } = useApp();
+  const { child, childId, parent, activeRequests, setActiveRequests, addActivity } = useApp();
   const [amount, setAmount] = useState('');
   const [deadline, setDeadline] = useState('');
   const [reason, setReason] = useState('');
@@ -49,33 +51,62 @@ export const RequestMoneyScreen: React.FC = () => {
   const isAlreadyBorrowing = child.borrowed > 0 || activeRequests.some(r => r.isOwn && !r.isFunded);
   const canSend = !isAlreadyBorrowing && amountNum > 0 && amountNum <= maxBorrow && deadline && (reason || otherReason.trim());
 
-  const sendRequest = () => {
+  const [sending, setSending] = useState(false);
+
+  const sendRequest = async () => {
+    if (!childId) return;
     const selectedReason = REASONS.find(r => r.label === reason);
     const selectedDeadline = DEADLINES.find(d => d.value === deadline);
-    const newRequest: ActiveRequest = {
-      id: `own_${Date.now()}`,
-      fromId: child.username,
-      fromName: child.displayName,
-      fromEmoji: child.avatarEmoji,
-      fromTrust: child.trustScore,
-      amount: amountNum,
-      reason: reason || otherReason.trim(),
-      reasonEmoji: selectedReason?.emoji ?? '💸',
-      deadline: deadline,
-      repayByDate: deadlineToDate(selectedDeadline?.days ?? 7),
-      expiresIn: 24,
-      createdAt: 'Just now',
-      isOwn: true,
-    };
-    setActiveRequests(prev => [newRequest, ...prev]);
-    addActivity({
-      id: `a_req_${Date.now()}`,
-      emoji: '💸',
-      text: `You requested £${amountNum.toFixed(2)} — expires in 24h`,
-      time: 'Just now',
-      type: 'request',
-    });
-    navigation.goBack();
+    const finalReason = reason || otherReason.trim();
+    const finalEmoji = selectedReason?.emoji ?? '💸';
+    const days = selectedDeadline?.days ?? 7;
+
+    setSending(true);
+    try {
+      const { requestId, pushTokens } = await db.createMoneyRequest(
+        childId, amountNum, finalReason, finalEmoji, days,
+      );
+
+      // Optimistically add to local state (polling will sync within 5s)
+      const newRequest: ActiveRequest = {
+        id: requestId,
+        fromId: childId,
+        fromName: child.displayName,
+        fromEmoji: child.avatarEmoji,
+        fromTrust: child.trustScore,
+        amount: amountNum,
+        reason: finalReason,
+        reasonEmoji: finalEmoji,
+        deadline: deadline,
+        repayByDate: deadlineToDate(days),
+        expiresIn: 24,
+        createdAt: 'Just now',
+        isOwn: true,
+      };
+      setActiveRequests(prev => [newRequest, ...prev]);
+      addActivity({
+        id: `a_req_${Date.now()}`,
+        emoji: '💸',
+        text: `You requested £${amountNum.toFixed(2)} for ${finalReason} — expires in 24h`,
+        time: 'Just now',
+        type: 'request',
+      });
+
+      // Notify each circle member
+      pushTokens.forEach(token => {
+        sendPushNotification(
+          token,
+          `💸 ${child.displayName} needs money`,
+          `${child.displayName} requested £${amountNum.toFixed(2)} for ${finalReason}`,
+        ).catch(() => {});
+      });
+
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not send request.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -157,7 +188,7 @@ export const RequestMoneyScreen: React.FC = () => {
             <Text style={styles.alreadyBorrowingText}>Already Borrowing</Text>
           </View>
         ) : (
-          <PrimaryButton label="Send Request 🚀" onPress={sendRequest} disabled={!canSend} />
+          <PrimaryButton label={sending ? 'Sending…' : 'Send Request 🚀'} onPress={sendRequest} disabled={!canSend || sending} />
         )}
       </View>
     </SafeAreaView>

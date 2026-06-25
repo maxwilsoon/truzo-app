@@ -8,6 +8,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
+import { useApp } from '../../context/AppContext';
 
 const PURPLE = '#4F35F3';
 const BG = '#F2F2F7';
@@ -45,6 +46,7 @@ const formatDOB = (raw: string): string => {
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Address'> };
 
 export const AddressScreen: React.FC<Props> = ({ navigation }) => {
+  const { setParent } = useApp();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [dob, setDob]             = useState('');
@@ -120,7 +122,10 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btn, !canContinue && styles.btnDisabled]}
-            onPress={() => navigation.navigate('HomeAddress')}
+            onPress={() => {
+              setParent(p => ({ ...p, firstName: firstName.trim(), lastName: lastName.trim() }));
+              navigation.navigate('HomeAddress');
+            }}
             disabled={!canContinue}
             activeOpacity={0.85}
           >

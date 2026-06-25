@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,128 +6,155 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 
+const PURPLE = '#4F35F3';
+
+type AccountType = 'parent' | 'child';
+
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'WhoIsLoggingIn'> };
 
-const getInitials = (name: string) =>
-  name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+const OPTIONS: { type: AccountType; label: string }[] = [
+  { type: 'parent', label: 'Parent / co-parent' },
+  { type: 'child',  label: 'Child' },
+];
 
 export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation }) => {
-  const { child, parent } = useApp();
+  const { parent } = useApp();
+  const [selected, setSelected] = useState<AccountType | null>(null);
+
+  const handleContinue = () => {
+    if (selected === 'parent') {
+      if (parent.passcode) {
+        // Known device — passcode is already cached, go straight to PIN entry
+        navigation.navigate('ParentPasscode', { mode: 'enter' });
+      } else {
+        // New device — need to authenticate with email/password first
+        navigation.navigate('ParentEmailLogin');
+      }
+    } else if (selected === 'child') {
+      navigation.navigate('ChildLogin');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <TouchableOpacity
+        style={styles.back}
+        onPress={() => navigation.goBack()}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Ionicons name="chevron-back" size={26} color="#1C1C1E" />
+      </TouchableOpacity>
+
       <View style={styles.content}>
-        <Text style={styles.title}>Who's logging in?</Text>
+        <Text style={styles.title}>Which account are you logging into?</Text>
 
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={styles.profileItem}
-            onPress={() => navigation.navigate('ParentPasscode', { mode: parent.passcode ? 'enter' : 'create' })}
-            activeOpacity={0.75}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.initials}>{getInitials(parent.displayName)}</Text>
-            </View>
-            <Text style={styles.name}>{parent.displayName}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.profileItem} onPress={() => navigation.navigate('ChildLogin')} activeOpacity={0.75}>
-            <View style={styles.avatar}>
-              <Text style={styles.initials}>{getInitials(child.displayName)}</Text>
-            </View>
-            <Text style={styles.name}>{child.displayName}</Text>
-          </TouchableOpacity>
+        <View style={styles.options}>
+          {OPTIONS.map(({ type, label }) => {
+            const active = selected === type;
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.option, active && styles.optionActive]}
+                onPress={() => setSelected(type)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>
+                  {label}
+                </Text>
+                <View style={[styles.radio, active && styles.radioActive]}>
+                  {active && <View style={styles.radioDot} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-
-        <TouchableOpacity style={styles.profileItem} onPress={() => navigation.navigate('Carousel')} activeOpacity={0.75}>
-          <View style={styles.avatar}>
-            <Text style={styles.plus}>+</Text>
-          </View>
-          <Text style={styles.name}>Other</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* Kids device banner */}
-      <TouchableOpacity
-        style={styles.banner}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('GetApp')}
-      >
-        <Ionicons name="phone-portrait-outline" size={28} color="#1A1A3E" style={styles.bannerIcon} />
-        <View style={styles.bannerText}>
-          <Text style={styles.bannerTitle}>Do your kids have their own device?</Text>
-          <Text style={styles.bannerSub}>
-            Get the app for them.{' '}
-            <Text style={styles.bannerLink}>Here's how</Text>
-          </Text>
-        </View>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.btn, !selected && styles.btnDisabled]}
+          onPress={handleContinue}
+          disabled={!selected}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnText}>Continue</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
 
-const AVATAR = 120;
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 32,
-  },
+  safe:    { flex: 1, backgroundColor: '#fff' },
+  back:    { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
+
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#1A1A3E',
-    textAlign: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 36,
-  },
-  profileItem: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
-    backgroundColor: '#C4B5F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initials: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#1A1A3E',
-  },
-  plus: {
-    fontSize: 44,
-    fontWeight: '300',
-    color: '#1A1A3E',
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A3E',
+    color: '#1C1C1E',
+    marginBottom: 32,
+    lineHeight: 34,
   },
 
-  banner: {
+  options: { gap: 12 },
+
+  option: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8E3FF',
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 18,
-    padding: 18,
-    gap: 14,
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: '#D1D1D6',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#fff',
   },
-  bannerIcon:  { flexShrink: 0 },
-  bannerText:  { flex: 1 },
-  bannerTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A3E', marginBottom: 3 },
-  bannerSub:   { fontSize: 14, color: '#3C3C43' },
-  bannerLink:  { color: '#4F35F3', fontWeight: '600' },
+  optionActive: {
+    borderColor: PURPLE,
+    backgroundColor: '#EDE8FF',
+  },
+
+  optionLabel: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#1C1C1E',
+  },
+  optionLabelActive: {
+    fontWeight: '600',
+  },
+
+  radio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#C7C7CC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioActive: {
+    borderColor: PURPLE,
+    backgroundColor: PURPLE,
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    paddingTop: 8,
+  },
+  btn: {
+    backgroundColor: PURPLE,
+    borderRadius: 50,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  btnDisabled: { opacity: 0.35 },
+  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
 });

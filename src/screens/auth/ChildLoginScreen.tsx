@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, TouchableOpacity, Alert,
+  TextInput, TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import { cache } from '../../lib/cache';
+import { registerPushToken } from '../../lib/notifications';
 
 const PURPLE = '#4F35F3';
 const BG = '#EDE8FF';
@@ -15,7 +18,7 @@ const BG = '#EDE8FF';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'> };
 
 export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { child } = useApp();
+  const { child, setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass]  = useState(false);
@@ -23,29 +26,99 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
   const [passwordError, setPasswordError] = useState('');
   const [userFocused, setUserFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const canContinue = username.trim().length > 0 && password.length > 0;
 
-  const login = () => {
-    let ok = true;
-    if (username.trim() !== child.username) {
-      setUsernameError('Username not found.');
-      ok = false;
-    } else {
-      setUsernameError('');
+  const login = async () => {
+    const u = username.trim().toLowerCase();
+    const p = password;
+
+    // Try local context first (for accounts created in same session)
+    if (child.username && u === child.username && p === child.password) {
+      setIsChildLoggedIn(true);
+      navigation.navigate('ChildTabs');
+      return;
     }
-    if (password !== child.password) {
-      setPasswordError('Incorrect password or PIN.');
-      ok = false;
-    } else {
-      setPasswordError('');
+
+    // Fall back to Supabase
+    setLoading(true);
+    try {
+      const result = await db.loginChild(u, p);
+      if (!result) {
+        setUsernameError('Username or password incorrect.');
+        setPasswordError(' ');
+        return;
+      }
+      const { child: row, parent: par } = result;
+      setChild(c => ({
+        ...c,
+        displayName:   row.display_name,
+        username:      row.username,
+        password:      row.password,
+        avatarEmoji:   row.avatar_emoji,
+        trustScore:    row.trust_score,
+        balance:       row.wallet_balance,
+        loanedOut:     row.loaned_out,
+        borrowed:      row.borrowed,
+        streak:        row.streak,
+        repaid:        row.repaid,
+        missed:        row.missed,
+        totalBorrowed: row.total_borrowed,
+        totalLent:     row.total_lent,
+        timesBorrowed: row.times_borrowed ?? 0,
+        timesLent:     row.times_lent ?? 0,
+        points:        row.points,
+        age:           row.age,
+        mobile:        row.mobile ?? '',
+      }));
+      if (par) {
+        setParent(prev => ({
+          ...prev,
+          firstName:       par.first_name ?? '',
+          lastName:        par.last_name ?? '',
+          displayName:     par.first_name ?? '',
+          mobile:          par.mobile ?? '',
+          address:         par.address ?? '',
+          safetyPoolLimit: par.safety_pool_limit ?? 50,
+          weeklyAllowance: par.weekly_allowance ?? 10,
+          passcode:        par.passcode ?? '',
+        }));
+      }
+      setChildId(row.id);
+      await cache.saveChild({ username: row.username, password: row.password, childId: row.id });
+
+      // Register device for push notifications (best-effort, won't block login)
+      registerPushToken(row.id).catch(() => {});
+
+      // Load circle + pending requests — each independently so one failure can't block another
+      db.getCircle(row.id).then(members => {
+        setCircle(members.map(m => ({
+          id: m.id, displayName: m.display_name,
+          username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+        })));
+      }).catch(() => {});
+
+      db.getPendingRequests(row.id).then(requests => {
+        setPendingRequests(requests.map(r => ({
+          requestId: r.request_id, id: r.id, displayName: r.display_name,
+          username: r.username, avatarEmoji: r.avatar_emoji,
+          trustScore: r.trust_score, createdAt: r.created_at,
+        })));
+      }).catch(() => {});
+
+
+      setIsChildLoggedIn(true);
+      navigation.navigate('ChildTabs');
+    } catch (err: any) {
+      Alert.alert('Login error', String(err?.message ?? err));
+    } finally {
+      setLoading(false);
     }
-    if (ok) navigation.navigate('ChildTabs');
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Back button */}
       <TouchableOpacity
         style={styles.back}
         onPress={() => navigation.goBack()}
@@ -67,14 +140,13 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </Text>
 
-          {/* Username */}
           <View style={[styles.inputWrap, userFocused && styles.inputFocused, !!usernameError && styles.inputError]}>
             <TextInput
               style={styles.input}
               placeholder="Username"
               placeholderTextColor="#AEAEB2"
               value={username}
-              onChangeText={t => { setUsername(t); setUsernameError(''); }}
+              onChangeText={t => { setUsername(t); setUsernameError(''); setPasswordError(''); }}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
@@ -91,14 +163,13 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
             )
           }
 
-          {/* Password */}
           <View style={[styles.inputWrap, styles.inputWrapRow, passFocused && styles.inputFocused, !!passwordError && styles.inputError]}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
               placeholder="Password or card PIN"
               placeholderTextColor="#AEAEB2"
               value={password}
-              onChangeText={t => { setPassword(t); setPasswordError(''); }}
+              onChangeText={t => { setPassword(t); setPasswordError(''); setUsernameError(''); }}
               secureTextEntry={!showPass}
               autoCapitalize="none"
               autoCorrect={false}
@@ -119,15 +190,17 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           }
         </View>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.btn, !canContinue && styles.btnDisabled]}
+            style={[styles.btn, (!canContinue || loading) && styles.btnDisabled]}
             onPress={login}
-            disabled={!canContinue}
+            disabled={!canContinue || loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnText}>Continue</Text>
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.btnText}>Continue</Text>
+            }
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

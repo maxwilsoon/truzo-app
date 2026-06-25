@@ -86,7 +86,7 @@ export const HomeScreen: React.FC = () => {
         {/* Balance Card */}
         <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.balanceCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>£{(child.balance + child.borrowed - child.loanedOut).toFixed(2)}</Text>
+          <Text style={styles.balanceAmount}>£{child.balance.toFixed(2)}</Text>
           <TouchableOpacity style={[styles.requestBtn, frozenAccount && styles.requestBtnDisabled]} onPress={() => !frozenAccount && navigation.navigate('RequestMoney')} activeOpacity={0.85}>
             <View style={styles.requestIconWrap}>
               <Text style={{ fontSize: 18 }}>💸</Text>

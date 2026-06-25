@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
+import { useApp } from '../context/AppContext';
+import { db } from '../lib/database';
 import { ChildTabNavigator } from './ChildTabNavigator';
 import { ParentTabNavigator } from './ParentTabNavigator';
 import { CarouselScreen } from '../screens/onboarding/CarouselScreen';
@@ -19,6 +22,7 @@ import { WhoIsLoggingInScreen } from '../screens/auth/WhoIsLoggingInScreen';
 import { GetAppScreen } from '../screens/auth/GetAppScreen';
 import { ChildLoginScreen } from '../screens/auth/ChildLoginScreen';
 import { ParentPasscodeScreen } from '../screens/auth/ParentPasscodeScreen';
+import { ParentEmailLoginScreen } from '../screens/auth/ParentEmailLoginScreen';
 import { TrustStatsScreen } from '../screens/child/TrustStatsScreen';
 import { RequestMoneyScreen } from '../screens/child/RequestMoneyScreen';
 import { AvatarPickerScreen } from '../screens/child/AvatarPickerScreen';
@@ -33,12 +37,85 @@ import { RateTruzoScreen } from '../screens/shared/RateTruzoScreen';
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// ─── DEV ONLY: set to false to restore normal login ───────────────────────
+const DEV_AUTO_LOGIN = true;
+const DEV_ACCOUNTS = {
+  web:    { username: 'ava_m',   password: 'Ava12345'  }, // laptop / browser → Ava
+  native: { username: 'tyler_p', password: 'Tyler1234' }, // phone             → Tyler
+};
+// ───────────────────────────────────────────────────────────────────────────
+
 export const AppNavigator = () => {
+  const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
+  const [navReady, setNavReady] = useState(false);
+
+  useEffect(() => {
+    if (!navReady || !DEV_AUTO_LOGIN) return;
+    const { username, password } = Platform.OS === 'web' ? DEV_ACCOUNTS.web : DEV_ACCOUNTS.native;
+    db.loginChild(username, password).then(result => {
+      if (!result) return;
+      const { child: row, parent: par } = result;
+      setChild(c => ({
+        ...c,
+        displayName:   row.display_name,
+        username:      row.username,
+        password:      row.password,
+        avatarEmoji:   row.avatar_emoji,
+        trustScore:    row.trust_score,
+        balance:       row.wallet_balance,
+        loanedOut:     row.loaned_out,
+        borrowed:      row.borrowed,
+        streak:        row.streak,
+        repaid:        row.repaid,
+        missed:        row.missed,
+        totalBorrowed: row.total_borrowed,
+        totalLent:     row.total_lent,
+        timesBorrowed: row.times_borrowed ?? 0,
+        timesLent:     row.times_lent ?? 0,
+        points:        row.points,
+        age:           row.age,
+        mobile:        row.mobile ?? '',
+      }));
+      if (par) {
+        setParent(prev => ({
+          ...prev,
+          firstName:       par.first_name ?? '',
+          lastName:        par.last_name ?? '',
+          displayName:     par.first_name ?? '',
+          mobile:          par.mobile ?? '',
+          address:         par.address ?? '',
+          safetyPoolLimit: par.safety_pool_limit ?? 50,
+          weeklyAllowance: par.weekly_allowance ?? 10,
+          passcode:        par.passcode ?? '',
+        }));
+      }
+      setChildId(row.id);
+      db.getCircle(row.id).then(members => {
+        setCircle(members.map(m => ({
+          id: m.id, displayName: m.display_name,
+          username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+        })));
+      }).catch(() => {});
+      db.getPendingRequests(row.id).then(requests => {
+        setPendingRequests(requests.map(r => ({
+          requestId: r.request_id, id: r.id, displayName: r.display_name,
+          username: r.username, avatarEmoji: r.avatar_emoji,
+          trustScore: r.trust_score, createdAt: r.created_at,
+        })));
+      }).catch(() => {});
+      setIsChildLoggedIn(true);
+      navigationRef.navigate('ChildTabs' as never);
+    }).catch(() => {});
+  }, [navReady]);
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
       <Stack.Navigator
         initialRouteName="Carousel"
-        screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+        screenOptions={{
+          headerShown: false,
+          animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
+        }}
       >
         <Stack.Screen name="Carousel" component={CarouselScreen} />
         <Stack.Screen name="Email" component={EmailScreen} />
@@ -52,21 +129,22 @@ export const AppNavigator = () => {
         <Stack.Screen name="Verifying" component={VerifyingScreen} />
         <Stack.Screen name="ChildDetails" component={ChildDetailsScreen} />
         <Stack.Screen name="WhoIsLoggingIn" component={WhoIsLoggingInScreen} />
-        <Stack.Screen name="GetApp" component={GetAppScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="GetApp" component={GetAppScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
+        <Stack.Screen name="ParentEmailLogin" component={ParentEmailLoginScreen} />
         <Stack.Screen name="ChildLogin" component={ChildLoginScreen} />
         <Stack.Screen name="ParentPasscode" component={ParentPasscodeScreen} />
         <Stack.Screen name="ParentTabs" component={ParentTabNavigator} />
         <Stack.Screen name="ChildTabs" component={ChildTabNavigator} />
-        <Stack.Screen name="TrustStats" component={TrustStatsScreen} options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="RequestMoney" component={RequestMoneyScreen} options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="AvatarPicker" component={AvatarPickerScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="TrustStats" component={TrustStatsScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
+        <Stack.Screen name="RequestMoney" component={RequestMoneyScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
+        <Stack.Screen name="AvatarPicker" component={AvatarPickerScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
         <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
         <Stack.Screen name="ActivityFeed" component={ActivityFeedScreen} />
-        <Stack.Screen name="AddFriends" component={AddFriendsScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="AddFriends" component={AddFriendsScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
         <Stack.Screen name="ChildSettings" component={ChildSettingsScreen} />
         <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         <Stack.Screen name="ParentAccountDetails" component={ParentAccountDetailsScreen} />
-        <Stack.Screen name="RateTruzo" component={RateTruzoScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="RateTruzo" component={RateTruzoScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

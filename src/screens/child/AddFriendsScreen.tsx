@@ -1,71 +1,149 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert,
+  ScrollView, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
+import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import { sendPushNotification } from '../../lib/notifications';
 
-const MOCK_USERS = [
-  { id: 'u1', name: 'Maya Patel',    username: 'maya_p',  initial: 'M', color: '#7C3AED', trust: 65  },
-  { id: 'u2', name: 'Marcus Brown',  username: 'marc_b',  initial: 'M', color: '#3B82F6', trust: 78  },
-  { id: 'u3', name: 'Priya Sharma',  username: 'priya_s', initial: 'P', color: '#10B981', trust: 82  },
-  { id: 'u4', name: 'Sam Wilson',    username: 'sam_w',   initial: 'S', color: '#EF4444', trust: 45  },
-  { id: 'u5', name: 'Taylor Reed',   username: 'taylor_r',initial: 'T', color: '#F59E0B', trust: 91  },
-];
+type SearchResult = {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_emoji: string;
+  trust_score: number;
+};
 
-const INVITED = [
-  { id: 'i1', name: 'Jordan Lee', username: 'j_lee', initial: 'J', color: '#F59E0B', trust: 96 },
-];
-
-const TrustCircle = ({ score, variant }: { score: number; variant: 'purple' | 'cyan' }) => (
-  <View style={[styles.trustCircle, variant === 'purple' ? styles.trustCirclePurple : styles.trustCircleCyan]}>
-    <Text style={[styles.trustCircleText, { color: variant === 'purple' ? colors.primary : '#06B6D4' }]}>
-      {score}
-    </Text>
-  </View>
-);
+const AVATAR_COLORS = ['#7C3AED','#3B82F6','#10B981','#EF4444','#F59E0B','#EC4899','#06B6D4'];
+const colorFor = (id: string) => AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
 
 export const AddFriendsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { childId, child, circle } = useApp();
   const [search, setSearch] = useState('');
-  const [invited, setInvited] = useState<string[]>(INVITED.map(i => i.id));
-  const [added, setAdded] = useState<string[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const query = search.trim().toLowerCase();
-  const results = query.length > 0
-    ? MOCK_USERS.filter(
-        u => u.name.toLowerCase().includes(query) || u.username.toLowerCase().includes(query)
-      )
-    : [];
+  // circleIds: already in each other's circles (accepted)
+  const [circleIds, setCircleIds] = useState<Set<string>>(new Set());
+  // requestedIds: sent a request, not yet accepted — persists across circle polling cycles
+  const requestedIdsRef = useRef<Set<string>>(new Set());
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
 
-  const handleAdd = (id: string, name: string) => {
-    setAdded(prev => [...prev, id]);
-    Alert.alert('Request sent! 🎉', `A friend request has been sent to ${name}.`);
+  // Sync circle ids whenever circle state updates (from 5-sec polling)
+  useEffect(() => {
+    setCircleIds(new Set(circle.map(m => m.id)));
+  }, [circle]);
+
+  // On mount, seed requestedIds from DB so existing pending requests show correctly
+  useEffect(() => {
+    if (!childId) return;
+    db.getOutgoingPendingRequests(childId)
+      .then(rows => {
+        rows.forEach(r => requestedIdsRef.current.add(r.id));
+        setRequestedIds(new Set(requestedIdsRef.current));
+      })
+      .catch(() => {});
+  }, [childId]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = search.trim();
+    if (q.length < 2) { setResults([]); setError(''); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const rows = await db.searchChildren(q, childId ?? undefined);
+        setResults(rows);
+        if (rows.length === 0) setError(`No users found for "${q}"`);
+      } catch {
+        setError('Search failed. Check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+  }, [search, childId]);
+
+  const handleCancel = (user: SearchResult) => {
+    if (!childId) return;
+    const doCancel = async () => {
+      try {
+        await db.cancelCircleRequest(childId, user.id);
+        requestedIdsRef.current.delete(user.id);
+        setRequestedIds(new Set(requestedIdsRef.current));
+      } catch (e: any) {
+        Alert.alert('Error', e.message ?? 'Could not cancel request.');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Cancel your friend request to ${user.display_name}?`)) doCancel();
+    } else {
+      Alert.alert(
+        'Cancel request?',
+        `Remove your friend request to ${user.display_name}?`,
+        [
+          { text: 'Keep', style: 'cancel' },
+          { text: 'Cancel request', style: 'destructive', onPress: doCancel },
+        ]
+      );
+    }
   };
 
-  const handleCancelInvite = (id: string) => {
-    setInvited(prev => prev.filter(i => i !== id));
+  const handleAdd = async (user: SearchResult) => {
+    if (!childId) {
+      Alert.alert('Not logged in', 'Please log in again.');
+      return;
+    }
+    // Optimistically mark as requested immediately
+    requestedIdsRef.current.add(user.id);
+    setRequestedIds(new Set(requestedIdsRef.current));
+
+    try {
+      const pushToken = await db.sendCircleRequest(childId, user.id);
+      // Notify the recipient (best-effort)
+      if (pushToken) {
+        sendPushNotification(
+          pushToken,
+          'New friend request 👋',
+          `${child.displayName} wants to join your circle`,
+        ).catch(() => {});
+      }
+    } catch (e: any) {
+      // Revert on failure
+      requestedIdsRef.current.delete(user.id);
+      setRequestedIds(new Set(requestedIdsRef.current));
+      Alert.alert('Error', e.message ?? 'Could not send request.');
+    }
   };
+
+  const getButtonState = (userId: string): 'in_circle' | 'requested' | 'none' => {
+    if (circleIds.has(userId)) return 'in_circle';
+    if (requestedIds.has(userId)) return 'requested';
+    return 'none';
+  };
+
+  const query = search.trim();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Handle bar */}
       <View style={styles.handleBar} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Add Friends</Text>
-        </View>
+        <Text style={styles.title}>Add Friends</Text>
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={18} color="#6B7280" />
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={18} color="#9CA3AF" style={{ marginRight: 4 }} />
         <TextInput
@@ -77,82 +155,74 @@ export const AddFriendsScreen: React.FC = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
+        {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />}
+        {!loading && search.length > 0 && (
+          <TouchableOpacity onPress={() => { setSearch(''); setResults([]); setError(''); }}>
             <Ionicons name="close-circle" size={18} color="#9CA3AF" />
           </TouchableOpacity>
         )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* Search results */}
-        {query.length > 0 && (
+        {query.length >= 2 && (
           <>
-            <Text style={styles.sectionLabel}>RESULTS FOR "{query.toUpperCase()}"</Text>
-            {results.length === 0 ? (
+            {error ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>No users found for "{search}"</Text>
+                <Text style={styles.emptyText}>{error}</Text>
               </View>
-            ) : (
-              results.map(user => (
-                <View key={user.id} style={styles.userCard}>
-                  <View style={[styles.avatar, { backgroundColor: user.color }]}>
-                    <Text style={styles.avatarInitial}>{user.initial}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.userName}>{user.name}</Text>
-                    <Text style={styles.userHandle}>@{user.username}</Text>
-                  </View>
-                  <TrustCircle score={user.trust} variant="cyan" />
-                  {added.includes(user.id) ? (
-                    <View style={styles.sentBtn}>
-                      <Text style={styles.sentBtnText}>Sent ✓</Text>
+            ) : results.length > 0 ? (
+              <>
+                <Text style={styles.sectionLabel}>RESULTS FOR "{query.toUpperCase()}"</Text>
+                {results.map(user => {
+                  const state = getButtonState(user.id);
+                  return (
+                    <View key={user.id} style={styles.userCard}>
+                      <View style={[styles.avatar, { backgroundColor: colorFor(user.id) }]}>
+                        <Text style={styles.avatarInitial}>{user.avatar_emoji}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.userName}>{user.display_name}</Text>
+                        <Text style={styles.userHandle}>@{user.username}</Text>
+                      </View>
+                      <View style={styles.trustCircle}>
+                        <Text style={styles.trustText}>{user.trust_score}</Text>
+                      </View>
+
+                      {state === 'in_circle' && (
+                        <View style={styles.inCircleBtn}>
+                          <Ionicons name="checkmark" size={14} color="#16A34A" />
+                          <Text style={styles.inCircleBtnText}>Friends</Text>
+                        </View>
+                      )}
+                      {state === 'requested' && (
+                        <TouchableOpacity
+                          style={styles.requestedBtn}
+                          onPress={() => handleCancel(user)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="time-outline" size={14} color="#6B7280" />
+                          <Text style={styles.requestedBtnText}>Requested</Text>
+                        </TouchableOpacity>
+                      )}
+                      {state === 'none' && (
+                        <TouchableOpacity
+                          style={styles.addBtn}
+                          onPress={() => handleAdd(user)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="person-add-outline" size={15} color={colors.primary} />
+                          <Text style={styles.addBtnText}>Add</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.addBtn}
-                      onPress={() => handleAdd(user.id, user.name)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="person-add-outline" size={15} color={colors.primary} />
-                      <Text style={styles.addBtnText}>Add</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))
-            )}
+                  );
+                })}
+              </>
+            ) : null}
           </>
         )}
 
-        {/* Invited — awaiting reply */}
-        {invited.length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>INVITED · AWAITING REPLY</Text>
-            {INVITED.filter(i => invited.includes(i.id)).map(user => (
-              <View key={user.id} style={styles.userCard}>
-                <View style={[styles.avatar, { backgroundColor: user.color }]}>
-                  <Text style={styles.avatarInitial}>{user.initial}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.userName}>{user.name}</Text>
-                  <Text style={styles.userHandle}>@{user.username}</Text>
-                </View>
-                <TrustCircle score={user.trust} variant="purple" />
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => handleCancelInvite(user.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </>
-        )}
-
-        {/* Empty state when no search */}
-        {query.length === 0 && invited.length === 0 && (
+        {query.length < 2 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyEmoji}>👥</Text>
             <Text style={styles.emptyText}>Search for friends by name or username</Text>
@@ -172,15 +242,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center', marginTop: 10, marginBottom: 4,
   },
   header: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8,
   },
-  title: { fontSize: 26, fontWeight: '800', color: '#1A1A3E', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#6B7280', lineHeight: 22 },
+  title: { fontSize: 26, fontWeight: '800', color: '#1A1A3E' },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
-    marginTop: 4,
   },
 
   searchWrap: {
@@ -205,38 +273,37 @@ const styles = StyleSheet.create({
     padding: 14, borderWidth: 1, borderColor: '#EDE9FE',
   },
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  avatarInitial: { fontSize: 26 },
   userName: { fontSize: 16, fontWeight: '700', color: '#1A1A3E' },
   userHandle: { fontSize: 13, color: '#6B7280', marginTop: 2 },
 
   trustCircle: {
     width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2.5,
+    borderWidth: 2.5, borderColor: '#06B6D4', backgroundColor: '#ECFEFF',
   },
-  trustCirclePurple: { borderColor: colors.primary, backgroundColor: '#F5F3FF' },
-  trustCircleCyan: { borderColor: '#06B6D4', backgroundColor: '#ECFEFF' },
-  trustCircleText: { fontSize: 14, fontWeight: '800' },
+  trustText: { fontSize: 14, fontWeight: '800', color: '#06B6D4' },
 
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 9,
-    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F5F3FF',
   },
   addBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 
-  sentBtn: {
+  requestedBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F9FAFB',
   },
-  sentBtnText: { fontSize: 14, fontWeight: '700', color: '#9CA3AF' },
+  requestedBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
 
-  cancelBtn: {
-    borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F9FAFB',
+  inCircleBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: 1.5, borderColor: '#BBF7D0', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F0FDF4',
   },
-  cancelBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  inCircleBtnText: { fontSize: 14, fontWeight: '700', color: '#16A34A' },
 
   emptyCard: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyEmoji: { fontSize: 40 },
