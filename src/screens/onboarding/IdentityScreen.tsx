@@ -37,7 +37,7 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Identi
 export const IdentityScreen: React.FC<Props> = ({ navigation }) => (
   <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
     <BackButton />
-    <StepProgress current={6} total={8} />
+    <StepProgress current={7} total={8} />
 
     <View style={styles.content}>
       <Text style={styles.title}>{"Let's verify your\nidentity"}</Text>

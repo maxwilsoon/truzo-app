@@ -47,7 +47,7 @@ export const DisplayNameScreen: React.FC<Props> = ({ navigation }) => {
             style={[styles.btn, !name.trim() && styles.btnDisabled]}
             onPress={() => {
               setParent(p => ({ ...p, displayName: name.trim() }));
-              navigation.navigate('Identity');
+              navigation.navigate('HomeAddress');
             }}
             disabled={!name.trim()}
             activeOpacity={0.85}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useApp } from '../../context/AppContext';
 import { ActiveRequest } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { sendPushNotification } from '../../lib/notifications';
+import { fmtAmt } from '../../lib/utils';
 
 const DEADLINES = [
   { label: 'Tomorrow', value: '1d', days: 1 },
@@ -36,7 +37,7 @@ const REASONS = [
 
 export const RequestMoneyScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child, childId, parent, activeRequests, setActiveRequests, addActivity } = useApp();
+  const { child, childId, parent, activeRequests, setActiveRequests, addActivity, recordWeeklyStreak, frozenAccount } = useApp();
   const [amount, setAmount] = useState('');
   const [deadline, setDeadline] = useState('');
   const [reason, setReason] = useState('');
@@ -45,13 +46,46 @@ export const RequestMoneyScreen: React.FC = () => {
   const maxBorrow = Math.min(
     child.trustScore < 50 ? 20 : child.trustScore < 70 ? 30 : child.trustScore < 85 ? 50 : 100,
     parent.safetyPoolLimit - parent.safetyPoolUsed
-  ) - child.loanedOut;
+  );
 
   const amountNum = parseFloat(amount) || 0;
   const isAlreadyBorrowing = child.borrowed > 0 || activeRequests.some(r => r.isOwn && !r.isFunded);
-  const canSend = !isAlreadyBorrowing && amountNum > 0 && amountNum <= maxBorrow && deadline && (reason || otherReason.trim());
+  const canSend = !frozenAccount && !isAlreadyBorrowing && amountNum > 0 && amountNum <= maxBorrow && deadline && (reason || otherReason.trim());
 
   const [sending, setSending] = useState(false);
+
+  const handleSendPress = () => {
+    const overBalance = amountNum > child.balance;
+    const hasLoaned  = child.loanedOut > 0;
+
+    if (!overBalance && !hasLoaned) {
+      sendRequest();
+      return;
+    }
+
+    const lines: string[] = [];
+    if (overBalance) {
+      lines.push(`You're requesting £${fmtAmt(amountNum)} but only have £${fmtAmt(child.balance)} in your wallet.`);
+    }
+    if (hasLoaned) {
+      lines.push(`You also have £${fmtAmt(child.loanedOut)} loaned out to friends that hasn't been paid back yet.`);
+    }
+    lines.push('');
+    lines.push('💡 Tip: set your repayment date after you expect to receive that money back — this keeps you out of the safety pool for as long as possible.');
+
+    const message = lines.join('\n');
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Heads up\n\n${message}\n\nSend the request anyway?`)) {
+        sendRequest();
+      }
+    } else {
+      Alert.alert('Heads up 💡', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Send anyway', onPress: sendRequest },
+      ]);
+    }
+  };
 
   const sendRequest = async () => {
     if (!childId) return;
@@ -66,6 +100,7 @@ export const RequestMoneyScreen: React.FC = () => {
       const { requestId, pushTokens } = await db.createMoneyRequest(
         childId, amountNum, finalReason, finalEmoji, days,
       );
+      recordWeeklyStreak().catch(() => {});
 
       // Optimistically add to local state (polling will sync within 5s)
       const newRequest: ActiveRequest = {
@@ -85,9 +120,9 @@ export const RequestMoneyScreen: React.FC = () => {
       };
       setActiveRequests(prev => [newRequest, ...prev]);
       addActivity({
-        id: `a_req_${Date.now()}`,
+        id: `a_req_${requestId}`,
         emoji: '💸',
-        text: `You requested £${amountNum.toFixed(2)} for ${finalReason} — expires in 24h`,
+        text: `You requested £${fmtAmt(amountNum)} for ${finalReason} — expires in 24h`,
         time: 'Just now',
         type: 'request',
       });
@@ -97,7 +132,7 @@ export const RequestMoneyScreen: React.FC = () => {
         sendPushNotification(
           token,
           `💸 ${child.displayName} needs money`,
-          `${child.displayName} requested £${amountNum.toFixed(2)} for ${finalReason}`,
+          `${child.displayName} requested £${fmtAmt(amountNum)} for ${finalReason}`,
         ).catch(() => {});
       });
 
@@ -120,6 +155,15 @@ export const RequestMoneyScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {/* Safety pool gate */}
+        {parent.safetyPoolLimit === 0 && (
+          <View style={styles.safetyGate}>
+            <Ionicons name="shield-outline" size={20} color="#7C3AED" />
+            <Text style={styles.safetyGateText}>
+              Your parent hasn't set up a Safety Pool yet. Ask them to add one from their dashboard before you can borrow.
+            </Text>
+          </View>
+        )}
         {/* Amount */}
         <View style={styles.amountCard}>
           <Text style={styles.amountPrefix}>£</Text>
@@ -128,13 +172,13 @@ export const RequestMoneyScreen: React.FC = () => {
             value={amount}
             onChangeText={setAmount}
             keyboardType="decimal-pad"
-            placeholder="0.00"
+            placeholder="0"
             placeholderTextColor={colors.textLight}
             maxLength={6}
           />
         </View>
         <Text style={styles.limitNote}>
-          Max you can borrow: <Text style={{ color: colors.primary, fontWeight: '700' }}>£{maxBorrow.toFixed(2)}</Text>
+          Max you can borrow: <Text style={{ color: colors.primary, fontWeight: '700' }}>£{fmtAmt(maxBorrow)}</Text>
         </Text>
 
         {/* Deadline */}
@@ -188,7 +232,7 @@ export const RequestMoneyScreen: React.FC = () => {
             <Text style={styles.alreadyBorrowingText}>Already Borrowing</Text>
           </View>
         ) : (
-          <PrimaryButton label={sending ? 'Sending…' : 'Send Request 🚀'} onPress={sendRequest} disabled={!canSend || sending} />
+          <PrimaryButton label={sending ? 'Sending…' : 'Send Request 🚀'} onPress={handleSendPress} disabled={!canSend || sending} />
         )}
       </View>
     </SafeAreaView>
@@ -219,6 +263,8 @@ const styles = StyleSheet.create({
   reasonLabelActive: { color: colors.primary },
   otherInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 16, height: 48, justifyContent: 'center', backgroundColor: colors.surface },
   otherText: { fontSize: 15, color: colors.text },
+  safetyGate: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#F5F3FF', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#DDD6FE' },
+  safetyGateText: { flex: 1, fontSize: 14, color: '#4C1D95', lineHeight: 20 },
   infoBox: { backgroundColor: colors.primaryXLight, borderRadius: 12, padding: 14 },
   infoText: { fontSize: 13, color: colors.primary, lineHeight: 20 },
   footer: { padding: 20, paddingTop: 8 },

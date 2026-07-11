@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, FlatList, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, FlatList, Platform, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,19 +12,49 @@ import { ActiveRequest, useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { sendPushNotification } from '../../lib/notifications';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
+import { fmtAmt } from '../../lib/utils';
 
 const AVATAR_COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899'];
-const PAGE_WIDTH = Dimensions.get('window').width - 32; // 16px padding each side
-const ITEM_WIDTH = PAGE_WIDTH / 4;
+// 4 friend avatars visible at once; remainder scroll horizontally
+const CARD_INNER_W = Dimensions.get('window').width - 32;
+const FRIEND_AVATAR_SIZE = 52;
+const FRIEND_ITEM_W = Math.floor((CARD_INNER_W - 24) / 4);
 
 
 export const CircleScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { activeRequests, setActiveRequests, circle, setCircle, child, childId, setChild, addTransaction, addActivity, pendingRequests, setPendingRequests } = useApp();
+  const { activeRequests, setActiveRequests, circle, setCircle, child, childId, setChild, addTransaction, addActivity, removeActivity, pendingRequests, setPendingRequests, recordWeeklyStreak, frozenAccount } = useApp();
   const [tab, setTab] = useState<'activity' | 'history'>('activity');
-  const [friendPage, setFriendPage] = useState(0);
   const [fundingRequest, setFundingRequest] = useState<ActiveRequest | null>(null);
   const [repayingRequest, setRepayingRequest] = useState<ActiveRequest | null>(null);
+  const [loanHistory, setLoanHistory] = useState<Array<{
+    id: string; amount: number; reason: string; reasonEmoji: string;
+    createdAt: string; repaidAt: string | null; repayByDate: string;
+    status: string; isBorrower: boolean; repaidOnTime: boolean;
+    borrowerName: string; borrowerUsername: string; borrowerEmoji: string; borrowerAvatarUrl: string | null;
+    funderName: string; funderUsername: string; funderEmoji: string; funderAvatarUrl: string | null;
+  }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    if (!childId || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const rows = await db.getLoanHistory(childId);
+      setLoanHistory(rows.map(r => ({
+        id: r.id, amount: r.amount, reason: r.reason, reasonEmoji: r.reason_emoji,
+        createdAt: r.created_at, repaidAt: r.repaid_at, repayByDate: r.repay_by_date,
+        status: (r as any).status ?? 'repaid',
+        isBorrower: r.is_borrower, repaidOnTime: r.repaid_on_time,
+        borrowerName: r.borrower_name, borrowerUsername: r.borrower_username,
+        borrowerEmoji: r.borrower_emoji, borrowerAvatarUrl: r.borrower_avatar_url,
+        funderName: r.funder_name, funderUsername: r.funder_username,
+        funderEmoji: r.funder_emoji, funderAvatarUrl: r.funder_avatar_url,
+      })));
+    } catch { /* best-effort */ } finally { setHistoryLoading(false); }
+  }, [childId]);
+
+  useEffect(() => { if (tab === 'history') loadHistory(); }, [tab]);
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
@@ -36,6 +66,7 @@ export const CircleScreen: React.FC = () => {
           id: accepted.id, displayName: accepted.displayName,
           username: accepted.username, avatarEmoji: accepted.avatarEmoji,
           trustScore: accepted.trustScore,
+          profileImageUrl: accepted.profileImageUrl,
         }]);
         addActivity({
           id: `a_friend_${Date.now()}`,
@@ -81,6 +112,22 @@ export const CircleScreen: React.FC = () => {
       try {
         await db.removeFromCircle(childId, memberId);
         setCircle(prev => prev.filter(m => m.id !== memberId));
+
+        // Cancel any unfunded money requests from the removed member and remove
+        // them from the local active-requests list. The DB cancellation propagates
+        // to other circle members within their next 5-second poll.
+        const pendingToCancel = activeRequests.filter(
+          r => r.fromId === memberId && !r.isFunded,
+        );
+        if (pendingToCancel.length > 0) {
+          setActiveRequests(prev => prev.filter(
+            r => !(r.fromId === memberId && !r.isFunded),
+          ));
+          pendingToCancel.forEach(req => {
+            db.cancelMoneyRequest(req.id, memberId).catch(() => {});
+          });
+        }
+
         addActivity({
           id: `a_remove_${Date.now()}`,
           emoji: '👋',
@@ -148,6 +195,10 @@ export const CircleScreen: React.FC = () => {
   };
 
   const handleFund = (req: ActiveRequest) => {
+    if (frozenAccount) {
+      Alert.alert('Account frozen', 'Your account is frozen. Repay your parent to unlock lending.');
+      return;
+    }
     if (child.balance < req.amount) {
       Alert.alert('Insufficient balance', 'You don\'t have enough balance to fund this request.');
       return;
@@ -161,37 +212,46 @@ export const CircleScreen: React.FC = () => {
     setFundingRequest(null);
     try {
       const { borrowerPushToken } = await db.fundMoneyRequest(req.id, childId, req.amount);
+      // Sync streak from DB (RPC already incremented it)
+      recordWeeklyStreak().catch(() => {});
       setActiveRequests(prev => prev.map(r =>
         r.id === req.id ? { ...r, isFunded: true, fundedById: childId, fundedByName: child.displayName, fundedByEmoji: child.avatarEmoji } : r
       ));
+      // Mirror every stat the DB RPC updated
       setChild(c => ({
         ...c,
-        balance: c.balance - req.amount,
-        loanedOut: c.loanedOut + req.amount,
+        balance:    c.balance    - req.amount,
+        loanedOut:  c.loanedOut  + req.amount,
+        totalLent:  c.totalLent  + req.amount,
+        timesLent:  c.timesLent  + 1,
         trustScore: Math.min(100, c.trustScore + 2),
-        points: c.points + 2,
+        points:     c.points     + 2,
       }));
+      // Resolve @username for activity / transaction description
+      const borrowerUser = circle.find(m => m.id === req.fromId)?.username ?? req.fromName;
+      // Activity written to DB by addActivity; uses predictable id so poll deduplicates by id.
       addActivity({
-        id: `a_fund_${Date.now()}`,
+        id:    `fund_${req.id}`,
         emoji: '💚',
-        text: `You funded ${req.fromName}'s request for £${req.amount.toFixed(2)} · +2 pts`,
-        time: 'Just now',
-        type: 'funded',
+        text:  `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`,
+        time:  'Just now',
+        type:  'funded',
       });
+      // Local-only transaction; poll overwrites with DB copy within 5 s
       addTransaction({
-        id: `t_fund_${Date.now()}`,
-        type: 'lend',
-        amount: -req.amount,
-        description: `Funded ${req.fromName}'s request`,
-        date: 'Just now',
+        id:          `t_fund_${Date.now()}`,
+        type:        'lend',
+        amount:      -req.amount,
+        description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`,
+        date:        'Just now',
         counterparty: req.fromName,
-        status: 'active',
+        status:      'active',
       });
       if (borrowerPushToken) {
         sendPushNotification(
           borrowerPushToken,
           `💚 ${child.displayName} funded your request!`,
-          `${child.displayName} sent you £${req.amount.toFixed(2)} for ${req.reason}`,
+          `${child.displayName} sent you £${fmtAmt(req.amount)} for ${req.reason}`,
         ).catch(() => {});
       }
     } catch (e: any) {
@@ -216,38 +276,52 @@ export const CircleScreen: React.FC = () => {
     const req = repayingRequest;
     setRepayingRequest(null);
     try {
-      const { funderPushToken } = await db.repayMoneyRequest(req.id, childId);
+      const { funderPushToken, amount: paidAmount } = await db.repayMoneyRequest(req.id, childId);
+      const amt = paidAmount ?? req.amount;
       setActiveRequests(prev => prev.filter(r => r.id !== req.id));
+
+      // The repay_money_request RPC already handles:
+      //   - funder's wallet_balance +
+      //   - funder's loaned_out -
+      //   - borrower's wallet_balance -
+      //   - borrower's borrowed, repaid, trust_score, points
+      //   - transactions for BOTH parties
+      //   - funder's activity_feed entry ('recv_' || requestId)
+      // We only need local optimistic updates + borrower's own activity entry.
       setChild(c => ({
         ...c,
-        balance: c.balance - req.amount,
-        borrowed: Math.max(0, c.borrowed - req.amount),
+        balance:    c.balance    - amt,
+        borrowed:   Math.max(0, c.borrowed - amt),
         trustScore: Math.min(100, c.trustScore + 5),
-        points: c.points + 5,
-        streak: c.streak + 1,
-        repaid: c.repaid + 1,
+        points:     c.points     + 5,
+        repaid:     c.repaid     + 1,
+        // streak: let the 5-second poll sync from DB (it's per-week logic in the RPC)
       }));
+      // Resolve @username for descriptions
+      const funderUser = circle.find(m => m.id === req.fundedById)?.username ?? req.fundedByName ?? 'friend';
+      // Borrower's activity — predictable id, written to DB by addActivity
       addActivity({
-        id: `a_repay_${Date.now()}`,
+        id:    `repay_${req.id}`,
         emoji: '✅',
-        text: `You repaid £${req.amount.toFixed(2)} to ${req.fundedByName ?? 'your friend'} · +5 pts`,
-        time: 'Just now',
-        type: 'repaid',
+        text:  `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`,
+        time:  'Just now',
+        type:  'repaid',
       });
+      // Local-only transaction; poll overwrites with DB copy within 5 s
       addTransaction({
-        id: `t_repay_${Date.now()}`,
-        type: 'repay',
-        amount: -req.amount,
-        description: `Repaid ${req.fundedByName ?? 'friend'}`,
-        date: 'Just now',
+        id:          `t_repay_${Date.now()}`,
+        type:        'repay',
+        amount:      -amt,
+        description: `Repaid £${fmtAmt(amt)} to @${funderUser}`,
+        date:        'Just now',
         counterparty: req.fundedByName,
-        status: 'completed',
+        status:      'completed',
       });
       if (funderPushToken) {
         sendPushNotification(
           funderPushToken,
           `✅ ${child.displayName} repaid you!`,
-          `${child.displayName} repaid £${req.amount.toFixed(2)}`,
+          `${child.displayName} repaid £${fmtAmt(amt)}`,
         ).catch(() => {});
       }
     } catch (e: any) {
@@ -258,40 +332,39 @@ export const CircleScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => navigation.navigate('AddFriends')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="person-add-outline" size={15} color={colors.primary} />
-          <Text style={styles.addBtnText}>Add friend</Text>
-        </TouchableOpacity>
-      </View>
-
-
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-        {/* Friends avatar row — 4 per page, swipeable */}
-        <View style={styles.friendsScrollOuter}>
+        {/* Friends card */}
+        <View style={styles.friendsCard}>
+          <View style={styles.friendsCardHeader}>
+            <Text style={styles.friendsCardTitle}>Friends</Text>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => navigation.navigate('AddFriends')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addBtnText}>+ Add</Text>
+            </TouchableOpacity>
+          </View>
           <FlatList
             data={circle}
             horizontal
-            pagingEnabled
             showsHorizontalScrollIndicator={false}
             keyExtractor={m => m.id}
-            getItemLayout={(_, index) => ({ length: ITEM_WIDTH, offset: ITEM_WIDTH * index, index })}
-            onMomentumScrollEnd={e => {
-              const page = Math.round(e.nativeEvent.contentOffset.x / PAGE_WIDTH);
-              setFriendPage(page);
-            }}
+            contentContainerStyle={styles.friendsList}
+            decelerationRate="fast"
             renderItem={({ item: m }) => (
-              <View style={styles.friendAvatarWrap}>
+              <View style={styles.friendItem}>
                 <View style={styles.friendAvatarContainer}>
-                  <View style={styles.friendAvatar}>
-                    <Text style={styles.friendAvatarEmoji}>{m.avatarEmoji}</Text>
-                  </View>
+                  {m.profileImageUrl ? (
+                    <View style={styles.friendAvatarPhotoWrap}>
+                      <Image source={{ uri: m.profileImageUrl }} style={styles.friendAvatarPhoto} resizeMode="cover" />
+                    </View>
+                  ) : (
+                    <View style={styles.friendAvatarBubble}>
+                      <Text style={styles.friendAvatarEmoji}>{m.avatarEmoji}</Text>
+                    </View>
+                  )}
                   <TouchableOpacity
                     style={styles.removeBtn}
                     onPress={() => handleRemoveFriend(m.id, m.displayName)}
@@ -301,9 +374,14 @@ export const CircleScreen: React.FC = () => {
                     <Ionicons name="close" size={10} color="#fff" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.friendAvatarName}>{m.displayName.split(' ')[0]}</Text>
+                <Text style={styles.friendUsername} numberOfLines={1}>@{m.username}</Text>
               </View>
             )}
+            ListEmptyComponent={
+              <View style={styles.friendsEmpty}>
+                <Text style={styles.friendsEmptyText}>No friends yet — tap Add to invite someone!</Text>
+              </View>
+            }
           />
         </View>
 
@@ -314,22 +392,19 @@ export const CircleScreen: React.FC = () => {
             onPress={() => setTab('activity')}
           >
             <Text style={[styles.tabText, tab === 'activity' && styles.tabTextActive]}>Activity</Text>
-            <View style={[styles.tabBadge, tab === 'activity' && styles.tabBadgeActive]}>
-              <Text style={[styles.tabBadgeText, tab === 'activity' && styles.tabBadgeTextActive]}>
-                {pendingRequests.length + activeRequests.length}
-              </Text>
-            </View>
+            {(pendingRequests.length + activeRequests.filter(r => !r.isOwn).length) > 0 && (
+              <View style={[styles.tabBadge, tab === 'activity' && styles.tabBadgeActive]}>
+                <Text style={[styles.tabBadgeText, tab === 'activity' && styles.tabBadgeTextActive]}>
+                  {pendingRequests.length + activeRequests.filter(r => !r.isOwn).length}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, tab === 'history' && styles.tabActive]}
             onPress={() => setTab('history')}
           >
             <Text style={[styles.tabText, tab === 'history' && styles.tabTextActive]}>History</Text>
-            <View style={[styles.tabBadge, tab === 'history' && styles.tabBadgeActive]}>
-              <Text style={[styles.tabBadgeText, tab === 'history' && styles.tabBadgeTextActive]}>
-                0
-              </Text>
-            </View>
           </TouchableOpacity>
         </View>
 
@@ -348,9 +423,15 @@ export const CircleScreen: React.FC = () => {
                 {pendingRequests.map(req => (
                   <View key={req.requestId} style={[styles.activeLoanCard, styles.friendReqCard]}>
                     <View style={styles.loanRow}>
-                      <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                        <Text style={{ fontSize: 22 }}>{req.avatarEmoji}</Text>
-                      </View>
+                      {req.profileImageUrl ? (
+                        <View style={[styles.avatarCircle, { marginRight: 12, overflow: 'hidden', backgroundColor: 'transparent' }]}>
+                          <Image source={{ uri: req.profileImageUrl }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+                        </View>
+                      ) : (
+                        <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
+                          <Text style={{ fontSize: 22 }}>{req.avatarEmoji}</Text>
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.loanTitle}>{req.displayName} wants to join your circle</Text>
                         <Text style={styles.loanSub}>@{req.username} · Trust score: {req.trustScore}</Text>
@@ -406,13 +487,13 @@ export const CircleScreen: React.FC = () => {
                     <Text style={{ fontSize: 22 }}>{req.fundedByEmoji ?? '💚'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>£{req.amount.toFixed(2)} in your wallet</Text>
+                    <Text style={styles.loanTitle}>£{fmtAmt(req.amount)} in your wallet</Text>
                     <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
                   </View>
                 </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{req.amount.toFixed(2)}</Text>
+                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
                     <Text style={styles.infoCellLabel}>borrowed</Text>
                   </View>
                   <View style={styles.infoDivider} />
@@ -428,7 +509,7 @@ export const CircleScreen: React.FC = () => {
                 </View>
                 <TouchableOpacity style={styles.repayBtn} onPress={() => handleRepay(req)} activeOpacity={0.85}>
                   <Ionicons name="arrow-undo-outline" size={18} color="#fff" />
-                  <Text style={styles.repayBtnText}>Repay £{req.amount.toFixed(2)}</Text>
+                  <Text style={styles.repayBtnText}>Repay £{fmtAmt(req.amount)}</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -436,23 +517,25 @@ export const CircleScreen: React.FC = () => {
             {/* ── YOUR OWN REQUESTS (waiting to be funded) ── */}
             {activeRequests.filter(r => r.isOwn && !r.isFunded).map(req => (
               <View key={req.id} style={[styles.activeLoanCard, styles.ownRequestCard]}>
-                <Text style={styles.cardTime}>{req.createdAt}</Text>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                    <Text style={{ fontSize: 20 }}>{req.fromEmoji}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>You requested £{req.amount.toFixed(2)}</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason} · waiting for your circle</Text>
-                  </View>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTime}>{req.createdAt}</Text>
                   <View style={styles.expiryPill}>
                     <Ionicons name="time-outline" size={12} color="#D97706" />
                     <Text style={styles.expiryText}>{req.expiresIn}h left</Text>
                   </View>
                 </View>
+                <View style={styles.loanRow}>
+                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
+                    <Text style={{ fontSize: 20 }}>{req.fromEmoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.loanTitle}>You requested £{fmtAmt(req.amount)}</Text>
+                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason} · waiting for your circle</Text>
+                  </View>
+                </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{req.amount.toFixed(2)}</Text>
+                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
                     <Text style={styles.infoCellLabel}>amount</Text>
                   </View>
                   <View style={styles.infoDivider} />
@@ -470,7 +553,10 @@ export const CircleScreen: React.FC = () => {
                   style={styles.cancelRequestBtn}
                   onPress={async () => {
                     setActiveRequests(prev => prev.filter(r => r.id !== req.id));
+                    removeActivity(`a_req_${req.id}`);
+                    removeActivity(`moneyreq_${req.id}`);
                     if (childId) db.cancelMoneyRequest(req.id, childId).catch(() => {});
+                    db.removeRequestActivities(req.id).catch(() => {});
                   }}
                   activeOpacity={0.8}
                 >
@@ -482,23 +568,25 @@ export const CircleScreen: React.FC = () => {
             {/* ── 3. FRIENDS REQUESTING MONEY (pending) ── */}
             {activeRequests.filter(r => !r.isOwn && !r.isFunded).map(req => (
               <View key={req.id} style={styles.activeLoanCard}>
-                <Text style={styles.cardTime}>{req.createdAt}</Text>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                    <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>{req.fromName} needs £{req.amount.toFixed(2)}</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
-                  </View>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTime}>{req.createdAt}</Text>
                   <View style={styles.expiryPill}>
                     <Ionicons name="time-outline" size={12} color="#D97706" />
                     <Text style={styles.expiryText}>{req.expiresIn}h left</Text>
                   </View>
                 </View>
+                <View style={styles.loanRow}>
+                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
+                    <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.loanTitle}>{req.fromName} needs £{fmtAmt(req.amount)}</Text>
+                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
+                  </View>
+                </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{req.amount.toFixed(2)}</Text>
+                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
                     <Text style={styles.infoCellLabel}>amount</Text>
                   </View>
                   <View style={styles.infoDivider} />
@@ -538,11 +626,11 @@ export const CircleScreen: React.FC = () => {
                     <Text style={styles.loanTitle}>You funded {req.fromName}</Text>
                     <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
                   </View>
-                  <Text style={styles.loanAmount}>£{req.amount.toFixed(2)}</Text>
+                  <Text style={styles.loanAmount}>£{fmtAmt(req.amount)}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{req.amount.toFixed(2)}</Text>
+                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
                     <Text style={styles.infoCellLabel}>lent</Text>
                   </View>
                   <View style={styles.infoDivider} />
@@ -568,12 +656,80 @@ export const CircleScreen: React.FC = () => {
             <View style={styles.sectionRow}>
               <Ionicons name="time-outline" size={18} color="#1A1A3E" />
               <Text style={styles.sectionHeading}>History</Text>
+              <TouchableOpacity onPress={loadHistory} style={{ marginLeft: 'auto' }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>📋</Text>
-              <Text style={styles.emptyTitle}>No history yet</Text>
-              <Text style={styles.emptySubtitle}>Completed loans and repayments will appear here.</Text>
-            </View>
+
+            {historyLoading && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptySubtitle}>Loading…</Text>
+              </View>
+            )}
+
+            {!historyLoading && loanHistory.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>📋</Text>
+                <Text style={styles.emptyTitle}>No history yet</Text>
+                <Text style={styles.emptySubtitle}>Completed loans and repayments will appear here once you repay or get repaid.</Text>
+              </View>
+            )}
+
+            {loanHistory.map(loan => {
+              const formatDate = (iso: string | null) => {
+                if (!iso) return '—';
+                const d = new Date(iso);
+                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              };
+              const counterparty = loan.isBorrower ? loan.funderName : loan.borrowerName;
+              const counterpartyUser = loan.isBorrower ? loan.funderUsername : loan.borrowerUsername;
+              const counterpartyEmoji = loan.isBorrower ? loan.funderEmoji : loan.borrowerEmoji;
+              const counterpartyAvatar = loan.isBorrower ? loan.funderAvatarUrl : loan.borrowerAvatarUrl;
+
+              return (
+                <View key={loan.id} style={[styles.activeLoanCard, { borderWidth: 1, borderColor: loan.repaidOnTime ? '#D1FAE5' : '#FEE2E2' }]}>
+                  <View style={styles.loanRow}>
+                    {counterpartyAvatar ? (
+                      <View style={[styles.avatarCircle, { marginRight: 12, overflow: 'hidden', backgroundColor: 'transparent' }]}>
+                        <Image source={{ uri: counterpartyAvatar }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+                      </View>
+                    ) : (
+                      <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
+                        <Text style={{ fontSize: 22 }}>{counterpartyEmoji}</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.loanTitle}>
+                        {loan.isBorrower ? 'Borrowed from' : 'Lent to'} @{counterpartyUser}
+                      </Text>
+                      <Text style={styles.loanSub}>{loan.reasonEmoji} {loan.reason}</Text>
+                    </View>
+                    <Text style={styles.loanAmount}>£{fmtAmt(loan.amount)}</Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoCell}>
+                      <Text style={styles.infoCellValue}>{formatDate(loan.createdAt)}</Text>
+                      <Text style={styles.infoCellLabel}>started</Text>
+                    </View>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoCell}>
+                      <Text style={styles.infoCellValue}>{formatDate(loan.repaidAt)}</Text>
+                      <Text style={styles.infoCellLabel}>repaid</Text>
+                    </View>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoCell}>
+                      <View style={[styles.fundedBadge, { backgroundColor: loan.repaidOnTime ? '#F0FDF4' : '#FEF2F2' }]}>
+                        <Ionicons name={loan.repaidOnTime ? 'checkmark-circle' : 'close-circle'} size={13} color={loan.repaidOnTime ? '#16A34A' : colors.error} />
+                        <Text style={[styles.fundedBadgeText, { color: loan.repaidOnTime ? '#16A34A' : colors.error }]}>
+                          {loan.repaidOnTime ? 'On time' : loan.status === 'defaulted' ? 'Defaulted' : 'Late'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
           </>
         )}
 
@@ -588,7 +744,7 @@ export const CircleScreen: React.FC = () => {
         subtitle={`${fundingRequest?.reasonEmoji ?? ''} ${fundingRequest?.reason ?? ''}`}
         amount={fundingRequest?.amount ?? 0}
         balanceAfter={child.balance - (fundingRequest?.amount ?? 0)}
-        confirmLabel={`Fund £${(fundingRequest?.amount ?? 0).toFixed(2)}`}
+        confirmLabel={`Fund £${fmtAmt(fundingRequest?.amount ?? 0)}`}
         confirmColor={colors.primary}
         onConfirm={confirmFund}
         onCancel={() => setFundingRequest(null)}
@@ -602,7 +758,7 @@ export const CircleScreen: React.FC = () => {
         subtitle={`${repayingRequest?.reasonEmoji ?? ''} ${repayingRequest?.reason ?? ''}`}
         amount={repayingRequest?.amount ?? 0}
         balanceAfter={child.balance - (repayingRequest?.amount ?? 0)}
-        confirmLabel={`Repay £${(repayingRequest?.amount ?? 0).toFixed(2)}`}
+        confirmLabel={`Repay £${fmtAmt(repayingRequest?.amount ?? 0)}`}
         confirmColor="#16A34A"
         onConfirm={confirmRepay}
         onCancel={() => setRepayingRequest(null)}
@@ -616,49 +772,45 @@ export const CircleScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F4FC' },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
-    paddingHorizontal: 20, paddingVertical: 14,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0EFF8',
+  // Friends card
+  friendsCard: {
+    backgroundColor: '#fff', borderRadius: 20, paddingTop: 12, paddingBottom: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
   },
+  friendsCardHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, marginBottom: 8,
+  },
+  friendsCardTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A3E' },
   addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: colors.primaryLight, borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 8,
+    paddingHorizontal: 12, paddingVertical: 5,
   },
   addBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 10,
-    borderRadius: 14, paddingHorizontal: 14, height: 48,
-    borderWidth: 1.5, borderColor: colors.primaryLight,
-  },
-  searchInput: { flex: 1, fontSize: 15, color: '#1A1A3E' },
-  searchResults: {
-    marginHorizontal: 16, marginTop: 4,
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-  },
-  searchNoResult: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-
-  // Friends avatar row at top
-  friendsScrollOuter: { backgroundColor: '#fff', borderRadius: 20 },
-  friendAvatarWrap: { width: ITEM_WIDTH, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 6 },
+  // Friends avatar row — compact, 4 per view, horizontally scrollable
+  friendsList: { paddingHorizontal: 12, paddingBottom: 14 },
+  friendItem: { width: FRIEND_ITEM_W, alignItems: 'center', paddingVertical: 6, gap: 5 },
   friendAvatarContainer: { position: 'relative' },
   removeBtn: {
-    position: 'absolute', top: -4, right: -4,
+    position: 'absolute', top: -2, right: -2,
     width: 18, height: 18, borderRadius: 9,
     backgroundColor: '#EF4444',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: '#fff',
   },
-  friendAvatar: {
-    width: 52, height: 52, borderRadius: 26,
+  friendAvatarPhotoWrap: { width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE, borderRadius: FRIEND_AVATAR_SIZE / 2, overflow: 'hidden' },
+  friendAvatarPhoto: { width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE },
+  friendAvatarBubble: {
+    width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE, borderRadius: FRIEND_AVATAR_SIZE / 2,
     backgroundColor: colors.primaryLight,
     alignItems: 'center', justifyContent: 'center',
   },
-  friendAvatarEmoji: { fontSize: 26 },
-  friendAvatarName: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  friendAvatarEmoji: { fontSize: 24 },
+  friendUsername: { fontSize: 11, fontWeight: '600', color: '#1A1A3E', textAlign: 'center', maxWidth: FRIEND_ITEM_W - 8 },
+  friendsEmpty: { paddingHorizontal: 4, paddingBottom: 14, paddingTop: 4, justifyContent: 'center' },
+  friendsEmptyText: { fontSize: 13, color: colors.textSecondary },
 
   // Tabs
   tabsWrap: {
@@ -691,8 +843,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
     position: 'relative',
   },
+  cardHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 10,
+  },
   cardTime: {
-    position: 'absolute', top: 12, right: 14,
     fontSize: 11, color: colors.textLight, fontWeight: '500',
   },
   needsRepayBadge: {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,9 +8,11 @@ import { TrustScoreRing } from '../../components/TrustScoreRing';
 import { PaymentSheet } from '../../components/PaymentSheet';
 import { MoneySheet } from '../../components/MoneySheet';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import { fmtAmt } from '../../lib/utils';
 
 export const ParentHomeScreen: React.FC = () => {
-  const { child, parent, setParent, setChild, addActivity, addTransaction, frozenAccount, parentDebt, repayParent } = useApp();
+  const { child, parent, setParent, setChild, addActivity, addTransaction, frozenAccount, parentDebt, repayParent, userId, childId, activityFeed, topUpSafetyPool, saveAllowanceToDb } = useApp();
   const [topUpVisible, setTopUpVisible] = useState(false);
   const [allowanceVisible, setAllowanceVisible] = useState(false);
   const [sendMoneyVisible, setSendMoneyVisible] = useState(false);
@@ -18,15 +20,12 @@ export const ParentHomeScreen: React.FC = () => {
   const [topUpPaymentAmount, setTopUpPaymentAmount] = useState(0);
   const [sendPaymentVisible, setSendPaymentVisible] = useState(false);
   const [sendPaymentAmount, setSendPaymentAmount] = useState(0);
+  const [sending, setSending] = useState(false);
   const tier = getTierInfo(child.trustScore);
   const poolPercent = (parent.safetyPoolUsed / parent.safetyPoolLimit) * 100;
 
-  const ACTIVITY = [
-    { id: '1', emoji: '🔔', text: 'Alex requested £15 for gaming', time: '2h ago' },
-    { id: '2', emoji: '💚', text: "Alex funded Maya's request · +2 pts", time: '1d ago' },
-    { id: '3', emoji: '📈', text: "Alex's trust score reached 50", time: '3d ago' },
-    { id: '4', emoji: '✅', text: 'Alex repaid Jordan on time · +1 streak', time: '5d ago' },
-  ];
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  const parentActivity = showAllActivity ? activityFeed : activityFeed.slice(0, 3);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -34,9 +33,6 @@ export const ParentHomeScreen: React.FC = () => {
         <View>
           <Text style={styles.headerGreeting}>Hello, {parent.displayName}</Text>
           <Text style={styles.headerSub}>Parent dashboard</Text>
-        </View>
-        <View style={styles.headerAvatar}>
-          <Ionicons name="person-outline" size={24} color={colors.primary} />
         </View>
       </View>
 
@@ -58,18 +54,18 @@ export const ParentHomeScreen: React.FC = () => {
             <View style={styles.childStatsRight}>
               <View style={styles.childStatRow}>
                 <Text style={styles.childStatLabel}>Balance</Text>
-                <Text style={styles.childStatValue}>£{child.balance.toFixed(2)}</Text>
+                <Text style={styles.childStatValue}>£{fmtAmt(child.balance)}</Text>
               </View>
               <View style={styles.childStatRow}>
                 <Text style={styles.childStatLabel}>Lent to friends</Text>
-                <Text style={[styles.childStatValue, { color: colors.warning }]}>£{child.loanedOut.toFixed(2)}</Text>
+                <Text style={[styles.childStatValue, { color: colors.warning }]}>£{fmtAmt(child.loanedOut)}</Text>
               </View>
               <View style={styles.childStatRow}>
                 <Text style={styles.childStatLabel}>Owes to circle</Text>
-                <Text style={[styles.childStatValue, { color: child.borrowed > 0 ? colors.error : colors.success }]}>£{child.borrowed.toFixed(2)}</Text>
+                <Text style={[styles.childStatValue, { color: child.borrowed > 0 ? colors.error : colors.success }]}>£{fmtAmt(child.borrowed)}</Text>
               </View>
               <View style={styles.childStatRow}>
-                <Text style={styles.childStatLabel}>Streak</Text>
+                <Text style={styles.childStatLabel}>Week Streak</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="flame-outline" size={14} color="#F97316" />
                   <Text style={styles.childStatValue}>{child.streak}</Text>
@@ -93,7 +89,7 @@ export const ParentHomeScreen: React.FC = () => {
                     <Text style={styles.frozenTitle}>Account frozen</Text>
                   </View>
                   <Text style={styles.frozenText}>
-                    {child.displayName} missed a loan repayment — £{parentDebt.toFixed(2)} was auto-paid from your safety pool. Once they repay you, confirm below to unfreeze their account.
+                    {child.displayName} missed a loan repayment — £{fmtAmt(parentDebt)} was auto-paid from your safety pool. Once they repay you, confirm below to unfreeze their account.
                   </Text>
                 </View>
               </View>
@@ -105,14 +101,14 @@ export const ParentHomeScreen: React.FC = () => {
                   addActivity({
                     id: `a_repayparent_${Date.now()}`,
                     emoji: '✅',
-                    text: `${parent.displayName} confirmed repayment of £${parentDebt.toFixed(2)} · ${child.displayName}'s account unfrozen`,
+                    text: `${parent.displayName} confirmed repayment of £${fmtAmt(parentDebt)} · ${child.displayName}'s account unfrozen`,
                     time: 'Just now',
                     type: 'repaid',
                   });
                 }}
               >
                 <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                <Text style={styles.confirmRepayText}>Confirm repayment of £{parentDebt.toFixed(2)}</Text>
+                <Text style={styles.confirmRepayText}>Confirm repayment of £{fmtAmt(parentDebt)}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -149,7 +145,11 @@ export const ParentHomeScreen: React.FC = () => {
           <TouchableOpacity style={styles.actionBtn} onPress={() => setAllowanceVisible(true)}>
             <View style={styles.actionIcon}><Ionicons name="wallet-outline" size={24} color={colors.primary} /></View>
             <Text style={styles.actionLabel}>Set Allowance</Text>
-            <Text style={styles.actionValue}>£{parent.weeklyAllowance}/wk</Text>
+            <Text style={styles.actionValue}>
+              {parent.allowanceActive
+                ? `£${parent.weeklyAllowance}/${parent.allowanceFrequency === 'fortnightly' ? '2wk' : parent.allowanceFrequency === 'monthly' ? 'mo' : 'wk'}`
+                : 'Not set'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => setSendMoneyVisible(true)}>
             <View style={styles.actionIcon}><Ionicons name="send-outline" size={24} color={colors.primary} /></View>
@@ -164,9 +164,18 @@ export const ParentHomeScreen: React.FC = () => {
             <Ionicons name="flash-outline" size={16} color={colors.gold} />
             <Text style={styles.sectionTitle}>Recent Activity</Text>
           </View>
+          {activityFeed.length > 3 && (
+            <TouchableOpacity onPress={() => setShowAllActivity(v => !v)}>
+              <Text style={styles.viewAllText}>{showAllActivity ? 'Show less' : 'View all'}</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.activityList}>
-          {ACTIVITY.map(a => (
+          {parentActivity.length === 0 ? (
+            <View style={styles.activityRow}>
+              <Text style={[styles.activityText, { color: colors.textLight }]}>No recent activity yet.</Text>
+            </View>
+          ) : parentActivity.map(a => (
             <View key={a.id} style={styles.activityRow}>
               <View style={styles.activityIcon}><Text style={{ fontSize: 18 }}>{a.emoji}</Text></View>
               <View style={{ flex: 1 }}>
@@ -215,7 +224,7 @@ export const ParentHomeScreen: React.FC = () => {
         amount={topUpPaymentAmount}
         description="Top up Safety Pool"
         onSuccess={() => {
-          setParent(p => ({ ...p, safetyPoolLimit: p.safetyPoolLimit + topUpPaymentAmount }));
+          topUpSafetyPool(topUpPaymentAmount).catch(() => {});
           setTopUpPaymentVisible(false);
         }}
         onCancel={() => {
@@ -229,24 +238,30 @@ export const ParentHomeScreen: React.FC = () => {
         visible={sendPaymentVisible}
         amount={sendPaymentAmount}
         description={`Send to ${child.displayName}`}
-        onSuccess={() => {
-          setChild(c => ({ ...c, balance: c.balance + sendPaymentAmount }));
-          addTransaction({
-            id: `tx_send_${Date.now()}`,
-            type: 'topup',
-            amount: sendPaymentAmount,
-            description: `Money from ${parent.displayName}`,
-            date: 'Just now',
-            status: 'completed',
-          });
-          addActivity({
-            id: `a_topup_${Date.now()}`,
-            emoji: '💸',
-            text: `${parent.displayName} sent you £${sendPaymentAmount.toFixed(2)}`,
-            time: 'Just now',
-            type: 'topup',
-          });
-          setSendPaymentVisible(false);
+        onSuccess={async () => {
+          setSending(true);
+          try {
+            if (userId && childId) {
+              await db.parentSendToChild(userId, childId, sendPaymentAmount, parent.displayName);
+            }
+            setChild(c => ({ ...c, balance: c.balance + sendPaymentAmount }));
+            const amtStr = Math.floor(sendPaymentAmount) === sendPaymentAmount
+              ? Math.floor(sendPaymentAmount).toString()
+              : sendPaymentAmount.toFixed(2);
+            addTransaction({
+              id: `tx_send_${Date.now()}`,
+              type: 'parent_transfer',
+              amount: sendPaymentAmount,
+              description: `${parent.displayName} sent you £${amtStr}`,
+              date: 'Just now',
+              status: 'completed',
+            });
+          } catch (e: any) {
+            Alert.alert('Send failed', e.message ?? 'Could not send money. Please try again.');
+          } finally {
+            setSending(false);
+            setSendPaymentVisible(false);
+          }
         }}
         onCancel={() => {
           setSendPaymentVisible(false);
@@ -264,7 +279,7 @@ export const ParentHomeScreen: React.FC = () => {
         isPayment={false}
         onClose={() => setAllowanceVisible(false)}
         onConfirm={amt => {
-          setParent(p => ({ ...p, weeklyAllowance: amt }));
+          saveAllowanceToDb(amt, parent.allowanceFrequency || 'weekly', null, true).catch(() => {});
           setAllowanceVisible(false);
         }}
       />
@@ -274,10 +289,9 @@ export const ParentHomeScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingBottom: 12, backgroundColor: colors.white },
+  header: { padding: 20, paddingBottom: 12, backgroundColor: colors.white },
   headerGreeting: { fontSize: 20, fontWeight: '800', color: colors.text },
   headerSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  headerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 16, gap: 16 },
   childCard: { backgroundColor: colors.white, borderRadius: 20, padding: 16 },
   childHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
@@ -314,8 +328,9 @@ const styles = StyleSheet.create({
   actionIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
   actionValue: { fontSize: 12, color: colors.primary, fontWeight: '700' },
-  sectionHeader: { paddingHorizontal: 4 },
+  sectionHeader: { paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  viewAllText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   activityList: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden' },
   activityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.surface },
   activityIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

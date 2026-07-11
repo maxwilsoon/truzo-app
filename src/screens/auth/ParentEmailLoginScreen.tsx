@@ -17,7 +17,7 @@ const BG = '#F2F2F7';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ParentEmailLogin'> };
 
 export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { setParent, setChild, setIsChildLoggedIn } = useApp();
+  const { setParent, setChild, setIsChildLoggedIn, setUserId, setChildId } = useApp();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -39,27 +39,40 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
       }
       const { userId, parent: par, child: ch } = result;
 
+      setUserId(userId);
+      await cache.saveUserId(userId);
+
       setParent(prev => ({
         ...prev,
         firstName:       par.first_name ?? '',
         lastName:        par.last_name ?? '',
-        displayName:     par.first_name ?? '',
+        displayName:     par.display_name || par.first_name || '',
         mobile:          par.mobile ?? '',
         address:         par.address ?? '',
-        safetyPoolLimit: par.safety_pool_limit ?? 50,
-        weeklyAllowance: par.weekly_allowance ?? 10,
-        passcode:        par.passcode ?? '',
-        email:           email.trim().toLowerCase(),
+        safetyPoolLimit:     par.safety_pool_limit ?? 0,
+        safetyPoolUsed:      par.safety_pool_used ?? 0,
+        weeklyAllowance:     par.weekly_allowance ?? 0,
+        allowanceFrequency:  par.allowance_frequency ?? 'weekly',
+        allowanceNextPayment: par.allowance_next_payment ?? '',
+        allowanceActive:     par.allowance_active ?? false,
+        passcode:               '',
+        passcodeHash:           par.passcode_hash ?? '',
+        passcodeCreated:        par.passcode_created ?? false,
+        marketingNotifications: par.marketing_notifications ?? false,
+        profileImageUrl:        par.profile_image_url ?? undefined,
+        email:                  email.trim().toLowerCase(),
         password,
       }));
 
       if (ch) {
+        setChildId(ch.id);
         setChild(prev => ({
           ...prev,
           displayName:   ch.display_name,
           username:      ch.username,
           password:      ch.password,
           avatarEmoji:   ch.avatar_emoji,
+          profileImageUrl: ch.profile_image_url ?? undefined,
           trustScore:    ch.trust_score,
           balance:       ch.wallet_balance,
           loanedOut:     ch.loaned_out,
@@ -75,11 +88,9 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
         }));
       }
 
-      await cache.saveUserId(userId);
-      await cache.saveParent({ passcode: par.passcode ?? '' });
-
-      const mode = par.passcode ? 'enter' : 'create';
-      navigation.navigate('ParentPasscode', { mode });
+      // Email + password is full authentication — always go straight to dashboard.
+      // The reactive cache effect in AppContext will persist the full parent state.
+      navigation.navigate('ParentTabs');
     } catch (err) {
       Alert.alert('Login failed', 'Please check your email and password.');
     } finally {

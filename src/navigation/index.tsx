@@ -18,6 +18,8 @@ import { AddressScreen } from '../screens/onboarding/AddressScreen';
 import { HomeAddressScreen } from '../screens/onboarding/HomeAddressScreen';
 import { VerifyingScreen } from '../screens/onboarding/VerifyingScreen';
 import { ChildDetailsScreen } from '../screens/onboarding/ChildDetailsScreen';
+import { SafetyPoolSetupScreen } from '../screens/onboarding/SafetyPoolSetupScreen';
+import { SelectAccountScreen } from '../screens/auth/SelectAccountScreen';
 import { WhoIsLoggingInScreen } from '../screens/auth/WhoIsLoggingInScreen';
 import { GetAppScreen } from '../screens/auth/GetAppScreen';
 import { ChildLoginScreen } from '../screens/auth/ChildLoginScreen';
@@ -32,13 +34,16 @@ import { AddFriendsScreen } from '../screens/child/AddFriendsScreen';
 import { ChildSettingsScreen } from '../screens/child/ChildSettingsScreen';
 import { PaymentMethodsScreen } from '../screens/parent/PaymentMethodsScreen';
 import { ParentAccountDetailsScreen } from '../screens/parent/ParentAccountDetailsScreen';
+import { ParentNotificationsScreen } from '../screens/parent/ParentNotificationsScreen';
 import { RateTruzoScreen } from '../screens/shared/RateTruzoScreen';
+import { BiometricSetupScreen } from '../screens/auth/BiometricSetupScreen';
+import { BiometricLoginScreen } from '../screens/auth/BiometricLoginScreen';
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // ─── DEV ONLY: set to false to restore normal login ───────────────────────
-const DEV_AUTO_LOGIN = true;
+const DEV_AUTO_LOGIN = false;
 const DEV_ACCOUNTS = {
   web:    { username: 'ava_m',   password: 'Ava12345'  }, // laptop / browser → Ava
   native: { username: 'tyler_p', password: 'Tyler1234' }, // phone             → Tyler
@@ -60,7 +65,8 @@ export const AppNavigator = () => {
         displayName:   row.display_name,
         username:      row.username,
         password:      row.password,
-        avatarEmoji:   row.avatar_emoji,
+        avatarEmoji:     row.avatar_emoji,
+        profileImageUrl: row.profile_image_url ?? undefined,
         trustScore:    row.trust_score,
         balance:       row.wallet_balance,
         loanedOut:     row.loaned_out,
@@ -79,14 +85,22 @@ export const AppNavigator = () => {
       if (par) {
         setParent(prev => ({
           ...prev,
-          firstName:       par.first_name ?? '',
-          lastName:        par.last_name ?? '',
-          displayName:     par.first_name ?? '',
-          mobile:          par.mobile ?? '',
-          address:         par.address ?? '',
-          safetyPoolLimit: par.safety_pool_limit ?? 50,
-          weeklyAllowance: par.weekly_allowance ?? 10,
-          passcode:        par.passcode ?? '',
+          firstName:              par.first_name ?? '',
+          lastName:               par.last_name ?? '',
+          displayName:            par.display_name || par.first_name || '',
+          mobile:                 par.mobile ?? '',
+          address:                par.address ?? '',
+          safetyPoolLimit:        par.safety_pool_limit ?? 0,
+          safetyPoolUsed:         par.safety_pool_used ?? 0,
+          weeklyAllowance:        par.weekly_allowance ?? 0,
+          allowanceFrequency:     par.allowance_frequency ?? 'weekly',
+          allowanceNextPayment:   par.allowance_next_payment ?? '',
+          allowanceActive:        par.allowance_active ?? false,
+          passcode:               '',
+          passcodeHash:    par.passcode_hash    ?? prev.passcodeHash,
+          passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
+          marketingNotifications: par.marketing_notifications ?? false,
+          profileImageUrl:        par.profile_image_url ?? undefined,
         }));
       }
       setChildId(row.id);
@@ -94,6 +108,7 @@ export const AppNavigator = () => {
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
           username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+          profileImageUrl: m.avatar_url ?? undefined,
         })));
       }).catch(() => {});
       db.getPendingRequests(row.id).then(requests => {
@@ -101,6 +116,7 @@ export const AppNavigator = () => {
           requestId: r.request_id, id: r.id, displayName: r.display_name,
           username: r.username, avatarEmoji: r.avatar_emoji,
           trustScore: r.trust_score, createdAt: r.created_at,
+          profileImageUrl: r.avatar_url ?? undefined,
         })));
       }).catch(() => {});
       setIsChildLoggedIn(true);
@@ -128,6 +144,8 @@ export const AppNavigator = () => {
         <Stack.Screen name="HomeAddress" component={HomeAddressScreen} />
         <Stack.Screen name="Verifying" component={VerifyingScreen} />
         <Stack.Screen name="ChildDetails" component={ChildDetailsScreen} />
+        <Stack.Screen name="SafetyPool" component={SafetyPoolSetupScreen} />
+        <Stack.Screen name="SelectAccount" component={SelectAccountScreen} />
         <Stack.Screen name="WhoIsLoggingIn" component={WhoIsLoggingInScreen} />
         <Stack.Screen name="GetApp" component={GetAppScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom' }} />
         <Stack.Screen name="ParentEmailLogin" component={ParentEmailLoginScreen} />
@@ -144,7 +162,10 @@ export const AppNavigator = () => {
         <Stack.Screen name="ChildSettings" component={ChildSettingsScreen} />
         <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         <Stack.Screen name="ParentAccountDetails" component={ParentAccountDetailsScreen} />
+        <Stack.Screen name="ParentNotifications" component={ParentNotificationsScreen} />
         <Stack.Screen name="RateTruzo" component={RateTruzoScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
+        <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom', gestureEnabled: false }} />
+        <Stack.Screen name="BiometricLogin" component={BiometricLoginScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade', gestureEnabled: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

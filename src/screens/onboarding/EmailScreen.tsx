@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, TouchableOpacity, ScrollView,
+  TextInput, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
 
 const PURPLE = '#4F35F3';
 const BG = '#F2F2F7';
@@ -19,6 +20,8 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
   const { setParent } = useApp();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showLoginLink, setShowLoginLink] = useState(false);
 
   const validate = () => {
     if (!email.includes('@') || !email.includes('.')) {
@@ -27,6 +30,25 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
     }
     setError('');
     return true;
+  };
+
+  const handleContinue = async () => {
+    if (!validate()) return;
+    setLoading(true);
+    try {
+      const exists = await db.checkEmailExists(email.trim());
+      if (exists) {
+        setError('Email already in use. Would you like to log in?');
+        setShowLoginLink(true);
+        return;
+      }
+    } catch {
+      // If check fails, allow continuation
+    } finally {
+      setLoading(false);
+    }
+    setParent(p => ({ ...p, email: email.trim() }));
+    navigation.navigate('Password');
   };
 
   return (
@@ -59,19 +81,11 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
             />
           </View>
           {!!error && <Text style={styles.errorText}>{error}</Text>}
-
-          {/* Promo / trust banner */}
-          <View style={styles.promoBanner}>
-            <Text style={styles.promoCheck}>✓</Text>
-            <Text style={styles.promoText}>
-              <Text style={styles.promoBold}>Free to join: </Text>
-              no monthly subscription fees.
-            </Text>
-          </View>
-
-          <TouchableOpacity>
-            <Text style={styles.promoLink}>Learn more about Truzo</Text>
-          </TouchableOpacity>
+          {showLoginLink && (
+            <TouchableOpacity onPress={() => navigation.navigate('ParentEmailLogin')}>
+              <Text style={styles.loginLink}>Log in instead</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Trust text */}
           <Text style={styles.legalText}>
@@ -91,12 +105,12 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
             {'.'}
           </Text>
           <TouchableOpacity
-            style={[styles.btn, !email && styles.btnDisabled]}
-            onPress={() => { if (validate()) { setParent(p => ({ ...p, email: email.trim() })); navigation.navigate('Password'); } }}
-            disabled={!email}
+            style={[styles.btn, (!email || loading) && styles.btnDisabled]}
+            onPress={handleContinue}
+            disabled={!email || loading}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnText}>Continue</Text>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continue</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -122,23 +136,8 @@ const styles = StyleSheet.create({
   },
   inputError: { borderColor: '#FF3B30' },
   input: { fontSize: 17, color: '#1C1C1E' },
-  errorText: { color: '#FF3B30', fontSize: 13, marginBottom: 12, marginLeft: 4 },
-
-  promoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 10,
-    marginTop: 16,
-    marginBottom: 10,
-  },
-  promoCheck: { fontSize: 18, color: '#059669', fontWeight: '900' },
-  promoText:  { flex: 1, fontSize: 15, color: '#065F46', lineHeight: 21 },
-  promoBold:  { fontWeight: '800' },
-  promoLink:  { color: PURPLE, fontSize: 15, fontWeight: '600', marginBottom: 20 },
+  errorText: { color: '#FF3B30', fontSize: 13, marginBottom: 8, marginLeft: 4 },
+  loginLink: { color: PURPLE, fontSize: 14, fontWeight: '600', marginBottom: 12, marginLeft: 4 },
 
   legalText: { fontSize: 13, color: '#8E8E93', lineHeight: 19, marginTop: 8 },
 

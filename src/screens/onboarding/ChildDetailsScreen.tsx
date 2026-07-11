@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
-  Platform, TextInput, TouchableOpacity, ScrollView,
+  Platform, TextInput, TouchableOpacity, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,15 +22,15 @@ const expandYear = (yy: number): number => {
 };
 
 export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
-  const { setChild } = useApp();
+  const { setChild, parent, saveOnboardingToDb } = useApp();
 
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName]   = useState('');
   const [dob, setDob]             = useState('');
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
   const [phone, setPhone]         = useState('');
+  const [loading, setLoading]     = useState(false);
 
   const [focused, setFocused]     = useState<string | null>(null);
   const [showPass, setShowPass]   = useState(false);
@@ -41,11 +41,11 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
   const passwordsMatch = password.length >= 8 && confirm === password;
   const canContinue =
     firstName.trim().length > 0 &&
-    lastName.trim().length > 0 &&
     dob.replace(/\D/g, '').length >= 6 &&
     username.trim().length > 0 &&
     passwordsMatch &&
-    phone.trim().length >= 7;
+    phone.trim().length >= 7 &&
+    !loading;
 
   const handleDob = (text: string) => {
     const prev = dob;
@@ -58,7 +58,7 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
     setDobError('');
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const parts = dob.split('/');
     const digits = dob.replace(/\D/g, '');
     if (parts.length !== 3 || digits.length < 6) {
@@ -82,16 +82,35 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
     const age = now.getFullYear() - fullYear -
       (now.getMonth() < m - 1 || (now.getMonth() === m - 1 && now.getDate() < d) ? 1 : 0);
 
+    const childDisplayName = `${firstName.trim()} ${parent.lastName}`.trim();
+    const childUsername    = username.trim();
+    const childMobile      = phone.trim();
+
     setChild(c => ({
       ...c,
-      displayName: `${firstName.trim()} ${lastName.trim()}`,
-      username: username.trim(),
+      displayName:   childDisplayName,
+      username:      childUsername,
       password,
-      mobile: phone.trim(),
+      mobile:        childMobile,
       age,
+      // Reset all stats so a new account always starts clean
+      balance: 0, loanedOut: 0, borrowed: 0,
+      streak: 0, repaid: 0, missed: 0,
+      totalBorrowed: 0, totalLent: 0,
+      timesBorrowed: 0, timesLent: 0,
+      points: 0, trustScore: 50,
     }));
 
-    navigation.navigate('Verifying');
+    setLoading(true);
+    try {
+      await saveOnboardingToDb({ displayName: childDisplayName, username: childUsername, password, mobile: childMobile, age });
+    } catch (err) {
+      console.warn('[Truzo] onboarding save failed:', err);
+    } finally {
+      setLoading(false);
+    }
+
+    navigation.navigate('WhoIsLoggingIn', { newAccount: true });
   };
 
   const field = (
@@ -174,24 +193,19 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
 
           {field('firstName', "Child's first name", firstName, setFirstName, { autoFocus: true, autoCapitalize: 'words' })}
           <View style={styles.gap} />
-          {field('lastName', "Child's last name", lastName, setLastName, { autoCapitalize: 'words' })}
-          <View style={styles.gap} />
           {field('dob', 'Date of birth (DD/MM/YYYY)', dob, handleDob, {
             keyboardType: 'numbers-and-punctuation',
             error: dobError,
           })}
-          {!dobError && <Text style={styles.hintText}>DD/MM/YYYY — two digits for the year is fine, e.g. 03</Text>}
           <View style={styles.gap} />
           {field('username', 'Username', username,
-            t => setUsername(t.toLowerCase().replace(/\s/g, '_')),
-            { hint: 'e.g. alex_t — no spaces' }
+            t => setUsername(t.toLowerCase().replace(/\s/g, '_'))
           )}
           <View style={styles.gap} />
           {field('password', 'Password', password, t => { setPassword(t); setPassError(''); }, {
             isPassword: true,
             showToggle: showPass,
             onToggle: () => setShowPass(v => !v),
-            hint: 'At least 8 characters',
           })}
           <View style={styles.gap} />
           {field('confirm', 'Confirm password', confirm, t => { setConfirm(t); setPassError(''); }, {
@@ -203,7 +217,6 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.gap} />
           {field('phone', "Child's phone number", phone, setPhone, {
             keyboardType: 'phone-pad',
-            hint: 'Can be the same as yours',
           })}
         </ScrollView>
 
@@ -214,7 +227,9 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
             disabled={!canContinue}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnText}>Continue</Text>
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.btnText}>Continue</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

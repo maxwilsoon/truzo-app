@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Vibration, Alert,
+  View, Text, StyleSheet, TouchableOpacity, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +8,8 @@ import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
+import { hashPasscode } from '../../lib/passcode';
+import { db } from '../../lib/database';
 
 const PURPLE = '#4F35F3';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
@@ -19,16 +21,38 @@ type Props = {
 
 export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { mode, pinToConfirm } = route.params;
-  const { parent, setParent, savePasscodeToDb } = useApp();
+  const { parent, setParent, savePasscodeToDb, userId } = useApp();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
 
-  const firstName = parent.displayName.split(' ')[0];
+  // If we arrive in 'enter' mode with no hash in context (e.g. child login cleared it),
+  // fetch the hash from DB so the parent can still verify their PIN.
+  // If the DB also has no hash (legacy account), fall back to email login.
+  useEffect(() => {
+    if (mode !== 'enter') return;
+    if (parent.passcodeHash || parent.passcode) return; // already have what we need
+    if (!userId) {
+      navigation.replace('ParentEmailLogin');
+      return;
+    }
+    db.getParentPasscodeHash(userId).then(result => {
+      if (result?.hash) {
+        setParent(p => ({ ...p, passcodeHash: result.hash!, passcodeCreated: true }));
+      } else {
+        // No passcode in DB — should only happen for pre-PIN legacy accounts
+        navigation.replace('ParentEmailLogin');
+      }
+    }).catch(() => {
+      navigation.replace('ParentEmailLogin');
+    });
+  }, []);
+
+  const firstName = (parent.displayName || 'there').split(' ')[0];
 
   const headings = {
     create:  { title: 'Create your PIN',  sub: 'Choose a 4-digit parent PIN' },
     confirm: { title: 'Confirm your PIN', sub: 'Re-enter your PIN to confirm' },
-    enter:   { title: `Hi ${firstName}`,  sub: 'Enter your 4 digit parent passcode' },
+    enter:   { title: `Hi ${firstName}`,  sub: 'Enter your 4-digit parent PIN' },
   };
   const { title, sub } = headings[mode];
 
@@ -38,7 +62,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
     setTimeout(() => { setCode(''); setError(false); }, 700);
   };
 
-  const press = (key: string) => {
+  const press = async (key: string) => {
     if (key === '⌫') {
       setCode(c => c.slice(0, -1));
       setError(false);
@@ -54,17 +78,37 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       setTimeout(() => {
         navigation.push('ParentPasscode', { mode: 'confirm', pinToConfirm: next });
       }, 150);
+
     } else if (mode === 'confirm') {
       if (next === pinToConfirm) {
-        setParent(p => ({ ...p, passcode: next }));
-        savePasscodeToDb(next).catch(err => console.warn('[Truzo] passcode save failed:', err));
-        setTimeout(() => navigation.navigate('ParentTabs'), 150);
+        const hash = await hashPasscode(userId ?? '', next);
+        setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
+        try { await savePasscodeToDb(hash); } catch { /* context + cache already updated */ }
+        setTimeout(() => navigation.navigate('SafetyPool'), 150);
       } else {
         shake();
       }
+
     } else {
-      if (next === parent.passcode) {
-        setTimeout(() => navigation.navigate('ParentTabs'), 150);
+      // Enter mode — try hash comparison first, fall back to plain text for migrating old accounts
+      if (parent.passcodeHash) {
+        const hash = await hashPasscode(userId ?? '', next);
+        if (hash === parent.passcodeHash) {
+          setTimeout(() => navigation.navigate('ParentTabs'), 150);
+        } else {
+          shake();
+        }
+      } else if (parent.passcode) {
+        // Migration path: old plain-text passcode in cache
+        if (next === parent.passcode) {
+          // Auto-upgrade: hash and save, clear plain text
+          const hash = await hashPasscode(userId ?? '', next);
+          setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
+          savePasscodeToDb(hash).catch(() => {});
+          setTimeout(() => navigation.navigate('ParentTabs'), 150);
+        } else {
+          shake();
+        }
       } else {
         shake();
       }
@@ -123,10 +167,10 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          onPress={() => Alert.alert('Forgot details?', 'Please contact support to reset your PIN.')}
+          onPress={() => navigation.navigate('ParentEmailLogin')}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Text style={styles.footerLink}>Forgot details?</Text>
+          <Text style={styles.footerLink}>Sign in with email</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

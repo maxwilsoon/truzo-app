@@ -6,17 +6,40 @@ const KEYS = {
   USER_ID: '@truzo/userId',
 } as const;
 
-async function load<T>(key: string): Promise<T | null> {
-  const raw = await AsyncStorage.getItem(key);
-  return raw ? (JSON.parse(raw) as T) : null;
+// AsyncStorage can throw "Native module is null, cannot access legacy storage"
+// on certain Expo Go / build configurations. Cache is best-effort — a failure
+// must never block authentication.
+async function safeSave(key: string, value: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, value);
+  } catch {
+    // Silently ignore — app works without local cache
+  }
+}
+
+async function safeLoad<T>(key: string): Promise<T | null> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function safeClear(keys: string[]): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove(keys);
+  } catch {
+    // best-effort
+  }
 }
 
 export const cache = {
-  saveParent:  (data: object)  => AsyncStorage.setItem(KEYS.PARENT,  JSON.stringify(data)),
-  loadParent:  <T>()           => load<T>(KEYS.PARENT),
-  saveChild:   (data: object)  => AsyncStorage.setItem(KEYS.CHILD,   JSON.stringify(data)),
-  loadChild:   <T>()           => load<T>(KEYS.CHILD),
-  saveUserId:  (id: string)    => AsyncStorage.setItem(KEYS.USER_ID, id),
-  loadUserId:  ()              => AsyncStorage.getItem(KEYS.USER_ID),
-  clear:       ()              => AsyncStorage.multiRemove(Object.values(KEYS)),
+  saveParent:  (data: object)  => safeSave(KEYS.PARENT,  JSON.stringify(data)),
+  loadParent:  <T>()           => safeLoad<T>(KEYS.PARENT),
+  saveChild:   (data: object)  => safeSave(KEYS.CHILD,   JSON.stringify(data)),
+  loadChild:   <T>()           => safeLoad<T>(KEYS.CHILD),
+  saveUserId:  (id: string)    => safeSave(KEYS.USER_ID, id),
+  loadUserId:  ()              => safeLoad<string>(KEYS.USER_ID),
+  clear:       ()              => safeClear(Object.values(KEYS)),
 };

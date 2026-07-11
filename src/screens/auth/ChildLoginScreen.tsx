@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, TouchableOpacity, Alert, ActivityIndicator,
+  TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
 import { registerPushToken } from '../../lib/notifications';
+import { getDeviceId, isBiometricAvailable, saveBiometricSession } from '../../lib/biometrics';
 
 const PURPLE = '#4F35F3';
 const BG = '#EDE8FF';
@@ -18,7 +19,7 @@ const BG = '#EDE8FF';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'> };
 
 export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { child, setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
+  const { child, setChild, childId, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests, setBiometricEnabled, setFrozenAccount, setParentDebt } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass]  = useState(false);
@@ -35,7 +36,8 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
     const p = password;
 
     // Try local context first (for accounts created in same session)
-    if (child.username && u === child.username && p === child.password) {
+    // Only skip the DB call if childId is already known — without it we can't do any DB operations
+    if (child.username && u === child.username && p === child.password && childId) {
       setIsChildLoggedIn(true);
       navigation.navigate('ChildTabs');
       return;
@@ -56,7 +58,8 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         displayName:   row.display_name,
         username:      row.username,
         password:      row.password,
-        avatarEmoji:   row.avatar_emoji,
+        avatarEmoji:     row.avatar_emoji,
+        profileImageUrl: row.profile_image_url ?? undefined,
         trustScore:    row.trust_score,
         balance:       row.wallet_balance,
         loanedOut:     row.loaned_out,
@@ -72,17 +75,27 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         age:           row.age,
         mobile:        row.mobile ?? '',
       }));
+      setFrozenAccount(row.account_frozen ?? false);
+      setParentDebt(row.parent_debt ?? 0);
       if (par) {
         setParent(prev => ({
           ...prev,
           firstName:       par.first_name ?? '',
           lastName:        par.last_name ?? '',
-          displayName:     par.first_name ?? '',
+          displayName:     par.display_name || par.first_name || '',
           mobile:          par.mobile ?? '',
           address:         par.address ?? '',
-          safetyPoolLimit: par.safety_pool_limit ?? 50,
-          weeklyAllowance: par.weekly_allowance ?? 10,
-          passcode:        par.passcode ?? '',
+          safetyPoolLimit:     par.safety_pool_limit ?? 0,
+          safetyPoolUsed:      par.safety_pool_used ?? 0,
+          weeklyAllowance:     par.weekly_allowance ?? 0,
+          allowanceFrequency:  par.allowance_frequency ?? 'weekly',
+          allowanceNextPayment: par.allowance_next_payment ?? '',
+          allowanceActive:     par.allowance_active ?? false,
+          passcode:               '',
+          passcodeHash:    par.passcode_hash    ?? prev.passcodeHash,
+          passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
+          marketingNotifications: par.marketing_notifications ?? false,
+          profileImageUrl:        par.profile_image_url ?? undefined,
         }));
       }
       setChildId(row.id);
@@ -96,6 +109,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
           username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+          profileImageUrl: m.avatar_url ?? undefined,
         })));
       }).catch(() => {});
 
@@ -104,12 +118,36 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           requestId: r.request_id, id: r.id, displayName: r.display_name,
           username: r.username, avatarEmoji: r.avatar_emoji,
           trustScore: r.trust_score, createdAt: r.created_at,
+          profileImageUrl: r.avatar_url ?? undefined,
         })));
       }).catch(() => {});
 
 
       setIsChildLoggedIn(true);
-      navigation.navigate('ChildTabs');
+
+      // Decide whether to offer Face ID setup or go straight to the dashboard.
+      // All biometric checks are best-effort — any failure falls back to ChildTabs.
+      let destination: 'BiometricSetup' | 'ChildTabs' = 'ChildTabs';
+      if (Platform.OS !== 'web') {
+        try {
+          const biometricsAvailable = await isBiometricAvailable();
+          if (biometricsAvailable) {
+            const deviceId = await getDeviceId();
+            if (row.biometric_enabled && row.last_device_id === deviceId) {
+              // Already set up on this device — silently restore the session
+              await saveBiometricSession(row.id);
+              setBiometricEnabled(true);
+            } else {
+              // Not yet set up (new account or new device) — offer the prompt
+              destination = 'BiometricSetup';
+            }
+          }
+        } catch {
+          // Native module unavailable (Expo Go) — skip silently
+        }
+      }
+
+      navigation.navigate(destination);
     } catch (err: any) {
       Alert.alert('Login error', String(err?.message ?? err));
     } finally {
@@ -128,7 +166,11 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
       </TouchableOpacity>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.title}>Hi 👋 let's log in</Text>
           <Text style={styles.sub}>
             Ask your parent or guardian for your login details.{' '}
@@ -166,7 +208,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={[styles.inputWrap, styles.inputWrapRow, passFocused && styles.inputFocused, !!passwordError && styles.inputError]}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Password or card PIN"
+              placeholder="Password"
               placeholderTextColor="#AEAEB2"
               value={password}
               onChangeText={t => { setPassword(t); setPasswordError(''); setUsernameError(''); }}
@@ -188,7 +230,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
             )
           }
-        </View>
+        </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
@@ -209,9 +251,9 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: BG },
-  back:    { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
+  safe:   { flex: 1, backgroundColor: BG },
+  back:   { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
+  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
 
   title: { fontSize: 28, fontWeight: '800', color: '#1A1A3E', marginBottom: 10 },
   sub:   { fontSize: 16, color: '#3C3C43', lineHeight: 24, marginBottom: 32 },

@@ -29,6 +29,13 @@
           "icon": "./assets/icon.png",
           "color": "#4F35F3"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Truzo needs access to your photos so you can set a profile picture.",
+          "cameraPermission": "Truzo needs access to your camera so you can take a profile photo."
+        }
       ]
     ],
     "extra": {

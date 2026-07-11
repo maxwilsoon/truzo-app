@@ -78,7 +78,7 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <BackButton />
-      <StepProgress current={7} total={8} />
+      <StepProgress current={8} total={8} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -124,7 +124,7 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
             style={[styles.btn, !canContinue && styles.btnDisabled]}
             onPress={() => {
               setParent(p => ({ ...p, firstName: firstName.trim(), lastName: lastName.trim() }));
-              navigation.navigate('HomeAddress');
+              navigation.navigate('Verifying');
             }}
             disabled={!canContinue}
             activeOpacity={0.85}

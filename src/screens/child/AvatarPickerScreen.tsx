@@ -1,13 +1,15 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Alert,
-  ActionSheetIOS, Platform,
+  Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
 
 const AVATARS = [
   '🦁', '🐨', '🐯', '🦋', '🐸',
@@ -21,9 +23,10 @@ const ITEM_WIDTH = SCREEN_WIDTH - 120;
 
 export const AvatarPickerScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child, setChild } = useApp();
+  const { child, childId, setChild } = useApp();
   const initialIndex = AVATARS.indexOf(child.avatarEmoji) >= 0 ? AVATARS.indexOf(child.avatarEmoji) : 0;
   const [selected, setSelected] = useState(AVATARS[initialIndex]);
+  const [uploading, setUploading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const currentIndex = AVATARS.indexOf(selected) >= 0 ? AVATARS.indexOf(selected) : 0;
 
@@ -32,30 +35,47 @@ export const AvatarPickerScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleAddPhoto = () => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Choose from Files', 'Choose from Camera Roll'],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1 || buttonIndex === 2) {
-            Alert.alert('Coming soon', 'Custom photo upload will be available in a future update.');
-          }
-        }
-      );
-    } else {
-      Alert.alert(
-        'Add Profile Picture',
-        '',
-        [
-          { text: 'Choose from Files', onPress: () => Alert.alert('Coming soon', 'Custom photo upload will be available in a future update.') },
-          { text: 'Choose from Camera Roll', onPress: () => Alert.alert('Coming soon', 'Custom photo upload will be available in a future update.') },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
+  const pickPhoto = async (source: 'library' | 'files') => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+      return;
     }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'] as any,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    if (!childId) { Alert.alert('Error', 'Not logged in.'); return; }
+
+    const asset = result.assets[0];
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+
+    setUploading(true);
+    try {
+      const url = await db.uploadProfileImage(childId, asset.uri, mimeType);
+      setChild(c => ({ ...c, profileImageUrl: url }));
+      Alert.alert('Done!', 'Your profile photo has been updated.');
+    } catch (e: any) {
+      Alert.alert('Upload failed', e.message ?? 'Could not upload photo. Try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleAddPhoto = () => {
+    Alert.alert(
+      'Add Profile Picture',
+      '',
+      [
+        { text: 'Choose from Camera Roll', onPress: () => pickPhoto('library') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   const goLeft = () => {
@@ -79,7 +99,6 @@ export const AvatarPickerScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }} />
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
@@ -131,12 +150,24 @@ export const AvatarPickerScreen: React.FC = () => {
         ))}
       </View>
 
-      {/* Add your own pic */}
+      {/* Profile photo section */}
       <Text style={styles.orText}>Or add your own pic</Text>
 
-      <TouchableOpacity style={styles.cameraCircle} onPress={handleAddPhoto} activeOpacity={0.8}>
-        <Ionicons name="camera-outline" size={34} color="#C4C4C4" />
+      <TouchableOpacity style={styles.cameraCircle} onPress={handleAddPhoto} activeOpacity={0.8} disabled={uploading}>
+        {uploading ? (
+          <ActivityIndicator color="#6366F1" />
+        ) : child.profileImageUrl ? (
+          <Image source={{ uri: child.profileImageUrl }} style={styles.profilePhoto} />
+        ) : (
+          <Ionicons name="camera-outline" size={34} color="#C4C4C4" />
+        )}
       </TouchableOpacity>
+
+      {child.profileImageUrl && !uploading && (
+        <TouchableOpacity onPress={handleAddPhoto} style={styles.changePhotoBtn}>
+          <Text style={styles.changePhotoText}>Change photo</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={{ flex: 1 }} />
 
@@ -218,6 +249,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center', justifyContent: 'center',
     alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  profilePhoto: {
+    width: 90, height: 90, borderRadius: 45,
+  },
+  changePhotoBtn: {
+    alignSelf: 'center', marginTop: 10,
+  },
+  changePhotoText: {
+    fontSize: 14, color: colors.primary, fontWeight: '600',
   },
 
   footer: { padding: 24, paddingBottom: 16 },

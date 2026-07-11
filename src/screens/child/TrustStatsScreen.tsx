@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, getTierInfo } from '../../theme/colors';
+import { fmtAmt } from '../../lib/utils';
 import { TrustScoreRing } from '../../components/TrustScoreRing';
 import { useApp } from '../../context/AppContext';
 
@@ -37,7 +38,7 @@ export const TrustStatsScreen: React.FC = () => {
             <Text style={styles.tierLabel}>{tier.emoji} {tier.tier}</Text>
             <Text style={styles.tierDesc}>{tier.description}</Text>
             <View style={[styles.streakBadge, { backgroundColor: `${tier.color}20` }]}>
-              <Text style={[styles.streakText, { color: tier.color }]}>🔥 {child.streak} streak</Text>
+              <Text style={[styles.streakText, { color: tier.color }]}>🔥 {child.streak} week streak</Text>
             </View>
           </View>
         </View>
@@ -49,8 +50,8 @@ export const TrustStatsScreen: React.FC = () => {
             { label: 'Missed repayments', value: child.missed, emoji: '❌', color: colors.error },
             { label: 'Times borrowed', value: child.timesBorrowed, emoji: '📩', color: colors.primary },
             { label: 'Times lent', value: child.timesLent, emoji: '🤝', color: colors.cyan },
-            { label: 'Amount borrowed', value: `£${child.totalBorrowed.toFixed(2)}`, emoji: '💸', color: colors.warning },
-            { label: 'Amount lent', value: `£${child.totalLent.toFixed(2)}`, emoji: '💰', color: colors.success },
+            { label: 'Amount borrowed', value: `£${fmtAmt(child.totalBorrowed)}`, emoji: '💸', color: colors.warning },
+            { label: 'Amount lent', value: `£${fmtAmt(child.totalLent)}`, emoji: '💰', color: colors.success },
           ].map(s => (
             <View key={s.label} style={styles.gridItem}>
               <Text style={styles.gridEmoji}>{s.emoji}</Text>

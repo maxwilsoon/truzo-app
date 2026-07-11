@@ -4,28 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
-import { useApp } from '../../context/AppContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Verifying'> };
 
 export const VerifyingScreen: React.FC<Props> = ({ navigation }) => {
-  const { saveOnboardingToDb } = useApp();
-
   useEffect(() => {
     let cancelled = false;
-
-    // Run the DB save and the minimum animation delay in parallel.
-    // We cap the DB wait at 6 s so a slow network never blocks the user forever.
-    const dbPromise = Promise.race([
-      saveOnboardingToDb().catch(err => console.warn('[Truzo] onboarding save failed:', err)),
-      new Promise<void>(resolve => setTimeout(resolve, 6000)),
-    ]);
     const animationDelay = new Promise<void>(resolve => setTimeout(resolve, 2800));
-
-    Promise.all([dbPromise, animationDelay]).then(() => {
-      if (!cancelled) navigation.navigate('WhoIsLoggingIn');
+    animationDelay.then(() => {
+      if (!cancelled) navigation.navigate('ChildDetails');
     });
-
     return () => { cancelled = true; };
   }, []);
 

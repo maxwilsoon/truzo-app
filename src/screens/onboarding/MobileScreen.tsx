@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, TouchableOpacity,
+  TextInput, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
 
 const PURPLE = '#4F35F3';
 const BG = '#F2F2F7';
@@ -26,6 +27,7 @@ export const MobileScreen: React.FC<Props> = ({ navigation }) => {
   const [mobile, setMobile] = useState('');
   const [error, setError]   = useState('');
   const [focused, setFocused] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (text: string) => {
     // Only allow digits and spaces
@@ -34,17 +36,29 @@ export const MobileScreen: React.FC<Props> = ({ navigation }) => {
     if (error) setError('');
   };
 
-  const proceed = () => {
+  const proceed = async () => {
     if (!isValidUK(mobile)) {
       setError('Enter a valid 11-digit UK mobile number starting with 07.');
       return;
+    }
+    setLoading(true);
+    try {
+      const exists = await db.checkMobileExists(mobile.trim());
+      if (exists) {
+        setError('This phone number is already registered to another account.');
+        return;
+      }
+    } catch {
+      // If check fails, allow continuation
+    } finally {
+      setLoading(false);
     }
     setError('');
     setParent(p => ({ ...p, mobile: mobile.trim() }));
     navigation.navigate('Notifications');
   };
 
-  const canContinue = isValidUK(mobile);
+  const canContinue = isValidUK(mobile) && !loading;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -97,7 +111,7 @@ export const MobileScreen: React.FC<Props> = ({ navigation }) => {
             disabled={!canContinue}
             activeOpacity={0.85}
           >
-            <Text style={styles.btnText}>Continue</Text>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continue</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

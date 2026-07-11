@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { fmtAmt } from '../../lib/utils';
 
 const GIFT_CARDS = [
   { id: 'gc1', name: 'Xbox',        emoji: '🎮', cost: 500, value: '£10' },
@@ -15,13 +16,14 @@ const GIFT_CARDS = [
 ];
 
 const TX_ICONS: Record<string, { icon: string; bg: string; color: string }> = {
-  topup:     { icon: 'shield-checkmark-outline',  bg: '#EDE9FE', color: '#7C3AED' },
-  allowance: { icon: 'wallet-outline',            bg: '#D1FAE5', color: '#10B981' },
-  lend:      { icon: 'arrow-up-circle-outline',   bg: '#DBEAFE', color: '#3B82F6' },
-  spend:     { icon: 'card-outline',              bg: '#FEE2E2', color: '#EF4444' },
-  repay:     { icon: 'checkmark-circle-outline',  bg: '#D1FAE5', color: '#10B981' },
-  borrow:    { icon: 'arrow-down-circle-outline', bg: '#D1FAE5', color: '#10B981' },
-  receive:   { icon: 'arrow-down-circle-outline', bg: '#D1FAE5', color: '#10B981' },
+  parent_transfer: { icon: 'heart-circle-outline',         bg: '#D1FAE5', color: '#10B981' },
+  topup:           { icon: 'shield-checkmark-outline',      bg: '#EDE9FE', color: '#7C3AED' },
+  allowance:       { icon: 'wallet-outline',               bg: '#D1FAE5', color: '#10B981' },
+  lend:            { icon: 'arrow-up-circle-outline',      bg: '#DBEAFE', color: '#3B82F6' },
+  spend:           { icon: 'card-outline',                 bg: '#FEE2E2', color: '#EF4444' },
+  repay:           { icon: 'checkmark-circle-outline',     bg: '#D1FAE5', color: '#10B981' },
+  borrow:          { icon: 'arrow-down-circle-outline',    bg: '#D1FAE5', color: '#10B981' },
+  receive:         { icon: 'arrow-down-circle-outline',    bg: '#D1FAE5', color: '#10B981' },
 };
 
 export const WalletScreen: React.FC = () => {
@@ -54,12 +56,12 @@ export const WalletScreen: React.FC = () => {
         </View>
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available balance</Text>
-          <Text style={styles.balanceAmount}>£{child.balance.toFixed(2)}</Text>
+          <Text style={styles.balanceAmount}>£{fmtAmt(child.balance)}</Text>
           <View style={styles.balanceSplit}>
             <View style={styles.balanceSplitItem}>
               <Text style={styles.splitEmoji}>🤝</Text>
               <View>
-                <Text style={styles.splitAmount}>£{child.loanedOut.toFixed(2)}</Text>
+                <Text style={styles.splitAmount}>£{fmtAmt(child.loanedOut)}</Text>
                 <Text style={styles.splitLabel}>Lent out</Text>
               </View>
             </View>
@@ -68,7 +70,7 @@ export const WalletScreen: React.FC = () => {
               <Text style={styles.splitEmoji}>⏳</Text>
               <View>
                 <Text style={[styles.splitAmount, child.borrowed > 0 && { color: colors.error }]}>
-                  £{child.borrowed.toFixed(2)}
+                  £{fmtAmt(child.borrowed)}
                 </Text>
                 <Text style={styles.splitLabel}>Borrowed</Text>
               </View>
@@ -137,17 +139,18 @@ export const WalletScreen: React.FC = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.txTitle}>{tx.description}</Text>
                   <Text style={styles.txSub}>{
-                    tx.type === 'topup'     ? 'Parent Added' :
-                    tx.type === 'allowance' ? 'Pocket Money' :
-                    tx.type === 'lend'      ? 'Money Lent' :
-                    tx.type === 'spend'     ? 'Card Spend' :
-                    tx.type === 'borrow'    ? 'Money Received' :
-                    tx.type === 'receive'   ? 'Repayment Received' :
-                                             'Repayment'
+                    tx.type === 'parent_transfer' ? 'Money Received' :
+                    tx.type === 'topup'           ? 'Parent Added' :
+                    tx.type === 'allowance'       ? 'Pocket Money' :
+                    tx.type === 'lend'            ? 'Money Lent' :
+                    tx.type === 'spend'           ? 'Card Spend' :
+                    tx.type === 'borrow'          ? 'Money Received' :
+                    tx.type === 'receive'         ? 'Repayment Received' :
+                                                   'Repayment'
                   } · {tx.date}</Text>
                 </View>
                 <Text style={[styles.txAmount, { color: isPositive ? '#22C55E' : colors.error }]}>
-                  {isPositive ? '+£' : '-£'}{Math.abs(tx.amount).toFixed(2)}
+                  {isPositive ? '+£' : '-£'}{fmtAmt(Math.abs(tx.amount))}
                 </Text>
               </View>
             );

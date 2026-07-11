@@ -248,7 +248,7 @@ export const CarouselScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Email')}>
           <Text style={styles.primaryText}>Parent sign up</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineBtn} onPress={() => navigation.navigate('WhoIsLoggingIn')}>
+        <TouchableOpacity style={styles.outlineBtn} onPress={() => navigation.navigate('SelectAccount')}>
           <Text style={styles.outlineText}>Have an account? Log in</Text>
         </TouchableOpacity>
       </SafeAreaView>

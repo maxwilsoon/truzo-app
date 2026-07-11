@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { fmtAmt } from '../lib/utils';
+
 const PURPLE = '#4F35F3';
 const PRESETS = [10, 20, 50, 100];
 
@@ -43,7 +45,7 @@ export const MoneySheet: React.FC<Props> = ({
   };
 
   const btnLabel = canConfirm
-    ? `${confirmLabel} £${amount.toFixed(2)}${amountSuffix}`
+    ? `${confirmLabel} £${fmtAmt(amount)}${amountSuffix}`
     : confirmLabel;
 
   return (

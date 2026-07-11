@@ -88,23 +88,6 @@ export const PasswordScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           {!!confirmError && <Text style={styles.errorText}>{confirmError}</Text>}
 
-          {/* Password rules — appear once user starts typing */}
-          {password.length > 0 && (
-            <View style={styles.rules}>
-              {rules.map(r => (
-                <View key={r.label} style={styles.rule}>
-                  <Ionicons
-                    name={r.test(password) ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={16}
-                    color={r.test(password) ? '#059669' : '#AEAEB2'}
-                  />
-                  <Text style={[styles.ruleText, r.test(password) && styles.rulePass]}>
-                    {r.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
         </ScrollView>
 
         {/* Footer */}
@@ -144,11 +127,6 @@ const styles = StyleSheet.create({
   inputError: { borderColor: '#FF3B30' },
   input:      { flex: 1, fontSize: 17, color: '#1C1C1E' },
   errorText:  { color: '#FF3B30', fontSize: 13, marginTop: -8, marginBottom: 12, marginLeft: 4 },
-
-  rules: { gap: 8, marginTop: 4 },
-  rule:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  ruleText: { fontSize: 13, color: '#AEAEB2' },
-  rulePass: { color: '#059669', fontWeight: '600' },
 
   footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {

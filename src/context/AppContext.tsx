@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { cache } from '../lib/cache';
 import { db } from '../lib/database';
+import { fmtAmt } from '../lib/utils';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -21,11 +22,12 @@ export interface CircleMember {
   username: string;
   avatarEmoji: string;
   trustScore: number;
+  profileImageUrl?: string;
 }
 
 export interface Transaction {
   id: string;
-  type: 'borrow' | 'lend' | 'repay' | 'receive' | 'topup' | 'spend' | 'allowance';
+  type: 'borrow' | 'lend' | 'repay' | 'receive' | 'topup' | 'spend' | 'allowance' | 'parent_transfer';
   amount: number;
   description: string;
   date: string;
@@ -61,6 +63,7 @@ export interface PendingRequest {
   avatarEmoji: string;
   trustScore: number;
   createdAt: string;
+  profileImageUrl?: string;
 }
 
 export interface ActivityItem {
@@ -69,6 +72,7 @@ export interface ActivityItem {
   text: string;
   time: string;
   type: 'request' | 'funded' | 'repaid' | 'missed' | 'joined' | 'tier' | 'topup' | 'spend';
+  createdAt?: string; // ISO timestamp — used for sort order
 }
 
 interface ChildProfile {
@@ -91,6 +95,8 @@ interface ChildProfile {
   mobile: string;
   email: string;
   password: string;
+  profileImageUrl?: string;
+  biometricEnabled: boolean;
 }
 
 interface ParentProfile {
@@ -104,7 +110,14 @@ interface ParentProfile {
   safetyPoolLimit: number;
   safetyPoolUsed: number;
   weeklyAllowance: number;
-  passcode: string;
+  allowanceFrequency: string;    // 'weekly' | 'fortnightly' | 'monthly'
+  allowanceNextPayment: string;  // ISO date string or ''
+  allowanceActive: boolean;
+  passcode: string;              // kept for cache backward-compat migration only
+  passcodeHash: string;          // SHA-256(userId:pin) — used for all new logins
+  passcodeCreated: boolean;      // true once a passcode has been set up
+  marketingNotifications: boolean;
+  profileImageUrl?: string;
 }
 
 interface AppContextType {
@@ -131,9 +144,11 @@ interface AppContextType {
   setActiveRequests: React.Dispatch<React.SetStateAction<ActiveRequest[]>>;
   activityFeed: ActivityItem[];
   addActivity: (item: ActivityItem) => void;
+  removeActivity: (id: string) => void;
   frozenAccount: boolean;
   setFrozenAccount: (v: boolean) => void;
   parentDebt: number;
+  setParentDebt: (v: number) => void;
   adjustTrustScore: (delta: number) => void;
   repayOnTime: () => void;
   lendMoney: () => void;
@@ -141,8 +156,16 @@ interface AppContextType {
   repayParent: () => void;
   addTransaction: (t: Transaction) => void;
   userId: string | null;
-  saveOnboardingToDb: () => Promise<void>;
+  setUserId: (id: string | null) => void;
+  saveOnboardingToDb: (childOverride?: { displayName?: string; username?: string; password?: string; mobile?: string; age?: number }) => Promise<void>;
   savePasscodeToDb: (passcode: string) => Promise<void>;
+  setupSafetyPool: (amount: number) => Promise<void>;
+  topUpSafetyPool: (amount: number) => Promise<void>;
+  saveAllowanceToDb: (amount: number, frequency: string, nextPayment: string | null, active: boolean) => Promise<void>;
+  setMarketingNotifications: (value: boolean) => Promise<void>;
+  recordWeeklyStreak: () => Promise<void>;
+  biometricEnabled: boolean;
+  setBiometricEnabled: (v: boolean) => void;
 }
 
 const defaultCircle: CircleMember[] = [];
@@ -196,20 +219,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mobile: '',
     email: '',
     password: '',
+    biometricEnabled: false,
   });
+
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const [parent, setParent] = useState<ParentProfile>({
     firstName: '',
     lastName: '',
-    displayName: 'Sarah',
-    email: 'sarah@example.com',
-    mobile: '+44 7700 900000',
-    password: 'Password1',
-    address: '123 Example Street, London, SW1A 1AA',
-    safetyPoolLimit: 50,
+    displayName: '',
+    email: '',
+    mobile: '',
+    password: '',
+    address: '',
+    safetyPoolLimit: 0,
     safetyPoolUsed: 0,
     weeklyAllowance: 10,
+    allowanceFrequency: 'weekly',
+    allowanceNextPayment: '',
+    allowanceActive: false,
     passcode: '',
+    passcodeHash: '',
+    passcodeCreated: false,
+    marketingNotifications: false,
   });
 
   // Tracks whether the initial AsyncStorage hydration has completed.
@@ -239,7 +271,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Keep the local cache in sync after every state update.
   useEffect(() => { if (hydrated.current) cache.saveParent(parent); }, [parent]);
-  useEffect(() => { if (hydrated.current) cache.saveChild(child);   }, [child]);
+  useEffect(() => {
+    if (hydrated.current) {
+      // Always persist childId alongside child data so it survives polling updates
+      cache.saveChild({ ...child, ...(childId ? { childId } : {}) });
+    }
+  }, [child, childId]);
   useEffect(() => { childIdRef.current = childId; }, [childId]);
 
   const adjustTrustScore = (delta: number) => {
@@ -251,18 +288,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const repayOnTime = () => {
-    setChild(c => {
-      const newStreak = c.streak + 1;
-      const bonus = newStreak === 3 ? 3 : newStreak === 5 ? 5 : newStreak === 10 ? 10 : 0;
-      const gain = 5 + bonus;
-      return {
-        ...c,
-        trustScore: Math.min(100, c.trustScore + gain),
-        points: Math.max(0, c.points + gain),
-        streak: newStreak,
-        repaid: c.repaid + 1,
-      };
-    });
+    setChild(c => ({
+      ...c,
+      trustScore: Math.min(100, c.trustScore + 5),
+      points: Math.max(0, c.points + 5),
+      repaid: c.repaid + 1,
+    }));
   };
 
   const lendMoney = () => {
@@ -271,6 +302,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       trustScore: Math.min(100, c.trustScore + 2),
       points: Math.max(0, c.points + 2),
     }));
+  };
+
+  // Calls the DB's weekly streak RPC and updates local streak from the result.
+  const recordWeeklyStreak = async () => {
+    if (!childIdRef.current) return;
+    const newStreak = await db.recordWeeklyStreak(childIdRef.current);
+    if (newStreak > 0) {
+      setChild(c => ({ ...c, streak: newStreak }));
+    }
   };
 
   const missRepayment = (amount: number) => {
@@ -291,10 +331,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const repayParent = () => {
-    setChild(c => ({ ...c, balance: Math.max(0, c.balance - parentDebt) }));
-    setParent(p => ({ ...p, safetyPoolUsed: Math.max(0, p.safetyPoolUsed - parentDebt) }));
+    const debt = parentDebt;
+    // Optimistic update
+    setChild(c => ({ ...c, balance: Math.max(0, c.balance - debt) }));
+    setParent(p => ({ ...p, safetyPoolUsed: Math.max(0, p.safetyPoolUsed - debt) }));
     setParentDebt(0);
     setFrozenAccount(false);
+    // Persist: clear parent_debt, restore safety pool, unfreeze in DB
+    if (childIdRef.current && userId) {
+      db.confirmParentRepayment(childIdRef.current, userId).catch(err =>
+        console.warn('[Truzo] confirmParentRepayment failed:', err)
+      );
+    }
   };
 
   const addTransaction = (t: Transaction) => {
@@ -302,52 +350,113 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addActivity = (item: ActivityItem) => {
-    setActivityFeed(prev => [item, ...prev]);
+    const stamped = { ...item, createdAt: item.createdAt ?? new Date().toISOString() };
+    setActivityFeed(prev => [stamped, ...prev]);
     if (childIdRef.current) {
       db.addActivityItem(childIdRef.current, item.id, item.emoji, item.text, item.type).catch(() => {});
     }
   };
 
-  const saveOnboardingToDb = async () => {
+  const removeActivity = (id: string) => {
+    setActivityFeed(prev => prev.filter(a => a.id !== id));
+  };
+
+  const saveOnboardingToDb = async (childOverride?: { displayName?: string; username?: string; password?: string; mobile?: string; age?: number }) => {
     const uid = await db.saveOnboarding({
       email:    parent.email,
       password: parent.password,
       parent: {
-        firstName:       parent.firstName,
-        lastName:        parent.lastName,
-        displayName:     parent.displayName,
-        mobile:          parent.mobile,
-        address:         parent.address,
-        safetyPoolLimit: parent.safetyPoolLimit,
-        weeklyAllowance: parent.weeklyAllowance,
+        firstName:              parent.firstName,
+        lastName:               parent.lastName,
+        displayName:            parent.displayName,
+        mobile:                 parent.mobile,
+        address:                parent.address,
+        safetyPoolLimit:        parent.safetyPoolLimit,
+        weeklyAllowance:        parent.weeklyAllowance,
+        marketingNotifications: parent.marketingNotifications,
       },
       child: {
-        displayName:   child.displayName,
-        username:      child.username,
-        password:      child.password,
-        mobile:        child.mobile,
-        age:           child.age,
+        displayName:   childOverride?.displayName   ?? child.displayName,
+        username:      childOverride?.username      ?? child.username,
+        password:      childOverride?.password      ?? child.password,
+        mobile:        childOverride?.mobile        ?? child.mobile,
+        age:           childOverride?.age           ?? child.age,
         avatarEmoji:   child.avatarEmoji,
-        trustScore:    child.trustScore,
-        balance:       child.balance,
-        loanedOut:     child.loanedOut,
-        borrowed:      child.borrowed,
-        streak:        child.streak,
-        repaid:        child.repaid,
-        missed:        child.missed,
-        totalBorrowed: child.totalBorrowed,
-        totalLent:     child.totalLent,
-        points:        child.points,
+        trustScore:    50,
+        balance:       0,
+        loanedOut:     0,
+        borrowed:      0,
+        streak:        0,
+        repaid:        0,
+        missed:        0,
+        totalBorrowed: 0,
+        totalLent:     0,
+        points:        0,
       },
     });
     setUserId(uid);
     await cache.saveUserId(uid);
+    // Clear any stale child identity from a previous session so the fast-path
+    // login check in ChildLoginScreen can't fire with the wrong child UUID.
+    setChildId(null);
+    // New account has no passcode yet. Clear any stale passcode data that
+    // may have been left in cache from a previous session or account.
+    setParent(p => ({ ...p, passcode: '', passcodeHash: '', passcodeCreated: false }));
   };
 
-  const savePasscodeToDb = async (passcode: string) => {
+  const savePasscodeToDb = async (passcodeHash: string) => {
     if (!userId) return;
-    await db.updatePasscode(userId, passcode);
+    await db.updatePasscodeHash(userId, passcodeHash);
   };
+
+  const setupSafetyPool = async (amount: number) => {
+    setParent(p => ({ ...p, safetyPoolLimit: amount, safetyPoolUsed: 0 }));
+    if (userId) await db.setupSafetyPool(userId, amount);
+  };
+
+  const topUpSafetyPool = async (amount: number) => {
+    if (!userId) return;
+    const newLimit = await db.topUpSafetyPool(userId, amount);
+    setParent(p => ({ ...p, safetyPoolLimit: newLimit }));
+  };
+
+  const saveAllowanceToDb = async (amount: number, frequency: string, nextPayment: string | null, active: boolean) => {
+    setParent(p => ({
+      ...p,
+      weeklyAllowance:     amount,
+      allowanceFrequency:  frequency,
+      allowanceNextPayment: nextPayment ?? '',
+      allowanceActive:     active,
+    }));
+    if (userId) await db.updateAllowance(userId, amount, frequency, nextPayment, active);
+  };
+
+  const setMarketingNotifications = async (value: boolean) => {
+    setParent(p => ({ ...p, marketingNotifications: value }));
+    if (userId) await db.updateMarketingPreference(userId, value);
+  };
+
+  // Refresh parent financial data whenever userId is available (on login + every 30 s).
+  useEffect(() => {
+    if (!userId) return;
+    const refresh = () => {
+      db.getParentStats(userId).then(stats => {
+        if (!stats) return;
+        setParent(p => ({
+          ...p,
+          safetyPoolLimit:     stats.safety_pool_limit,
+          safetyPoolUsed:      stats.safety_pool_used,
+          weeklyAllowance:     stats.weekly_allowance,
+          allowanceFrequency:  stats.allowance_frequency ?? 'weekly',
+          allowanceNextPayment: stats.allowance_next_payment ?? '',
+          allowanceActive:     stats.allowance_active ?? false,
+        }));
+      }).catch(() => {});
+    };
+    refresh();
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [userId]);
 
   // Poll every 5 seconds while a child is logged in — picks up new friend requests, circle changes, and resolved sent requests
   useEffect(() => {
@@ -356,12 +465,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const seenResolvedIds = new Set<string>();
     const seenFundedIds = new Set<string>();
     const seenMoneyRequestIds = new Set<string>();
+    const seenExpiredIds = new Set<string>();
     // Each flag turns true after the FIRST async response for that call,
     // so pre-existing DB rows are silently seeded without generating feed items.
     let pendingFirstDone = false;
     let resolvedFirstDone = false;
     let fundedFirstDone = false;
     let moneyReqFirstDone = false;
+    let expiredFirstDone = false;
 
     const deadlineDaysToLabel = (days: number) => {
       if (days === 1) return '1d';
@@ -379,20 +490,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const expiresInHours = (iso: string) =>
       Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 3600000));
 
-    // Load persisted activity feed from DB so history survives logout/login
-    db.getActivityFeed(childId).then(items => {
-      if (items.length === 0) return;
-      setActivityFeed(items.map(i => ({
-        id: i.id,
-        emoji: i.emoji,
-        text: i.text,
-        time: formatCreatedAt(i.created_at),
-        type: i.type as ActivityItem['type'],
-      })));
-    }).catch(() => {});
-
     const poll = async () => {
       // Each call is independent — one failing cannot block the others
+
+      // 0. Activity feed — merged on every cycle so:
+      //    a) DB-written items from counterparty RPCs appear without re-login.
+      //    b) Optimistic items added this tick (before this fetch resolved) are not lost.
+      //    Sorted by created_at DESC so newest is always first regardless of RPC order.
+      db.getActivityFeed(childId).then(items => {
+        const dbIds = new Set(items.map(i => i.id));
+        const dbMapped: ActivityItem[] = items.map(i => ({
+          id: i.id,
+          emoji: i.emoji,
+          text: i.text,
+          time: formatCreatedAt(i.created_at),
+          type: i.type as ActivityItem['type'],
+          createdAt: i.created_at,
+        }));
+        setActivityFeed(prev => {
+          // Preserve any optimistic items not yet persisted to DB
+          const optimistic = prev.filter(a => !dbIds.has(a.id));
+          return [...optimistic, ...dbMapped].sort((a, b) => {
+            const ta = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
+            const tb = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
+            return tb - ta;
+          });
+        });
+      }).catch(() => {});
 
       // 0a. Transaction history from DB (live for both parties)
       db.getChildTransactions(childId).then(txs => {
@@ -407,24 +531,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })));
       }).catch(() => {});
 
-      // 0b. Child's own financials — balance, borrowed, loaned_out, trust score
+      // 0b. Child's own financials — balance, borrowed, loaned_out, trust score, frozen state
       db.getChildStats(childId).then(stats => {
         if (!stats) return;
         setChild(c => ({
           ...c,
-          balance:       stats.wallet_balance,
-          loanedOut:     stats.loaned_out,
-          borrowed:      stats.borrowed,
-          trustScore:    stats.trust_score,
-          points:        stats.points,
-          streak:        stats.streak,
-          repaid:        stats.repaid,
-          missed:        stats.missed,
-          totalBorrowed: stats.total_borrowed,
-          totalLent:     stats.total_lent,
-          timesBorrowed: stats.times_borrowed,
-          timesLent:     stats.times_lent,
+          balance:         stats.wallet_balance,
+          loanedOut:       stats.loaned_out,
+          borrowed:        stats.borrowed,
+          trustScore:      stats.trust_score,
+          points:          stats.points,
+          streak:          stats.streak,
+          repaid:          stats.repaid,
+          missed:          stats.missed,
+          totalBorrowed:   stats.total_borrowed,
+          totalLent:       stats.total_lent,
+          timesBorrowed:   stats.times_borrowed,
+          timesLent:       stats.times_lent,
+          profileImageUrl: stats.profile_image_url ?? c.profileImageUrl,
         }));
+        setFrozenAccount(stats.account_frozen ?? false);
+        setParentDebt(stats.parent_debt ?? 0);
+      }).catch(() => {});
+
+      // 0c. Overdue funded loans — process defaults atomically on the server
+      db.getOverdueFundedLoans(childId).then(overdue => {
+        overdue.forEach(({ request_id }) => {
+          db.processLoanDefault(request_id).catch(() => {});
+        });
       }).catch(() => {});
 
       // 1. Circle members (most critical — must always succeed)
@@ -432,6 +566,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
           username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+          profileImageUrl: m.avatar_url ?? undefined,
         })));
       }).catch(() => {});
 
@@ -441,6 +576,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           requestId: r.request_id, id: r.id, displayName: r.display_name,
           username: r.username, avatarEmoji: r.avatar_emoji,
           trustScore: r.trust_score, createdAt: r.created_at,
+          profileImageUrl: r.avatar_url ?? undefined,
         }));
         mapped.forEach(req => {
           if (!seenRequestIds.has(req.requestId)) {
@@ -491,6 +627,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 4. Active money requests from self + circle
       db.getActiveRequests(childId).then(moneyReqs => {
+        const now = Date.now();
+        const isExpired = (r: typeof moneyReqs[0]) =>
+          r.status === 'pending' && new Date(r.expires_at).getTime() <= now;
+
         moneyReqs.forEach(r => {
           // Detect own requests that just became funded → notify borrower
           if (r.is_own && r.status === 'funded' && r.funded_by_name && !seenFundedIds.has(r.id)) {
@@ -499,52 +639,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `funded_${r.id}`,
                 emoji: '💚',
-                text: `${r.funded_by_name} funded your request of £${Number(r.amount).toFixed(2)}!`,
+                text: `${r.funded_by_name} funded your request of £${fmtAmt(Number(r.amount))}!`,
                 time: 'Just now',
                 type: 'funded' as const,
               });
             }
           }
           // Detect new pending requests from circle members → notify everyone in their circle
-          if (!r.is_own && r.status === 'pending' && !seenMoneyRequestIds.has(r.id)) {
+          if (!r.is_own && r.status === 'pending' && !isExpired(r) && !seenMoneyRequestIds.has(r.id)) {
             seenMoneyRequestIds.add(r.id);
             if (moneyReqFirstDone) {
               addActivity({
                 id: `moneyreq_${r.id}`,
                 emoji: '💸',
-                text: `${r.from_name} needs £${Number(r.amount).toFixed(2)} for ${r.reason}`,
+                text: `${r.from_name} needs £${fmtAmt(Number(r.amount))} for ${r.reason}`,
                 time: 'Just now',
                 type: 'request' as const,
+              });
+            }
+          }
+          // Detect own pending requests that just expired → notify requester
+          if (r.is_own && isExpired(r) && !seenExpiredIds.has(r.id)) {
+            seenExpiredIds.add(r.id);
+            if (expiredFirstDone) {
+              addActivity({
+                id: `expired_${r.id}`,
+                emoji: '⏰',
+                text: `Your request for £${fmtAmt(Number(r.amount))} expired unfunded`,
+                time: 'Just now',
+                type: 'missed' as const,
               });
             }
           }
         });
         fundedFirstDone = true;
         moneyReqFirstDone = true;
+        expiredFirstDone = true;
 
+        // Exclude expired pending requests — they drop off everyone's circle page
+        // via this same poll; funded requests are kept until repaid.
         setActiveRequests(() =>
-          moneyReqs.map(r => ({
-            id: r.id,
-            fromId: r.from_id,
-            fromName: r.from_name,
-            fromEmoji: r.from_emoji,
-            fromTrust: r.from_trust,
-            amount: r.amount,
-            reason: r.reason,
-            reasonEmoji: r.reason_emoji,
-            deadline: deadlineDaysToLabel(r.deadline_days),
-            repayByDate: r.repay_by_date,
-            expiresIn: expiresInHours(r.expires_at),
-            createdAt: formatCreatedAt(r.created_at),
-            isOwn: r.is_own,
-            isFunded: r.status === 'funded',
-            fundedById: r.funded_by ?? undefined,
-            fundedByName: r.funded_by_name ?? undefined,
-            fundedByEmoji: r.funded_by_emoji ?? undefined,
-          }))
+          moneyReqs
+            .filter(r => !isExpired(r))
+            .map(r => ({
+              id: r.id,
+              fromId: r.from_id,
+              fromName: r.from_name,
+              fromEmoji: r.from_emoji,
+              fromTrust: r.from_trust,
+              amount: r.amount,
+              reason: r.reason,
+              reasonEmoji: r.reason_emoji,
+              deadline: deadlineDaysToLabel(r.deadline_days),
+              repayByDate: r.repay_by_date,
+              expiresIn: expiresInHours(r.expires_at),
+              createdAt: formatCreatedAt(r.created_at),
+              isOwn: r.is_own,
+              isFunded: r.status === 'funded',
+              fundedById: r.funded_by ?? undefined,
+              fundedByName: r.funded_by_name ?? undefined,
+              fundedByEmoji: r.funded_by_emoji ?? undefined,
+            }))
         );
       }).catch(() => {});
     };
+    // On login, expire streak to 0 if the child missed an entire ISO week
+    db.checkStreakExpiry(childId).then(freshStreak => {
+      if (freshStreak >= 0) setChild(c => ({ ...c, streak: freshStreak }));
+    }).catch(() => {});
+
     poll(); // immediate first fetch
     const id = setInterval(poll, 5000);
     return () => clearInterval(id);
@@ -562,15 +725,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       circle, setCircle,
       transactions,
       activeRequests, setActiveRequests,
-      activityFeed, addActivity,
+      activityFeed, addActivity, removeActivity,
       frozenAccount, setFrozenAccount,
-      parentDebt,
+      parentDebt, setParentDebt,
       adjustTrustScore,
       repayOnTime, lendMoney, missRepayment, repayParent,
       addTransaction,
-      userId,
+      userId, setUserId,
       saveOnboardingToDb,
       savePasscodeToDb,
+      setupSafetyPool,
+      topUpSafetyPool,
+      saveAllowanceToDb,
+      setMarketingNotifications,
+      recordWeeklyStreak,
+      biometricEnabled,
+      setBiometricEnabled,
     }}>
       {children}
     </AppContext.Provider>

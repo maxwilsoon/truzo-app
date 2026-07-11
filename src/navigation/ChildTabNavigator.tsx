@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
+import { useApp } from '../context/AppContext';
 import { HomeScreen } from '../screens/child/HomeScreen';
 import { CircleScreen } from '../screens/child/CircleScreen';
 import { WalletScreen } from '../screens/child/WalletScreen';
@@ -12,6 +13,8 @@ const Tab = createBottomTabNavigator();
 
 export const ChildTabNavigator = () => {
   const insets = useSafeAreaInsets();
+  const { pendingRequests, activeRequests } = useApp();
+  const circleBadge = pendingRequests.length + activeRequests.filter(r => !r.isOwn).length;
   return (
   <Tab.Navigator
     screenOptions={({ route }) => ({
@@ -40,7 +43,11 @@ export const ChildTabNavigator = () => {
     })}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Circle" component={CircleScreen} />
+    <Tab.Screen
+      name="Circle"
+      component={CircleScreen}
+      options={{  }}
+    />
     <Tab.Screen name="Wallet" component={WalletScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>

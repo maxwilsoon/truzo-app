@@ -10,7 +10,9 @@ export type RootStackParamList = {
   HomeAddress: undefined;
   Verifying: undefined;
   ChildDetails: undefined;
-  WhoIsLoggingIn: undefined;
+  SafetyPool: undefined;
+  SelectAccount: undefined;
+  WhoIsLoggingIn: { newAccount?: boolean } | undefined;
   GetApp: undefined;
   ParentEmailLogin: undefined;
   ChildLogin: undefined;
@@ -26,5 +28,8 @@ export type RootStackParamList = {
   ChildSettings: undefined;
   PaymentMethods: undefined;
   ParentAccountDetails: undefined;
+  ParentNotifications: undefined;
   RateTruzo: undefined;
+  BiometricSetup: undefined;
+  BiometricLogin: undefined;
 };

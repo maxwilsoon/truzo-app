@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
+import { useApp } from '../../context/AppContext';
 
 const PURPLE = '#4F35F3';
 const BG = '#F2F2F7';
@@ -26,41 +27,50 @@ const MegaphoneIllustration = () => (
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Notifications'> };
 
-export const NotificationsScreen: React.FC<Props> = ({ navigation }) => (
-  <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-    <BackButton />
-    <StepProgress current={4} total={8} />
+export const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
+  const { setParent } = useApp();
 
-    <View style={styles.content}>
-      <Text style={styles.title}>Stay in the know</Text>
-      <Text style={styles.sub}>
-        With email and push notification updates about new features, offers and reminders.
-      </Text>
+  const choose = (value: boolean) => {
+    setParent(p => ({ ...p, marketingNotifications: value }));
+    navigation.navigate('DisplayName');
+  };
 
-      <View style={styles.illuArea}>
-        <MegaphoneIllustration />
+  return (
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <BackButton />
+      <StepProgress current={4} total={8} />
+
+      <View style={styles.content}>
+        <Text style={styles.title}>Stay in the know</Text>
+        <Text style={styles.sub}>
+          With email and push notification updates about new features, offers and reminders.
+        </Text>
+
+        <View style={styles.illuArea}>
+          <MegaphoneIllustration />
+        </View>
       </View>
-    </View>
 
-    <View style={styles.footer}>
-      <TouchableOpacity
-        style={styles.yesBtn}
-        onPress={() => navigation.navigate('DisplayName')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.yesBtnText}>Yes, send me updates</Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.yesBtn}
+          onPress={() => choose(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.yesBtnText}>Yes, send me updates</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={() => navigation.navigate('DisplayName')}
-        activeOpacity={0.6}
-        style={styles.noBtn}
-      >
-        <Text style={styles.noBtnText}>No thanks</Text>
-      </TouchableOpacity>
-    </View>
-  </SafeAreaView>
-);
+        <TouchableOpacity
+          onPress={() => choose(false)}
+          activeOpacity={0.6}
+          style={styles.noBtn}
+        >
+          <Text style={styles.noBtnText}>No thanks</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
 
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: BG },

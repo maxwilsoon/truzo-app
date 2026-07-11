@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { navigationRef } from '../../navigation';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
@@ -43,9 +44,15 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.username}>@{child.username}</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('AvatarPicker')}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarEmoji}>{child.avatarEmoji}</Text>
-            </View>
+            {child.profileImageUrl ? (
+              <View style={styles.avatarWrap}>
+                <Image source={{ uri: child.profileImageUrl }} style={styles.avatarPhoto} resizeMode="cover" />
+              </View>
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarEmoji}>{child.avatarEmoji}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -67,16 +74,19 @@ export const ProfileScreen: React.FC = () => {
             icon="log-out-outline"
             label="Log Out"
             last
-            onPress={() =>
-              Alert.alert('Log out', 'Are you sure?', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Log out',
-                  style: 'destructive',
-                  onPress: () => navigation.navigate('WhoIsLoggingIn'),
-                },
-              ])
-            }
+            onPress={() => {
+              const doLogout = () => navigationRef.reset({ index: 0, routes: [{ name: 'WhoIsLoggingIn' }] });
+              if (Platform.OS === 'web') {
+                if (window.confirm('Are you sure you want to log out?')) {
+                  setTimeout(doLogout, 0);
+                }
+              } else {
+                Alert.alert('Log out', 'Are you sure?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Log out', style: 'destructive', onPress: doLogout },
+                ]);
+              }
+            }}
           />
         </View>
 
@@ -106,6 +116,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  avatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+  },
+  avatarPhoto: {
+    width: 64,
+    height: 64,
   },
   avatar: {
     width: 64,

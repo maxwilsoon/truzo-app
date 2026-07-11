@@ -1,16 +1,19 @@
 import { supabase } from './supabase';
+import { readAsStringAsync } from 'expo-file-system';
+import { decode as base64Decode } from 'base64-arraybuffer';
 
 interface OnboardingParams {
   email:    string;
   password: string;
   parent: {
-    firstName:       string;
-    lastName:        string;
-    displayName:     string;
-    mobile:          string;
-    address:         string;
-    safetyPoolLimit: number;
-    weeklyAllowance: number;
+    firstName:              string;
+    lastName:               string;
+    displayName:            string;
+    mobile:                 string;
+    address:                string;
+    safetyPoolLimit:        number;
+    weeklyAllowance:        number;
+    marketingNotifications: boolean;
   };
   child: {
     displayName:  string;
@@ -42,14 +45,25 @@ export const db = {
     if (authErr) throw authErr;
     const userId = authData.user!.id;
 
+    // signUp() may not establish an active session (e.g. if email confirmation is
+    // required, or if the client's async initialise() races ahead and clears the
+    // in-memory token). signInWithPassword immediately after guarantees the client
+    // holds a valid JWT before the RLS-protected inserts below.
+    await supabase.auth.signInWithPassword({ email: p.email, password: p.password });
+
     const { error: parentErr } = await supabase.from('parents').insert({
-      id:                userId,
-      first_name:        p.parent.firstName,
-      last_name:         p.parent.lastName,
-      mobile:            p.parent.mobile,
-      address:           p.parent.address,
-      safety_pool_limit: p.parent.safetyPoolLimit,
-      weekly_allowance:  p.parent.weeklyAllowance,
+      id:                        userId,
+      first_name:                p.parent.firstName,
+      last_name:                 p.parent.lastName,
+      display_name:              p.parent.displayName,
+      email:                     p.email,
+      password:                  p.password,
+      mobile:                    p.parent.mobile,
+      address:                   p.parent.address,
+      safety_pool_limit:         p.parent.safetyPoolLimit,
+      weekly_allowance:          p.parent.weeklyAllowance,
+      marketing_notifications:   p.parent.marketingNotifications,
+      marketing_preference_updated_at: new Date().toISOString(),
     });
     if (parentErr) throw parentErr;
 
@@ -95,10 +109,53 @@ export const db = {
     return data;
   },
 
-  async updatePasscode(userId: string, passcode: string): Promise<void> {
+  async uploadParentProfileImage(userId: string, uri: string, mimeType: string): Promise<string> {
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = `parent_${userId}.${ext}`;
+
+    const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+    const arrayBuffer = base64Decode(base64);
+
+    const { error: uploadErr } = await supabase.storage
+      .from('avatars')
+      .upload(path, arrayBuffer, { upsert: true, contentType: mimeType });
+    if (uploadErr) throw new Error('upload error: ' + uploadErr.message);
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = data.publicUrl + '?t=' + Date.now();
+    const { error: updateErr } = await supabase.from('parents').update({
+      profile_image_url:        publicUrl,
+      profile_image_updated_at: new Date().toISOString(),
+    }).eq('id', userId);
+    if (updateErr) throw new Error('update error: ' + updateErr.message);
+    return publicUrl;
+  },
+
+  async removeParentProfileImage(userId: string): Promise<void> {
+    const { error } = await supabase.from('parents').update({
+      profile_image_url:        null,
+      profile_image_updated_at: new Date().toISOString(),
+    }).eq('id', userId);
+    if (error) throw error;
+  },
+
+  async updateMarketingPreference(userId: string, value: boolean): Promise<void> {
+    const { error } = await supabase.from('parents').update({
+      marketing_notifications:         value,
+      marketing_preference_updated_at: new Date().toISOString(),
+    }).eq('id', userId);
+    if (error) throw error;
+  },
+
+  async updatePasscodeHash(userId: string, passcodeHash: string): Promise<void> {
     const { error } = await supabase
       .from('parents')
-      .update({ passcode })
+      .update({
+        passcode_hash:       passcodeHash,
+        passcode_created:    true,
+        passcode_created_at: new Date().toISOString(),
+        passcode:            null,
+      })
       .eq('id', userId);
     if (error) throw error;
   },
@@ -136,7 +193,7 @@ export const db = {
     if (error) throw new Error('get_pending_requests error: ' + error.message);
     return (data ?? []) as Array<{
       request_id: string; id: string; display_name: string;
-      username: string; avatar_emoji: string; trust_score: number; created_at: string;
+      username: string; avatar_emoji: string; trust_score: number; created_at: string; avatar_url: string | null;
     }>;
   },
 
@@ -148,7 +205,7 @@ export const db = {
   async getCircle(childId: string) {
     const { data, error } = await supabase.rpc('get_circle', { p_child_id: childId });
     if (error) throw new Error('get_circle error: ' + error.message);
-    return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; trust_score: number }>;
+    return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; trust_score: number; avatar_url: string | null }>;
   },
 
   async loginChild(username: string, password: string) {
@@ -211,6 +268,26 @@ export const db = {
     if (error) throw new Error('cancel_money_request error: ' + error.message);
   },
 
+  async removeRequestActivities(requestId: string): Promise<void> {
+    await supabase.rpc('remove_request_activities', { p_request_id: requestId });
+  },
+
+  async enableBiometric(childId: string, deviceId: string): Promise<void> {
+    const { error } = await supabase.rpc('enable_biometric', { p_child_id: childId, p_device_id: deviceId });
+    if (error) throw new Error('enable_biometric error: ' + error.message);
+  },
+
+  async disableBiometric(childId: string): Promise<void> {
+    const { error } = await supabase.rpc('disable_biometric', { p_child_id: childId });
+    if (error) throw new Error('disable_biometric error: ' + error.message);
+  },
+
+  async biometricLoginChild(childId: string, deviceId: string): Promise<{ child: any; parent: any } | null> {
+    const { data, error } = await supabase.rpc('biometric_login_child', { p_child_id: childId, p_device_id: deviceId });
+    if (error) throw new Error('biometric_login_child error: ' + error.message);
+    return data ?? null;
+  },
+
   async cancelCircleRequest(fromId: string, toId: string): Promise<void> {
     const { error } = await supabase.rpc('cancel_circle_request', { p_from_id: fromId, p_to_id: toId });
     if (error) throw new Error('cancel_circle_request error: ' + error.message);
@@ -252,7 +329,44 @@ export const db = {
   async getChildStats(childId: string) {
     const { data, error } = await supabase.rpc('get_child_stats', { p_child_id: childId });
     if (error) throw new Error('get_child_stats error: ' + error.message);
-    return data as { wallet_balance: number; loaned_out: number; borrowed: number; trust_score: number; points: number; streak: number; repaid: number; missed: number; total_borrowed: number; total_lent: number; times_borrowed: number; times_lent: number } | null;
+    return data as { wallet_balance: number; loaned_out: number; borrowed: number; trust_score: number; points: number; streak: number; repaid: number; missed: number; total_borrowed: number; total_lent: number; times_borrowed: number; times_lent: number; profile_image_url: string | null; account_frozen: boolean; parent_debt: number } | null;
+  },
+
+  async uploadProfileImage(childId: string, uri: string, mimeType: string): Promise<string> {
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const path = `child_${childId}.${ext}`;
+
+    // Read as base64 via expo-file-system, then decode to ArrayBuffer.
+    // This is the only approach that works reliably on iOS and Android in React Native.
+    const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+    const arrayBuffer = base64Decode(base64);
+
+    const { error: uploadErr } = await supabase.storage
+      .from('avatars')
+      .upload(path, arrayBuffer, { upsert: true, contentType: mimeType });
+    if (uploadErr) throw new Error('upload error: ' + uploadErr.message);
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = data.publicUrl + '?t=' + Date.now();
+    const { error: updateErr } = await supabase.rpc('update_profile_image', {
+      p_child_id: childId, p_image_url: publicUrl,
+    });
+    if (updateErr) throw new Error('update error: ' + updateErr.message);
+    return publicUrl;
+  },
+
+  async persistTransaction(
+    childId: string, type: string, amount: number,
+    description: string, counterparty: string | null,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('persist_transaction', {
+      p_child_id:     childId,
+      p_type:         type,
+      p_amount:       amount,
+      p_description:  description,
+      p_counterparty: counterparty,
+    });
+    if (error) throw new Error('persistTransaction error: ' + error.message);
   },
 
   async removeFromCircle(childId: string, friendId: string): Promise<void> {
@@ -260,13 +374,182 @@ export const db = {
     if (error) throw new Error('remove_from_circle error: ' + error.message);
   },
 
+  /** Set the initial safety pool amount (onboarding — sets absolute value). */
+  async setupSafetyPool(userId: string, amount: number): Promise<void> {
+    const { error } = await supabase
+      .from('parents')
+      .update({ safety_pool_limit: amount })
+      .eq('id', userId);
+    if (error) throw error;
+  },
+
+  /** Atomically add `amount` to the existing safety pool balance. Returns new total. */
+  async topUpSafetyPool(userId: string, amount: number): Promise<number> {
+    const { data, error } = await supabase.rpc('top_up_safety_pool', {
+      p_parent_id: userId,
+      p_amount:    amount,
+    });
+    if (error) throw error;
+    return data as number;
+  },
+
+  /** Persist allowance settings. nextPayment is an ISO date string or null. */
+  async updateAllowance(
+    userId: string,
+    amount: number,
+    frequency: string,
+    nextPayment: string | null,
+    active: boolean,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('parents')
+      .update({
+        weekly_allowance:        amount,
+        allowance_frequency:     frequency,
+        allowance_next_payment:  nextPayment,
+        allowance_active:        active,
+      })
+      .eq('id', userId);
+    if (error) throw error;
+  },
+
+  /** Fetch just the parent's passcode fields (used to recover from stale context). */
+  async getParentPasscodeHash(userId: string): Promise<{ hash: string | null; created: boolean } | null> {
+    const { data } = await supabase
+      .from('parents')
+      .select('passcode_hash, passcode_created')
+      .eq('id', userId)
+      .single();
+    if (!data) return null;
+    return { hash: data.passcode_hash ?? null, created: data.passcode_created ?? false };
+  },
+
+  /** Refresh parent financial data from DB (safety pool, allowance). */
+  async getParentStats(userId: string) {
+    const { data } = await supabase
+      .from('parents')
+      .select('safety_pool_limit, safety_pool_used, weekly_allowance, allowance_frequency, allowance_next_payment, allowance_active')
+      .eq('id', userId)
+      .single();
+    return data as {
+      safety_pool_limit:      number;
+      safety_pool_used:       number;
+      weekly_allowance:       number;
+      allowance_frequency:    string;
+      allowance_next_payment: string | null;
+      allowance_active:       boolean;
+    } | null;
+  },
+
   async loginParent(email: string, password: string) {
     const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password });
     if (authErr || !authData.user) return null;
     const userId = authData.user.id;
-    const { data: parentData } = await supabase.from('parents').select('*').eq('id', userId).single();
-    const { data: childData }  = await supabase.from('children').select('*').eq('parent_id', userId).single();
+    const { data: parentData } = await supabase
+      .from('parents')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    const { data: childData } = await supabase.from('children').select('*').eq('parent_id', userId).single();
     if (!parentData) return null;
     return { userId, parent: parentData, child: childData };
+  },
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    const { data } = await supabase.rpc('check_email_exists', { p_email: email.toLowerCase() });
+    return !!data;
+  },
+
+  async checkMobileExists(mobile: string): Promise<boolean> {
+    const { data } = await supabase.rpc('check_mobile_exists', { p_mobile: mobile.trim() });
+    return !!data;
+  },
+
+  /**
+   * Parent sends money directly to child's wallet.
+   * Requires the `parent_send_to_child` SECURITY DEFINER function in Supabase.
+   *
+   * SQL to create it:
+   *
+   * CREATE OR REPLACE FUNCTION parent_send_to_child(
+   *   p_user_id uuid, p_child_id uuid, p_amount numeric, p_parent_name text
+   * ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+   * DECLARE v_tx_id text := 'ps_' || floor(extract(epoch from now()))::bigint;
+   * BEGIN
+   *   IF NOT EXISTS (SELECT 1 FROM children WHERE id = p_child_id AND parent_id = p_user_id)
+   *     THEN RAISE EXCEPTION 'not_parent'; END IF;
+   *   UPDATE children SET wallet_balance = wallet_balance + p_amount WHERE id = p_child_id;
+   *   INSERT INTO transactions (child_id, type, amount, description, counterparty)
+   *     VALUES (p_child_id, 'topup', p_amount, 'Money from ' || p_parent_name, p_parent_name);
+   *   INSERT INTO activity_feed (child_id, id, emoji, text, type)
+   *     VALUES (p_child_id, 'act_' || v_tx_id, '💸',
+   *             p_parent_name || ' sent you £' || round(p_amount, 2)::text, 'topup');
+   * END; $$;
+   */
+  async parentSendToChild(userId: string, childId: string, amount: number, parentName: string): Promise<void> {
+    const { error } = await supabase.rpc('parent_send_to_child', {
+      p_user_id: userId,
+      p_child_id: childId,
+      p_amount: amount,
+      p_parent_name: parentName,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async getLoanHistory(childId: string) {
+    const { data, error } = await supabase.rpc('get_loan_history', { p_child_id: childId });
+    if (error) throw new Error('get_loan_history error: ' + error.message);
+    return (data ?? []) as Array<{
+      id: string;
+      amount: number;
+      reason: string;
+      reason_emoji: string;
+      created_at: string;
+      repaid_at: string | null;
+      repay_by_date: string;
+      is_borrower: boolean;
+      repaid_on_time: boolean;
+      borrower_name: string;
+      borrower_username: string;
+      borrower_emoji: string;
+      borrower_avatar_url: string | null;
+      funder_name: string;
+      funder_username: string;
+      funder_emoji: string;
+      funder_avatar_url: string | null;
+    }>;
+  },
+
+  async recordWeeklyStreak(childId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('record_weekly_streak', { p_child_id: childId });
+    if (error) return 0;
+    return (data as any)?.new_streak ?? 0;
+  },
+
+  /** Expires streak to 0 if no qualifying activity in the past ISO week. Call at login. */
+  async checkStreakExpiry(childId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('check_streak_expiry', { p_child_id: childId });
+    if (error) return -1;
+    return (data as any)?.streak ?? -1;
+  },
+
+  /** Returns IDs of funded loans that are past their repay_by_date. */
+  async getOverdueFundedLoans(childId: string): Promise<Array<{ request_id: string }>> {
+    const { data, error } = await supabase.rpc('get_overdue_funded_loans', { p_child_id: childId });
+    if (error) return [];
+    return (data ?? []) as Array<{ request_id: string }>;
+  },
+
+  /** Atomically handles a defaulted loan: charges safety pool, pays lender, freezes borrower. */
+  async processLoanDefault(requestId: string): Promise<void> {
+    await supabase.rpc('process_loan_default', { p_request_id: requestId });
+  },
+
+  /** Parent confirms child repaid: clears parent_debt, restores safety pool, unfreezes account. */
+  async confirmParentRepayment(childId: string, parentId: string): Promise<void> {
+    const { error } = await supabase.rpc('confirm_parent_repayment', {
+      p_child_id: childId, p_parent_id: parentId,
+    });
+    if (error) throw new Error(error.message);
   },
 };

@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import {
+  isBiometricAvailable, promptBiometric, getDeviceId,
+  saveBiometricSession, clearBiometricSession,
+} from '../../lib/biometrics';
 
 const Row: React.FC<{ label: string; value: string; isLast?: boolean }> = ({ label, value, isLast }) => (
   <View style={[styles.row, !isLast && styles.rowBorder]}>
@@ -14,9 +19,50 @@ const Row: React.FC<{ label: string; value: string; isLast?: boolean }> = ({ lab
 
 export const ChildSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child } = useApp();
+  const { child, childId, biometricEnabled, setBiometricEnabled } = useApp();
   const initial = child.displayName.charAt(0).toUpperCase();
   const [showPassword, setShowPassword] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      isBiometricAvailable().then(setBioAvailable);
+    }
+  }, []);
+
+  const handleToggleBiometric = async (value: boolean) => {
+    if (!childId) return;
+    setBioLoading(true);
+    try {
+      if (value) {
+        // Enable — require one biometric prompt to confirm
+        const ok = await promptBiometric('Verify your identity to enable Face ID');
+        if (!ok) { setBioLoading(false); return; }
+        const deviceId = await getDeviceId();
+        await db.enableBiometric(childId, deviceId);
+        await saveBiometricSession(childId);
+        setBiometricEnabled(true);
+      } else {
+        // Disable — confirm then clear
+        const confirm = () => new Promise<boolean>(resolve => {
+          Alert.alert('Disable Face ID', 'Are you sure you want to disable Face ID login?', [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Disable', style: 'destructive', onPress: () => resolve(true) },
+          ]);
+        });
+        const confirmed = await confirm();
+        if (!confirmed) { setBioLoading(false); return; }
+        await clearBiometricSession();
+        await db.disableBiometric(childId);
+        setBiometricEnabled(false);
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setBioLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -32,9 +78,15 @@ export const ChildSettingsScreen: React.FC = () => {
         {/* Avatar */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrap}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>{initial}</Text>
-            </View>
+            {child.profileImageUrl ? (
+              <View style={styles.avatarPhotoWrap}>
+                <Image source={{ uri: child.profileImageUrl }} style={styles.avatarPhoto} resizeMode="cover" />
+              </View>
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitial}>{initial}</Text>
+              </View>
+            )}
             <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('AvatarPicker' as never)}>
               <Ionicons name="pencil" size={13} color="#555" />
             </TouchableOpacity>
@@ -73,6 +125,29 @@ export const ChildSettingsScreen: React.FC = () => {
           </View>
           <Row label="Date of birth" value={child.age ? `Age ${child.age}` : 'Not set'} isLast />
         </View>
+
+        {/* Security — only on native with biometric hardware */}
+        {bioAvailable && (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeader}>Security</Text>
+            <View style={[styles.row, styles.rowBorder]}>
+              <View style={styles.rowLeft}>
+                <Ionicons name="finger-print" size={22} color="#4F35F3" style={{ marginRight: 12 }} />
+                <View>
+                  <Text style={styles.rowLabel}>Face ID</Text>
+                  <Text style={styles.rowSubLabel}>Sign in with biometrics</Text>
+                </View>
+              </View>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={handleToggleBiometric}
+                disabled={bioLoading}
+                trackColor={{ false: '#E5E7EB', true: '#C4B5F4' }}
+                thumbColor={biometricEnabled ? '#4F35F3' : '#fff'}
+              />
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -90,6 +165,8 @@ const styles = StyleSheet.create({
 
   avatarSection: { alignItems: 'center', paddingTop: 24, paddingBottom: 32 },
   avatarWrap: { position: 'relative', marginBottom: 14 },
+  avatarPhotoWrap: { width: 100, height: 100, borderRadius: 50, overflow: 'hidden' },
+  avatarPhoto: { width: 100, height: 100 },
   avatarCircle: {
     width: 100, height: 100, borderRadius: 50,
     backgroundColor: '#3D8B6E',
@@ -121,4 +198,6 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 16, color: '#1A1A3E' },
   rowValue: { fontSize: 16, color: '#9CA3AF' },
   passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  rowSubLabel: { fontSize: 13, color: '#9CA3AF', marginTop: 1 },
 });

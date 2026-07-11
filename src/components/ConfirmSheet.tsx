@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { fmtAmt } from '../lib/utils';
 
 interface Props {
   visible: boolean;
@@ -70,14 +71,14 @@ export const ConfirmSheet: React.FC<Props> = ({
         {/* Amount row */}
         <View style={styles.amountRow}>
           <Text style={styles.amountLabel}>Amount</Text>
-          <Text style={[styles.amountValue, { color: confirmColor }]}>£{amount.toFixed(2)}</Text>
+          <Text style={[styles.amountValue, { color: confirmColor }]}>£{fmtAmt(amount)}</Text>
         </View>
 
         {/* Balance after */}
         <View style={[styles.amountRow, { borderTopWidth: 0, paddingTop: 4 }]}>
           <Text style={styles.amountLabel}>Wallet after</Text>
           <Text style={[styles.amountValue, { color: balanceAfter < 0 ? colors.error : colors.text, fontSize: 15 }]}>
-            £{balanceAfter.toFixed(2)}
+            £{fmtAmt(balanceAfter)}
           </Text>
         </View>
 

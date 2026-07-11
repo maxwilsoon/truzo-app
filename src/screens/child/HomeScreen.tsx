@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors, getTierInfo, getTierPercentile } from '../../theme/colors';
 import { TrustScoreRing } from '../../components/TrustScoreRing';
 import { useApp } from '../../context/AppContext';
+import { fmtAmt } from '../../lib/utils';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -18,15 +19,22 @@ export const HomeScreen: React.FC = () => {
   const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
 
-  // Activity feed is the public circle feed — hide private wallet events
-  const circleActivity = activityFeed.filter(a => a.type !== 'topup' && a.type !== 'spend');
+  // Activity feed is the public circle feed — hide private wallet events, sort newest first
+  const now = Date.now();
+  const circleActivity = activityFeed
+    .filter(a => a.type !== 'topup' && a.type !== 'spend')
+    .sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : now;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : now;
+      return tb - ta;
+    });
 
   const tier = getTierInfo(child.trustScore);
   const percentile = getTierPercentile(child.trustScore);
 
   const leaderboard = [
-    { rank: 1, name: 'You', emoji: child.avatarEmoji, score: child.trustScore, isYou: true },
-    ...circle.map((m, i) => ({ rank: i + 2, name: m.displayName, emoji: m.avatarEmoji, score: m.trustScore, isYou: false })),
+    { rank: 1, name: 'You', emoji: child.avatarEmoji, photo: child.profileImageUrl, score: child.trustScore, isYou: true },
+    ...circle.map((m, i) => ({ rank: i + 2, name: m.displayName, emoji: m.avatarEmoji, photo: m.profileImageUrl, score: m.trustScore, isYou: false })),
   ].sort((a, b) => b.score - a.score).map((m, i) => ({ ...m, rank: i + 1 }));
 
   const visibleLeaderboard = showAllLeaderboard ? leaderboard : leaderboard.slice(0, 3);
@@ -38,16 +46,22 @@ export const HomeScreen: React.FC = () => {
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('AvatarPicker')}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileEmoji}>{child.avatarEmoji}</Text>
-          </View>
+          {child.profileImageUrl ? (
+            <View style={styles.profileAvatarWrap}>
+              <Image source={{ uri: child.profileImageUrl }} style={styles.profilePhoto} resizeMode="cover" />
+            </View>
+          ) : (
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileEmoji}>{child.avatarEmoji}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
       {frozenAccount && (
         <View style={styles.frozenBanner}>
-          <Text style={styles.frozenText}>🔒 Account frozen — £{parentDebt.toFixed(2)} auto-paid to Jordan Lee from your parent's safety pool · -15 trust pts</Text>
-          <Text style={styles.frozenSub}>Pay your parent back £{parentDebt.toFixed(2)}, then ask them to confirm in their app to unfreeze your account.</Text>
+          <Text style={styles.frozenText}>🔒 Account frozen — £{fmtAmt(parentDebt)} auto-paid to Jordan Lee from your parent's safety pool · -15 trust pts</Text>
+          <Text style={styles.frozenSub}>Pay your parent back £{fmtAmt(parentDebt)}, then ask them to confirm in their app to unfreeze your account.</Text>
         </View>
       )}
 
@@ -69,10 +83,6 @@ export const HomeScreen: React.FC = () => {
           </View>
           <View style={styles.trustStats}>
             <View style={styles.statPill}>
-              <Text style={styles.statEmoji}>🔥</Text>
-              <Text style={styles.statText}>{child.streak} streak</Text>
-            </View>
-            <View style={styles.statPill}>
               <Text style={styles.statEmoji}>✅</Text>
               <Text style={[styles.statText, { color: colors.primary }]}>Repaid {child.repaid}</Text>
             </View>
@@ -80,13 +90,19 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.statEmoji}>⚠️</Text>
               <Text style={styles.statText}>{child.missed} missed</Text>
             </View>
+            {child.streak > 0 && (
+              <View style={styles.statPill}>
+                <Text style={styles.statEmoji}>🔥</Text>
+                <Text style={styles.statText}>{child.streak} week streak</Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
 
         {/* Balance Card */}
         <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.balanceCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>£{child.balance.toFixed(2)}</Text>
+          <Text style={styles.balanceAmount}>£{fmtAmt(child.balance)}</Text>
           <TouchableOpacity style={[styles.requestBtn, frozenAccount && styles.requestBtnDisabled]} onPress={() => !frozenAccount && navigation.navigate('RequestMoney')} activeOpacity={0.85}>
             <View style={styles.requestIconWrap}>
               <Text style={{ fontSize: 18 }}>💸</Text>
@@ -111,9 +127,15 @@ export const HomeScreen: React.FC = () => {
               <View style={[styles.rankCircle, { backgroundColor: rankColors[item.rank] ?? '#D1D5DB' }]}>
                 <Text style={styles.rankText}>{item.rank}</Text>
               </View>
-              <View style={styles.leaderAvatar}>
-                <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
-              </View>
+              {item.photo ? (
+                <View style={styles.leaderAvatarWrap}>
+                  <Image source={{ uri: item.photo }} style={styles.leaderAvatarPhoto} resizeMode="cover" />
+                </View>
+              ) : (
+                <View style={styles.leaderAvatar}>
+                  <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
+                </View>
+              )}
               <Text style={[styles.leaderName, item.isYou && styles.leaderNameYou]}>
                 {item.name}{item.rank === 1 ? ' 👑' : ''}
               </Text>
@@ -152,8 +174,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.white },
   profileBtn: {},
+  profileAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
+  profilePhoto: { width: 40, height: 40 },
   profileAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   profileEmoji: { fontSize: 20 },
+  leaderAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
+  leaderAvatarPhoto: { width: 40, height: 40 },
   headerGreeting: { fontSize: 17, fontWeight: '700', color: colors.text },
   frozenBanner: { backgroundColor: colors.errorLight, padding: 14, gap: 6 },
   frozenText: { fontSize: 13, color: colors.error, fontWeight: '700' },
