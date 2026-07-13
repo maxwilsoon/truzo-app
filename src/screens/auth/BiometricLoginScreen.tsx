@@ -69,7 +69,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
         address:         par.address ?? '',
         safetyPoolLimit:        par.safety_pool_limit ?? 50,
         weeklyAllowance:        par.weekly_allowance ?? 10,
-        passcodeCreated:        par.parent_passcode_created ?? false,
+        passcodeCreated:        par.passcode_created ?? false,
         marketingNotifications: par.marketing_notifications ?? null,
         profileImageUrl:        par.profile_image_url ?? undefined,
       }));
