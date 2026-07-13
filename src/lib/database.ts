@@ -58,7 +58,6 @@ export const db = {
       last_name:                 p.parent.lastName,
       display_name:              p.parent.displayName,
       email:                     p.email,
-      password:                  p.password,
       mobile:                    p.parent.mobile,
       address:                   p.parent.address,
       safety_pool_limit:         p.parent.safetyPoolLimit,

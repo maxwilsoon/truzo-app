@@ -99,7 +99,6 @@ export const ParentAccountDetailsScreen: React.FC = () => {
 
           <InfoRow icon="mail-outline"       label="Email address"  value={parent.email}    />
           <InfoRow icon="call-outline"       label="Phone number"   value={parent.mobile}   />
-          <InfoRow icon="lock-closed-outline" label="Password"      value={parent.password} password />
           <InfoRow icon="home-outline"       label="Home address"   value={parent.address}  last />
         </Section>
 

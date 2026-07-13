@@ -62,7 +62,6 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
         marketingNotifications: par.marketing_notifications ?? false,
         profileImageUrl:        par.profile_image_url ?? undefined,
         email:                  email.trim().toLowerCase(),
-        password,
       }));
 
       if (ch) {

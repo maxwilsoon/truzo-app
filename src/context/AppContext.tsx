@@ -105,7 +105,6 @@ interface ParentProfile {
   displayName: string;
   email: string;
   mobile: string;
-  password: string;
   address: string;
   safetyPoolLimit: number;
   safetyPoolUsed: number;
@@ -157,6 +156,7 @@ interface AppContextType {
   addTransaction: (t: Transaction) => void;
   userId: string | null;
   setUserId: (id: string | null) => void;
+  setOnboardingPassword: (pw: string) => void;
   saveOnboardingToDb: (childOverride?: { displayName?: string; username?: string; password?: string; mobile?: string; age?: number }) => Promise<void>;
   savePasscodeToDb: (passcode: string) => Promise<void>;
   setupSafetyPool: (amount: number) => Promise<void>;
@@ -227,13 +227,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [repayHighlightId, setRepayHighlightId] = useState<string | null>(null);
 
+  // Holds the parent's Supabase Auth password only for the duration of onboarding.
+  // Never stored in state, never written to AsyncStorage, cleared after signUp completes.
+  const pendingPasswordRef = useRef<string>('');
+  const setOnboardingPassword = (pw: string) => { pendingPasswordRef.current = pw; };
+
   const [parent, setParent] = useState<ParentProfile>({
     firstName: '',
     lastName: '',
     displayName: '',
     email: '',
     mobile: '',
-    password: '',
     address: '',
     safetyPoolLimit: 0,
     safetyPoolUsed: 0,
@@ -367,7 +371,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveOnboardingToDb = async (childOverride?: { displayName?: string; username?: string; password?: string; mobile?: string; age?: number }) => {
     const uid = await db.saveOnboarding({
       email:    parent.email,
-      password: parent.password,
+      password: pendingPasswordRef.current,
       parent: {
         firstName:              parent.firstName,
         lastName:               parent.lastName,
@@ -399,6 +403,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setUserId(uid);
     await cache.saveUserId(uid);
+    // Erase the transient onboarding password from memory — it was only needed for signUp.
+    pendingPasswordRef.current = '';
     // Clear any stale child identity from a previous session so the fast-path
     // login check in ChildLoginScreen can't fire with the wrong child UUID.
     setChildId(null);
@@ -736,6 +742,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       repayOnTime, lendMoney, missRepayment, repayParent,
       addTransaction,
       userId, setUserId,
+      setOnboardingPassword,
       saveOnboardingToDb,
       savePasscodeToDb,
       setupSafetyPool,

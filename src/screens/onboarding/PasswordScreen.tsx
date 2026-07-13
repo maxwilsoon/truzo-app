@@ -25,7 +25,7 @@ const rules = [
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Password'> };
 
 export const PasswordScreen: React.FC<Props> = ({ navigation }) => {
-  const { setParent } = useApp();
+  const { setOnboardingPassword } = useApp();
   const [password, setPassword]       = useState('');
   const [confirm, setConfirm]         = useState('');
   const [showPass, setShowPass]       = useState(false);
@@ -38,7 +38,7 @@ export const PasswordScreen: React.FC<Props> = ({ navigation }) => {
   const proceed = () => {
     if (password !== confirm) { setConfirmError("Passwords don't match."); return; }
     setConfirmError('');
-    setParent(p => ({ ...p, password }));
+    setOnboardingPassword(password);
     navigation.navigate('Mobile');
   };
 
