@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,154 +9,138 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { fmtAmt } from '../../lib/utils';
 
-const GIFT_CARDS = [
-  { id: 'gc1', name: 'Xbox',        emoji: '🎮', cost: 500, value: '£10' },
-  { id: 'gc2', name: 'Starbucks',   emoji: '☕', cost: 500, value: '£5'  },
-  { id: 'gc3', name: 'Vue Cinema',  emoji: '🎬', cost: 600, value: '£8'  },
-  { id: 'gc4', name: "McDonald's",  emoji: '🍔', cost: 500, value: '£5'  },
-  { id: 'gc5', name: 'Spotify',     emoji: '🎵', cost: 750, value: '1 mo' },
-];
-
 const TX_ICONS: Record<string, { icon: string; bg: string; color: string }> = {
-  parent_transfer: { icon: 'heart-circle-outline',         bg: '#D1FAE5', color: '#10B981' },
-  topup:           { icon: 'shield-checkmark-outline',      bg: '#EDE9FE', color: '#7C3AED' },
-  allowance:       { icon: 'wallet-outline',               bg: '#D1FAE5', color: '#10B981' },
-  lend:            { icon: 'arrow-up-circle-outline',      bg: '#DBEAFE', color: '#3B82F6' },
-  spend:           { icon: 'card-outline',                 bg: '#FEE2E2', color: '#EF4444' },
-  repay:           { icon: 'checkmark-circle-outline',     bg: '#D1FAE5', color: '#10B981' },
-  borrow:          { icon: 'arrow-down-circle-outline',    bg: '#D1FAE5', color: '#10B981' },
-  receive:         { icon: 'arrow-down-circle-outline',    bg: '#D1FAE5', color: '#10B981' },
+  parent_transfer: { icon: 'gift-outline',              bg: '#D1FAE5', color: '#10B981' },
+  topup:           { icon: 'shield-checkmark-outline',  bg: '#EDE9FE', color: '#7C3AED' },
+  allowance:       { icon: 'gift-outline',              bg: '#D1FAE5', color: '#10B981' },
+  lend:            { icon: 'person-circle-outline',     bg: '#DBEAFE', color: '#3B82F6' },
+  spend:           { icon: 'card-outline',              bg: '#F3F4F6', color: '#6B7280' },
+  repay:           { icon: 'person-circle-outline',     bg: '#FEE2E2', color: '#EF4444' },
+  borrow:          { icon: 'arrow-down-circle-outline', bg: '#D1FAE5', color: '#10B981' },
+  receive:         { icon: 'person-circle-outline',     bg: '#D1FAE5', color: '#10B981' },
 };
+
+const CARD_ACTIONS = [
+  { icon: 'snow-outline',     label: 'Freeze Card'   },
+  { icon: 'eye-outline',      label: 'View PIN'      },
+  { icon: 'settings-outline', label: 'Card Settings' },
+] as const;
+
+const MastercardLogo: React.FC = () => (
+  <View style={s.mastercardWrap}>
+    <View style={[s.mastercardCircle, { backgroundColor: '#EB001B' }]} />
+    <View style={[s.mastercardCircle, { backgroundColor: '#F79E1B', marginLeft: -10 }]} />
+  </View>
+);
 
 export const WalletScreen: React.FC = () => {
   const { child, transactions } = useApp();
   const [showAll, setShowAll] = useState(false);
   const displayTx = showAll ? transactions : transactions.slice(0, 4);
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+  const handleCardAction = (label: string) =>
+    Alert.alert(label, `${label} is coming soon.`);
 
-        {/* Virtual Card */}
-        <LinearGradient colors={['#7C3AED', '#6D28D9']} style={styles.card} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <View style={styles.cardTop}>
-            <Text style={styles.cardBrand}>truzo</Text>
-            <View style={styles.cardChipWrap}>
-              <View style={styles.cardChip} />
-            </View>
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+
+        {/* Page header */}
+        <View style={s.pageHeader}>
+          <Text style={s.pageTitle}>Wallet</Text>
+          <View style={s.pageHeaderIcon}>
+            <Ionicons name="wallet-outline" size={22} color="#1A1A3E" />
           </View>
-          <View style={styles.cardBottom}>
-            <Text style={styles.cardNumber}>•••• •••• •••• 2025</Text>
-            <Text style={styles.cardHolder}>{child.displayName.toUpperCase()}</Text>
+        </View>
+
+        {/* Balance card */}
+        <LinearGradient
+          colors={['#7C3AED', '#5B21B6'] as const}
+          style={s.balanceCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={s.balanceLabel}>Your Balance</Text>
+          <Text style={s.balanceAmount}>£{fmtAmt(child.balance)}</Text>
+          <View style={s.cardFooter}>
+            <Text style={s.cardNumber}>•••• 4827</Text>
+            <MastercardLogo />
           </View>
         </LinearGradient>
 
-        {/* Wallet balance */}
-        <View style={styles.sectionRow}>
-          <Ionicons name="wallet-outline" size={20} color={colors.text} />
-          <Text style={styles.sectionHeading}>Wallet</Text>
-        </View>
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available balance</Text>
-          <Text style={styles.balanceAmount}>£{fmtAmt(child.balance)}</Text>
-          <View style={styles.balanceSplit}>
-            <View style={styles.balanceSplitItem}>
-              <Text style={styles.splitEmoji}>🤝</Text>
-              <View>
-                <Text style={styles.splitAmount}>£{fmtAmt(child.loanedOut)}</Text>
-                <Text style={styles.splitLabel}>Lent out</Text>
+        {/* Card actions */}
+        <View style={s.actionsCard}>
+          {CARD_ACTIONS.map(a => (
+            <TouchableOpacity
+              key={a.label}
+              style={s.actionBtn}
+              onPress={() => handleCardAction(a.label)}
+              activeOpacity={0.7}
+            >
+              <View style={s.actionCircle}>
+                <Ionicons name={a.icon as any} size={22} color="#1A1A3E" />
               </View>
-            </View>
-            <View style={styles.splitDivider} />
-            <View style={styles.balanceSplitItem}>
-              <Text style={styles.splitEmoji}>⏳</Text>
-              <View>
-                <Text style={[styles.splitAmount, child.borrowed > 0 && { color: colors.error }]}>
-                  £{fmtAmt(child.borrowed)}
-                </Text>
-                <Text style={styles.splitLabel}>Borrowed</Text>
-              </View>
-            </View>
+              <Text style={s.actionLabel}>{a.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Lending stats */}
+        <View style={s.statsRow}>
+          <View style={s.statCard}>
+            <Text style={s.statLabel}>Amount Lent Out</Text>
+            <Text style={s.statValue}>£{fmtAmt(child.loanedOut)}</Text>
+          </View>
+          <View style={s.statCard}>
+            <Text style={s.statLabel}>Amount Borrowed</Text>
+            <Text style={[s.statValue, child.borrowed > 0 && s.statValueRed]}>
+              £{fmtAmt(child.borrowed)}
+            </Text>
           </View>
         </View>
 
-        {/* Rewards */}
-        <View style={styles.rewardsCard}>
-          <View style={styles.rewardsTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rewardsTitle}>Rewards</Text>
-              <Text style={styles.rewardsSub}>Earn by repaying on time & funding friends</Text>
-            </View>
-            <View style={styles.ptsBadge}>
-              <Ionicons name="star" size={22} color={colors.gold} />
-              <Text style={styles.ptsNum}>{child.points}</Text>
-              <Text style={styles.ptsLabel}>pts</Text>
-            </View>
-          </View>
-
-          <View style={styles.progressBg}>
-            <View style={[styles.progressFill, { width: `${Math.min((child.points / 500) * 100, 100)}%` }]} />
-          </View>
-          <Text style={styles.progressNote}>{Math.max(0, 500 - child.points)} pts to next reward</Text>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.giftRow}>
-            {GIFT_CARDS.map(gc => {
-              const locked = child.points < gc.cost;
-              return (
-                <View key={gc.id} style={styles.giftCard}>
-                  <Text style={styles.giftEmoji}>{gc.emoji}</Text>
-                  <Text style={styles.giftName}>{gc.name}</Text>
-                  <Text style={styles.giftValue}>£{gc.value.replace('£','')}</Text>
-                  <Text style={styles.giftPts}>{gc.cost} pts</Text>
-                  <View style={[styles.giftBtn, locked && styles.giftBtnLocked]}>
-                    {locked && <Ionicons name="lock-closed-outline" size={13} color="#9CA3AF" />}
-                    <Text style={[styles.giftBtnText, locked && styles.giftBtnTextLocked]}>
-                      {gc.cost}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Money In & Out */}
-        <View style={styles.sectionRow}>
-          <Ionicons name="swap-vertical-outline" size={20} color={colors.text} />
-          <Text style={styles.sectionHeading}>Money In & Out</Text>
-          <TouchableOpacity onPress={() => setShowAll(v => !v)} style={{ marginLeft: 'auto' }}>
-            <Text style={styles.viewAll}>{showAll ? 'Show less' : 'View all'}</Text>
+        {/* Transactions header */}
+        <View style={s.txHeader}>
+          <Text style={s.txSectionTitle}>Transactions</Text>
+          <TouchableOpacity onPress={() => setShowAll(v => !v)} activeOpacity={0.7}>
+            <Text style={s.seeAll}>{showAll ? 'See less' : 'See all'}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.txList}>
-          {displayTx.map((tx, i) => {
-            const icon = TX_ICONS[tx.type] ?? { icon: 'cash-outline', bg: '#D1FAE5', color: '#10B981' };
-            const isPositive = tx.amount > 0;
-            return (
-              <View key={tx.id} style={[styles.txRow, i < displayTx.length - 1 && styles.txRowBorder]}>
-                <View style={[styles.txIconWrap, { backgroundColor: icon.bg }]}>
-                  <Ionicons name={icon.icon as any} size={20} color={icon.color} />
+        {/* Transaction list */}
+        <View style={s.txList}>
+          {displayTx.length === 0 ? (
+            <View style={s.txEmpty}>
+              <Text style={s.txEmptyText}>No transactions yet</Text>
+            </View>
+          ) : (
+            displayTx.map((tx, i) => {
+              const icon = TX_ICONS[tx.type] ?? { icon: 'cash-outline', bg: '#D1FAE5', color: '#10B981' };
+              const isPositive = tx.amount > 0;
+              const isSpend    = tx.type === 'spend';
+              return (
+                <View
+                  key={tx.id}
+                  style={[s.txRow, i < displayTx.length - 1 && s.txRowBorder]}
+                >
+                  <View style={[s.txIconWrap, { backgroundColor: icon.bg }]}>
+                    <Ionicons name={icon.icon as any} size={20} color={icon.color} />
+                  </View>
+                  <View style={s.txMid}>
+                    <Text style={s.txName}>{tx.description}</Text>
+                    <Text style={s.txDate}>{tx.date}</Text>
+                  </View>
+                  <Text style={[
+                    s.txAmount,
+                    isSpend    ? s.txAmountNeutral :
+                    isPositive ? s.txAmountPos     : s.txAmountNeg,
+                  ]}>
+                    {isPositive ? '+£' : '-£'}{fmtAmt(Math.abs(tx.amount))}
+                  </Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.txTitle}>{tx.description}</Text>
-                  <Text style={styles.txSub}>{
-                    tx.type === 'parent_transfer' ? 'Money Received' :
-                    tx.type === 'topup'           ? 'Parent Added' :
-                    tx.type === 'allowance'       ? 'Pocket Money' :
-                    tx.type === 'lend'            ? 'Money Lent' :
-                    tx.type === 'spend'           ? 'Card Spend' :
-                    tx.type === 'borrow'          ? 'Money Received' :
-                    tx.type === 'receive'         ? 'Repayment Received' :
-                                                   'Repayment'
-                  } · {tx.date}</Text>
-                </View>
-                <Text style={[styles.txAmount, { color: isPositive ? '#22C55E' : colors.error }]}>
-                  {isPositive ? '+£' : '-£'}{fmtAmt(Math.abs(tx.amount))}
-                </Text>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </View>
 
         <View style={{ height: 32 }} />
@@ -163,68 +149,73 @@ export const WalletScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F4FC' },
+const s = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: '#F5F5F5' },
   scroll: { padding: 16, gap: 16 },
 
-  // Card
-  card: { borderRadius: 22, padding: 24, height: 200 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardBrand: { fontSize: 22, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
-  cardChipWrap: { width: 44, height: 34, borderRadius: 8, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
-  cardChip: { width: 28, height: 20, borderRadius: 4, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)' },
-  cardBottom: { marginTop: 'auto', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  cardNumber: { fontSize: 16, letterSpacing: 2, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
-  cardHolder: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 1 },
-
-  // Section heading
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  sectionHeading: { fontSize: 18, fontWeight: '800', color: '#1A1A3E' },
-  viewAll: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  // Page header
+  pageHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 4 },
+  pageTitle:     { fontSize: 24, fontWeight: '800', color: '#1A1A3E' },
+  pageHeaderIcon:{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
   // Balance card
-  balanceCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, gap: 16 },
-  balanceLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '500' },
-  balanceAmount: { fontSize: 40, fontWeight: '900', color: '#1A1A3E', letterSpacing: -1, marginTop: -8 },
-  balanceSplit: { flexDirection: 'row', backgroundColor: '#F5F4FC', borderRadius: 14, overflow: 'hidden' },
-  balanceSplitItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 10 },
-  splitDivider: { width: 1, backgroundColor: colors.border },
-  splitEmoji: { fontSize: 22 },
-  splitAmount: { fontSize: 15, fontWeight: '800', color: '#1A1A3E' },
-  splitLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  balanceCard:   { borderRadius: 24, padding: 22, minHeight: 158, justifyContent: 'space-between' },
+  balanceLabel:  { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
+  balanceAmount: { fontSize: 46, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1, marginTop: 4 },
+  cardFooter:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
+  cardNumber:    { fontSize: 15, color: 'rgba(255,255,255,0.8)', letterSpacing: 2, fontWeight: '500' },
 
-  // Rewards
-  rewardsCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, gap: 12 },
-  rewardsTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  rewardsTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A3E', marginBottom: 4 },
-  rewardsSub: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  ptsBadge: { width: 68, backgroundColor: '#F5F4FC', borderRadius: 16, alignItems: 'center', paddingVertical: 10 },
-  ptsNum: { fontSize: 22, fontWeight: '900', color: colors.primary },
-  ptsLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
-  progressBg: { height: 6, backgroundColor: '#EDE9FE', borderRadius: 3 },
-  progressFill: { height: 6, backgroundColor: colors.primary, borderRadius: 3 },
-  progressNote: { fontSize: 13, color: colors.textSecondary },
-  giftRow: { gap: 10, paddingBottom: 4 },
-  giftCard: {
-    width: 120, backgroundColor: '#F9F8FF', borderRadius: 16, padding: 14,
-    alignItems: 'center', gap: 4,
-    borderWidth: 1, borderColor: '#EDE9FE',
+  // Mastercard logo
+  mastercardWrap:   { flexDirection: 'row', alignItems: 'center' },
+  mastercardCircle: { width: 28, height: 28, borderRadius: 14, opacity: 0.92 },
+
+  // Card actions
+  actionsCard: {
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
+    backgroundColor: '#FFFFFF', borderRadius: 20, paddingVertical: 18, paddingHorizontal: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  giftName: { fontSize: 13, fontWeight: '700', color: '#1A1A3E' },
-  giftValue: { fontSize: 16, fontWeight: '900', color: colors.primary },
-  giftEmoji: { fontSize: 28 },
-  giftPts: { fontSize: 12, color: colors.textSecondary },
-  giftBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EDE9FE', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 },
-  giftBtnLocked: { backgroundColor: '#F3F4F6' },
-  giftBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  giftBtnTextLocked: { color: colors.textSecondary },
+  actionBtn:    { alignItems: 'center', gap: 8 },
+  actionCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actionLabel: { fontSize: 12, fontWeight: '600', color: '#374151' },
 
-  // Transactions
-  txList: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden' },
-  txRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
-  txRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F5F4FC' },
-  txIconWrap: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  txTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A3E', marginBottom: 3 },
-  txSub: { fontSize: 12, color: colors.textSecondary },
-  txAmount: { fontSize: 16, fontWeight: '800' },
+  // Lending stats
+  statsRow:     { flexDirection: 'row', gap: 12 },
+  statCard:     {
+    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, gap: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
+  statLabel:    { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  statValue:    { fontSize: 20, fontWeight: '800', color: '#1A1A3E' },
+  statValueRed: { color: '#EF4444' },
+
+  // Transactions section
+  txHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  txSectionTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A3E' },
+  seeAll:         { fontSize: 14, fontWeight: '700', color: colors.primary },
+
+  // Transaction list
+  txList: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  txRow:           { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  txRowBorder:     { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F3F4F6' },
+  txIconWrap:      { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  txMid:           { flex: 1 },
+  txName:          { fontSize: 14, fontWeight: '700', color: '#1A1A3E', marginBottom: 2 },
+  txDate:          { fontSize: 12, color: '#9CA3AF' },
+  txAmount:        { fontSize: 15, fontWeight: '800' },
+  txAmountPos:     { color: '#22C55E' },
+  txAmountNeg:     { color: '#EF4444' },
+  txAmountNeutral: { color: '#1A1A3E' },
+  txEmpty:         { padding: 32, alignItems: 'center' },
+  txEmptyText:     { fontSize: 14, color: '#9CA3AF' },
 });

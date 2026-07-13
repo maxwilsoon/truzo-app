@@ -32,4 +32,5 @@ export type RootStackParamList = {
   RateTruzo: undefined;
   BiometricSetup: undefined;
   BiometricLogin: undefined;
+  ChildProfile: undefined;
 };

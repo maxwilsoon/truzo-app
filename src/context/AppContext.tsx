@@ -166,6 +166,8 @@ interface AppContextType {
   recordWeeklyStreak: () => Promise<void>;
   biometricEnabled: boolean;
   setBiometricEnabled: (v: boolean) => void;
+  repayHighlightId: string | null;
+  setRepayHighlightId: (id: string | null) => void;
 }
 
 const defaultCircle: CircleMember[] = [];
@@ -223,6 +225,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [repayHighlightId, setRepayHighlightId] = useState<string | null>(null);
 
   const [parent, setParent] = useState<ParentProfile>({
     firstName: '',
@@ -681,6 +684,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveRequests(() =>
           moneyReqs
             .filter(r => !isExpired(r))
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
             .map(r => ({
               id: r.id,
               fromId: r.from_id,
@@ -741,6 +745,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recordWeeklyStreak,
       biometricEnabled,
       setBiometricEnabled,
+      repayHighlightId,
+      setRepayHighlightId,
     }}>
       {children}
     </AppContext.Provider>

@@ -35,6 +35,13 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Back button */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* Header row — name left, avatar right */}
@@ -97,8 +104,10 @@ export const ProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0EFF8' },
-  scroll: { paddingHorizontal: 24, paddingTop: 32, gap: 12 },
+  safe:   { flex: 1, backgroundColor: '#F0EFF8' },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
+  backBtn:{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  scroll: { paddingHorizontal: 24, paddingTop: 16, gap: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

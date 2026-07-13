@@ -28,7 +28,7 @@ async function safeLoad<T>(key: string): Promise<T | null> {
 
 async function safeClear(keys: string[]): Promise<void> {
   try {
-    await AsyncStorage.multiRemove(keys);
+    await Promise.all(keys.map(k => AsyncStorage.removeItem(k)));
   } catch {
     // best-effort
   }

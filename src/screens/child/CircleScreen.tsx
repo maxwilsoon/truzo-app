@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, FlatList, Platform, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  Platform, Image, StatusBar, Dimensions, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -14,19 +16,30 @@ import { sendPushNotification } from '../../lib/notifications';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { fmtAmt } from '../../lib/utils';
 
-const AVATAR_COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444', '#8B5CF6', '#EC4899'];
-// 4 friend avatars visible at once; remainder scroll horizontally
-const CARD_INNER_W = Dimensions.get('window').width - 32;
-const FRIEND_AVATAR_SIZE = 52;
-const FRIEND_ITEM_W = Math.floor((CARD_INNER_W - 24) / 4);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Parses activity text into a social-feed style sentence
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const CircleScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { activeRequests, setActiveRequests, circle, setCircle, child, childId, setChild, addTransaction, addActivity, removeActivity, pendingRequests, setPendingRequests, recordWeeklyStreak, frozenAccount } = useApp();
-  const [tab, setTab] = useState<'activity' | 'history'>('activity');
-  const [fundingRequest, setFundingRequest] = useState<ActiveRequest | null>(null);
+  const {
+    activeRequests, setActiveRequests, circle, setCircle,
+    child, childId, setChild, addTransaction, addActivity, removeActivity,
+    pendingRequests, setPendingRequests, recordWeeklyStreak, frozenAccount,
+    repayHighlightId, setRepayHighlightId,
+  } = useApp();
+
+  const [fundingRequest,  setFundingRequest]  = useState<ActiveRequest | null>(null);
   const [repayingRequest, setRepayingRequest] = useState<ActiveRequest | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<{
+    id: string; displayName: string; username: string;
+    avatarEmoji: string; profileImageUrl?: string; trustScore: number;
+  } | null>(null);
+  const [showHistory,    setShowHistory]      = useState(false);
+  const [reqTab,          setReqTab]          = useState<'toFund' | 'pending'>('toFund');
+  const [showAllToFund,   setShowAllToFund]   = useState(false);
   const [loanHistory, setLoanHistory] = useState<Array<{
     id: string; amount: number; reason: string; reasonEmoji: string;
     createdAt: string; repaidAt: string | null; repayByDate: string;
@@ -35,6 +48,29 @@ export const CircleScreen: React.FC = () => {
     funderName: string; funderUsername: string; funderEmoji: string; funderAvatarUrl: string | null;
   }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [highlightedId,  setHighlightedId]  = useState<string | null>(null);
+
+  const scrollRef      = useRef<import('react-native').ScrollView>(null);
+  const requestsCardY  = useRef(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (repayHighlightId) {
+        setRepayHighlightId(null);
+        setReqTab('pending');
+        setHighlightedId(repayHighlightId);
+      }
+    }, [repayHighlightId])
+  );
+
+  useEffect(() => {
+    if (!highlightedId) return;
+    const scrollTimer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, requestsCardY.current - 16), animated: true });
+    }, 300);
+    const clearTimer = setTimeout(() => setHighlightedId(null), 3500);
+    return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+  }, [highlightedId]);
 
   const loadHistory = useCallback(async () => {
     if (!childId || historyLoading) return;
@@ -54,117 +90,34 @@ export const CircleScreen: React.FC = () => {
     } catch { /* best-effort */ } finally { setHistoryLoading(false); }
   }, [childId]);
 
-  useEffect(() => { if (tab === 'history') loadHistory(); }, [tab]);
+  useEffect(() => { if (showHistory) loadHistory(); }, [showHistory]);
+
+  // ── Friend request actions ─────────────────────────────────────────────────
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      const { fromId, fromPushToken } = await db.acceptCircleRequest(requestId);
+      const { fromPushToken } = await db.acceptCircleRequest(requestId);
       const accepted = pendingRequests.find(r => r.requestId === requestId);
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (accepted) {
         setCircle(prev => [...prev, {
           id: accepted.id, displayName: accepted.displayName,
           username: accepted.username, avatarEmoji: accepted.avatarEmoji,
-          trustScore: accepted.trustScore,
-          profileImageUrl: accepted.profileImageUrl,
+          trustScore: accepted.trustScore, profileImageUrl: accepted.profileImageUrl,
         }]);
         addActivity({
-          id: `a_friend_${Date.now()}`,
-          emoji: '🤝',
+          id: `a_friend_${Date.now()}`, emoji: '🤝',
           text: `${accepted.displayName} has joined your circle!`,
-          time: 'Just now',
-          type: 'joined',
+          time: 'Just now', type: 'joined',
         });
-        // Notify the sender their request was accepted
         if (fromPushToken) {
           sendPushNotification(
-            fromPushToken,
-            'Friend request accepted ✅',
+            fromPushToken, 'Friend request accepted ✅',
             `${child.displayName} accepted your request — you're now in each other's circles!`,
           ).catch(() => {});
         }
       }
-    } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not accept request.');
-    }
-  };
-
-  const handleRemoveFriend = (memberId: string, displayName: string) => {
-    if (!childId) return;
-
-    // Block if there's an active funded loan between these two users
-    const activeLoan = activeRequests.find(r =>
-      r.isFunded === true &&
-      ((r.fromId === childId && r.fundedById === memberId) ||
-       (r.fromId === memberId && r.fundedById === childId))
-    );
-    if (activeLoan) {
-      const msg = `You can't remove ${displayName} while there's an active loan between you. Repay the loan first.`;
-      if (Platform.OS === 'web') {
-        window.alert(msg);
-      } else {
-        Alert.alert('Active loan', msg);
-      }
-      return;
-    }
-
-    const doRemove = async () => {
-      try {
-        await db.removeFromCircle(childId, memberId);
-        setCircle(prev => prev.filter(m => m.id !== memberId));
-
-        // Cancel any unfunded money requests from the removed member and remove
-        // them from the local active-requests list. The DB cancellation propagates
-        // to other circle members within their next 5-second poll.
-        const pendingToCancel = activeRequests.filter(
-          r => r.fromId === memberId && !r.isFunded,
-        );
-        if (pendingToCancel.length > 0) {
-          setActiveRequests(prev => prev.filter(
-            r => !(r.fromId === memberId && !r.isFunded),
-          ));
-          pendingToCancel.forEach(req => {
-            db.cancelMoneyRequest(req.id, memberId).catch(() => {});
-          });
-        }
-
-        addActivity({
-          id: `a_remove_${Date.now()}`,
-          emoji: '👋',
-          text: `You removed ${displayName} from your circle`,
-          time: 'Just now',
-          type: 'request',
-        });
-      } catch (e: any) {
-        // DB also enforces this — surface its message if it fires
-        const msg = e.message ?? 'Could not remove friend.';
-        const isLoanBlock = msg.includes('active_loan');
-        if (Platform.OS === 'web') {
-          window.alert(isLoanBlock
-            ? `You can't remove ${displayName} while there's an active loan. Repay the loan first.`
-            : msg);
-        } else {
-          Alert.alert(
-            isLoanBlock ? 'Active loan' : 'Error',
-            isLoanBlock
-              ? `You can't remove ${displayName} while there's an active loan. Repay the loan first.`
-              : msg,
-          );
-        }
-      }
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Remove ${displayName} from your circle?`)) doRemove();
-    } else {
-      Alert.alert(
-        'Remove friend?',
-        `${displayName} will be removed from your circle. They won't be able to lend or borrow with you.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remove', style: 'destructive', onPress: doRemove },
-        ]
-      );
-    }
+    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not accept request.'); }
   };
 
   const handleDeclineRequest = async (requestId: string) => {
@@ -174,25 +127,92 @@ export const CircleScreen: React.FC = () => {
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (declined) {
         addActivity({
-          id: `a_decline_${Date.now()}`,
-          emoji: '❌',
+          id: `a_decline_${Date.now()}`, emoji: '❌',
           text: `You declined ${declined.displayName}'s request`,
-          time: 'Just now',
-          type: 'request',
+          time: 'Just now', type: 'request',
         });
-        // Notify the sender their request was declined
         if (fromPushToken) {
           sendPushNotification(
-            fromPushToken,
-            'Friend request declined',
+            fromPushToken, 'Friend request declined',
             `${child.displayName} didn't accept your request`,
           ).catch(() => {});
         }
       }
-    } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not decline request.');
+    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not decline request.'); }
+  };
+
+  const handleRemoveFriend = (memberId: string, username: string) => {
+    if (!childId) return;
+
+    // Client-side block: active funded loan in either direction
+    const activeLoan = activeRequests.find(r =>
+      r.isFunded === true &&
+      ((r.fromId === childId && r.fundedById === memberId) ||
+       (r.fromId === memberId && r.fundedById === childId))
+    );
+    if (activeLoan) {
+      const msg = "You can't remove this person while money is still owed. Complete or resolve all active loans first.";
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Outstanding money', msg);
+      return;
+    }
+
+    const doRemove = async () => {
+      setSelectedFriend(null);
+      try {
+        await db.removeFromCircle(childId, memberId);
+
+        // Remove from local circle immediately
+        setCircle(prev => prev.filter(m => m.id !== memberId));
+
+        // Remove their unfunded requests from the active list (viewer access revoked DB-side)
+        setActiveRequests(prev => prev.filter(r => !(r.fromId === memberId && !r.isFunded)));
+
+        addActivity({
+          id: `a_remove_${Date.now()}`, emoji: '👋',
+          text: `You removed @${username} from your circle`,
+          time: 'Just now', type: 'request',
+        });
+
+        // Refresh circle from DB to reflect server state on both users' devices
+        if (childId) {
+          db.getCircle(childId).then(members => {
+            setCircle(members.map(m => ({
+              id: m.id, displayName: m.display_name, username: m.username,
+              avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
+              profileImageUrl: m.avatar_url ?? undefined,
+            })));
+          }).catch(() => {});
+        }
+
+        const successMsg = `@${username} has been removed from your Circle.`;
+        Platform.OS === 'web'
+          ? window.alert(successMsg)
+          : Alert.alert('Removed', successMsg);
+      } catch (e: any) {
+        const msg = e.message ?? 'Could not remove friend.';
+        const isLoanBlock = msg.includes('active_loan');
+        const errMsg = isLoanBlock
+          ? "You can't remove this person while money is still owed. Complete or resolve all active loans first."
+          : msg;
+        Platform.OS === 'web'
+          ? window.alert(errMsg)
+          : Alert.alert(isLoanBlock ? 'Outstanding money' : 'Error', errMsg);
+      }
+    };
+
+    const title    = `Remove @${username} from your Circle?`;
+    const message  = "You will no longer see each other's new requests or Circle updates. Previous loan and transaction history will remain.";
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) doRemove();
+    } else {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]);
     }
   };
+
+  // ── Fund / Repay ───────────────────────────────────────────────────────────
 
   const handleFund = (req: ActiveRequest) => {
     if (frozenAccount) {
@@ -200,7 +220,7 @@ export const CircleScreen: React.FC = () => {
       return;
     }
     if (child.balance < req.amount) {
-      Alert.alert('Insufficient balance', 'You don\'t have enough balance to fund this request.');
+      Alert.alert('Insufficient balance', "You don't have enough balance to fund this request.");
       return;
     }
     setFundingRequest(req);
@@ -212,12 +232,10 @@ export const CircleScreen: React.FC = () => {
     setFundingRequest(null);
     try {
       const { borrowerPushToken } = await db.fundMoneyRequest(req.id, childId, req.amount);
-      // Sync streak from DB (RPC already incremented it)
       recordWeeklyStreak().catch(() => {});
       setActiveRequests(prev => prev.map(r =>
         r.id === req.id ? { ...r, isFunded: true, fundedById: childId, fundedByName: child.displayName, fundedByEmoji: child.avatarEmoji } : r
       ));
-      // Mirror every stat the DB RPC updated
       setChild(c => ({
         ...c,
         balance:    c.balance    - req.amount,
@@ -227,45 +245,16 @@ export const CircleScreen: React.FC = () => {
         trustScore: Math.min(100, c.trustScore + 2),
         points:     c.points     + 2,
       }));
-      // Resolve @username for activity / transaction description
       const borrowerUser = circle.find(m => m.id === req.fromId)?.username ?? req.fromName;
-      // Activity written to DB by addActivity; uses predictable id so poll deduplicates by id.
-      addActivity({
-        id:    `fund_${req.id}`,
-        emoji: '💚',
-        text:  `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`,
-        time:  'Just now',
-        type:  'funded',
-      });
-      // Local-only transaction; poll overwrites with DB copy within 5 s
-      addTransaction({
-        id:          `t_fund_${Date.now()}`,
-        type:        'lend',
-        amount:      -req.amount,
-        description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`,
-        date:        'Just now',
-        counterparty: req.fromName,
-        status:      'active',
-      });
-      if (borrowerPushToken) {
-        sendPushNotification(
-          borrowerPushToken,
-          `💚 ${child.displayName} funded your request!`,
-          `${child.displayName} sent you £${fmtAmt(req.amount)} for ${req.reason}`,
-        ).catch(() => {});
-      }
-    } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not fund request.');
-    }
+      addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`, time: 'Just now', type: 'funded' });
+      addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
+      if (borrowerPushToken) sendPushNotification(borrowerPushToken, `💚 ${child.displayName} funded your request!`, `${child.displayName} sent you £${fmtAmt(req.amount)} for ${req.reason}`).catch(() => {});
+    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not fund request.'); }
   };
 
   const handleRepay = (req: ActiveRequest) => {
     if (child.balance < req.amount) {
-      if (Platform.OS === 'web') {
-        window.alert("You don't have enough balance to repay.");
-      } else {
-        Alert.alert('Insufficient balance', "You don't have enough balance to repay.");
-      }
+      Platform.OS === 'web' ? window.alert("You don't have enough balance to repay.") : Alert.alert('Insufficient balance', "You don't have enough balance to repay.");
       return;
     }
     setRepayingRequest(req);
@@ -279,407 +268,448 @@ export const CircleScreen: React.FC = () => {
       const { funderPushToken, amount: paidAmount } = await db.repayMoneyRequest(req.id, childId);
       const amt = paidAmount ?? req.amount;
       setActiveRequests(prev => prev.filter(r => r.id !== req.id));
-
-      // The repay_money_request RPC already handles:
-      //   - funder's wallet_balance +
-      //   - funder's loaned_out -
-      //   - borrower's wallet_balance -
-      //   - borrower's borrowed, repaid, trust_score, points
-      //   - transactions for BOTH parties
-      //   - funder's activity_feed entry ('recv_' || requestId)
-      // We only need local optimistic updates + borrower's own activity entry.
-      setChild(c => ({
-        ...c,
-        balance:    c.balance    - amt,
-        borrowed:   Math.max(0, c.borrowed - amt),
-        trustScore: Math.min(100, c.trustScore + 5),
-        points:     c.points     + 5,
-        repaid:     c.repaid     + 1,
-        // streak: let the 5-second poll sync from DB (it's per-week logic in the RPC)
-      }));
-      // Resolve @username for descriptions
+      setChild(c => ({ ...c, balance: c.balance - amt, borrowed: Math.max(0, c.borrowed - amt), trustScore: Math.min(100, c.trustScore + 5), points: c.points + 5, repaid: c.repaid + 1 }));
       const funderUser = circle.find(m => m.id === req.fundedById)?.username ?? req.fundedByName ?? 'friend';
-      // Borrower's activity — predictable id, written to DB by addActivity
-      addActivity({
-        id:    `repay_${req.id}`,
-        emoji: '✅',
-        text:  `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`,
-        time:  'Just now',
-        type:  'repaid',
-      });
-      // Local-only transaction; poll overwrites with DB copy within 5 s
-      addTransaction({
-        id:          `t_repay_${Date.now()}`,
-        type:        'repay',
-        amount:      -amt,
-        description: `Repaid £${fmtAmt(amt)} to @${funderUser}`,
-        date:        'Just now',
-        counterparty: req.fundedByName,
-        status:      'completed',
-      });
-      if (funderPushToken) {
-        sendPushNotification(
-          funderPushToken,
-          `✅ ${child.displayName} repaid you!`,
-          `${child.displayName} repaid £${fmtAmt(amt)}`,
-        ).catch(() => {});
-      }
-    } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not repay.');
-    }
+      addActivity({ id: `repay_${req.id}`, emoji: '✅', text: `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`, time: 'Just now', type: 'repaid' });
+      addTransaction({ id: `t_repay_${Date.now()}`, type: 'repay', amount: -amt, description: `Repaid £${fmtAmt(amt)} to @${funderUser}`, date: 'Just now', counterparty: req.fundedByName, status: 'completed' });
+      if (funderPushToken) sendPushNotification(funderPushToken, `✅ ${child.displayName} repaid you!`, `${child.displayName} repaid £${fmtAmt(amt)}`).catch(() => {});
+    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not repay.'); }
   };
 
+  // ── Derived data ───────────────────────────────────────────────────────────
+
+  const friendRequests = activeRequests.filter(r => !r.isOwn && !r.isFunded);
+  const ownFundedLoans = activeRequests.filter(r => r.isOwn  && r.isFunded);
+  const ownPending     = activeRequests.filter(r => r.isOwn  && !r.isFunded);
+  const fundedByMe     = activeRequests.filter(r => !r.isOwn && r.isFunded);
+
+  const TO_FUND_LIMIT = 3;
+  const visibleFriendRequests = showAllToFund ? friendRequests : friendRequests.slice(0, TO_FUND_LIMIT);
+  const firstNameOf = (full: string) => full.split(' ')[0];
+
+  // "Pending" tab: everything active for the current user
+  const pendingItems = [...ownPending, ...ownFundedLoans, ...fundedByMe];
+
+  const totalBadge = pendingRequests.length + activeRequests.filter(r => !r.isOwn).length;
+
+  // Leaderboard: child + circle members, sorted by trust score desc, stable secondary sort by id
+  const leaderboard = [
+    { id: 'me', name: child.displayName, username: child.username, photo: child.profileImageUrl, emoji: child.avatarEmoji, score: child.trustScore, isYou: true },
+    ...circle.map(m => ({ id: m.id, name: m.displayName, username: m.username, photo: m.profileImageUrl, emoji: m.avatarEmoji, score: m.trustScore, isYou: false })),
+  ].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+   .map((m, i) => ({ ...m, rank: i + 1 }));
+
+  const top4 = leaderboard.slice(0, 4);
+  // Visual order: rank-2 | rank-1 (elevated, gold) | rank-3 | rank-4
+  const ldrDisplay = top4.length >= 2 ? [top4[1], top4[0], ...top4.slice(2)] : top4;
+
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-        {/* Friends card */}
-        <View style={styles.friendsCard}>
-          <View style={styles.friendsCardHeader}>
-            <Text style={styles.friendsCardTitle}>Friends</Text>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => navigation.navigate('AddFriends')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.addBtnText}>+ Add</Text>
-            </TouchableOpacity>
+        {/* ── PAGE HEADER ─────────────────────────────────────────── */}
+        <View style={s.pageHeader}>
+          <View>
+            <Text style={s.pageTitle}>Your Circle</Text>
+            <Text style={s.pageSubtitle}>People you trust, earn more together.</Text>
           </View>
-          <FlatList
-            data={circle}
+        </View>
+
+        {/* ── FRIENDS ROW ─────────────────────────────────────────── */}
+        {/*
+          Layout: a fixed outer row containing:
+          - A ScrollView exactly 4 slots wide (friends scroll through it)
+          - A fixed 5th slot (Add Friend) that never scrolls away
+        */}
+        <View style={s.friendsOuter}>
+          <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={m => m.id}
-            contentContainerStyle={styles.friendsList}
+            contentContainerStyle={s.friendsScroll}
+            snapToInterval={SLOT_W}
+            snapToAlignment="start"
             decelerationRate="fast"
-            renderItem={({ item: m }) => (
-              <View style={styles.friendItem}>
-                <View style={styles.friendAvatarContainer}>
-                  {m.profileImageUrl ? (
-                    <View style={styles.friendAvatarPhotoWrap}>
-                      <Image source={{ uri: m.profileImageUrl }} style={styles.friendAvatarPhoto} resizeMode="cover" />
-                    </View>
-                  ) : (
-                    <View style={styles.friendAvatarBubble}>
-                      <Text style={styles.friendAvatarEmoji}>{m.avatarEmoji}</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => handleRemoveFriend(m.id, m.displayName)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name="close" size={10} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.friendUsername} numberOfLines={1}>@{m.username}</Text>
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={styles.friendsEmpty}>
-                <Text style={styles.friendsEmptyText}>No friends yet — tap Add to invite someone!</Text>
-              </View>
-            }
-          />
-        </View>
-
-        {/* Tabs — below friends bar, scrolls with content */}
-        <View style={styles.tabsWrap}>
-          <TouchableOpacity
-            style={[styles.tab, tab === 'activity' && styles.tabActive]}
-            onPress={() => setTab('activity')}
+            style={{ width: SLOT_W * 4 }}
           >
-            <Text style={[styles.tabText, tab === 'activity' && styles.tabTextActive]}>Activity</Text>
-            {(pendingRequests.length + activeRequests.filter(r => !r.isOwn).length) > 0 && (
-              <View style={[styles.tabBadge, tab === 'activity' && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, tab === 'activity' && styles.tabBadgeTextActive]}>
-                  {pendingRequests.length + activeRequests.filter(r => !r.isOwn).length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === 'history' && styles.tabActive]}
-            onPress={() => setTab('history')}
-          >
-            <Text style={[styles.tabText, tab === 'history' && styles.tabTextActive]}>History</Text>
-          </TouchableOpacity>
-        </View>
-
-        {tab === 'activity' ? (
-          <>
-            {/* ── PENDING FRIEND REQUESTS ── */}
-            {pendingRequests.length > 0 && (
-              <>
-                <View style={styles.sectionRow}>
-                  <Ionicons name="person-add-outline" size={18} color="#1A1A3E" />
-                  <Text style={styles.sectionHeading}>Friend Requests</Text>
-                  <View style={[styles.tabBadge, { backgroundColor: '#EDE9FE', marginLeft: 4 }]}>
-                    <Text style={[styles.tabBadgeText, { color: colors.primary }]}>{pendingRequests.length}</Text>
-                  </View>
-                </View>
-                {pendingRequests.map(req => (
-                  <View key={req.requestId} style={[styles.activeLoanCard, styles.friendReqCard]}>
-                    <View style={styles.loanRow}>
-                      {req.profileImageUrl ? (
-                        <View style={[styles.avatarCircle, { marginRight: 12, overflow: 'hidden', backgroundColor: 'transparent' }]}>
-                          <Image source={{ uri: req.profileImageUrl }} style={{ width: 40, height: 40 }} resizeMode="cover" />
-                        </View>
-                      ) : (
-                        <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                          <Text style={{ fontSize: 22 }}>{req.avatarEmoji}</Text>
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.loanTitle}>{req.displayName} wants to join your circle</Text>
-                        <Text style={styles.loanSub}>@{req.username} · Trust score: {req.trustScore}</Text>
+            {circle.map(m => (
+              <TouchableOpacity
+                key={m.id}
+                style={s.friendSlot}
+                activeOpacity={0.75}
+                onPress={() => setSelectedFriend(m)}
+              >
+                {/* Outer wrapper sits outside overflow:hidden so the dot isn't clipped */}
+                <View style={s.friendAvatarOuter}>
+                  <View style={s.friendRingWrap}>
+                    {m.profileImageUrl ? (
+                      <Image source={{ uri: m.profileImageUrl }} style={s.friendPhoto} resizeMode="cover" />
+                    ) : (
+                      <View style={s.friendEmojiFill}>
+                        <Text style={{ fontSize: 24 }}>{m.avatarEmoji}</Text>
                       </View>
-                    </View>
-                    <View style={styles.reqActions}>
-                      <TouchableOpacity
-                        style={styles.acceptBtn}
-                        onPress={() => handleAcceptRequest(req.requestId)}
-                        activeOpacity={0.85}
-                      >
-                        <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                        <Text style={styles.acceptBtnText}>Accept</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.declineBtn}
-                        onPress={() => handleDeclineRequest(req.requestId)}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.declineBtnText}>Decline</Text>
-                      </TouchableOpacity>
-                    </View>
+                    )}
                   </View>
-                ))}
-              </>
-            )}
+                  <View style={s.onlineDot} />
+                </View>
+                <Text style={s.friendUsername} numberOfLines={1}>@{m.username}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-            <View style={styles.sectionRow}>
-              <Ionicons name="swap-horizontal-outline" size={18} color="#1A1A3E" />
-              <Text style={styles.sectionHeading}>Active Transactions</Text>
+          {/* Fixed 5th slot — always visible, never scrolls */}
+          <TouchableOpacity
+            style={s.friendSlot}
+            onPress={() => navigation.navigate('AddFriends')}
+            activeOpacity={0.75}
+          >
+            <View style={s.addRingWrap}>
+              <Ionicons name="add" size={26} color={colors.primary} />
+            </View>
+            <Text style={s.addLabel}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── PENDING FRIEND REQUESTS ─────────────────────────────── */}
+        {pendingRequests.length > 0 && (
+          <View style={s.cardOuter}>
+            <View style={s.cardInner}>
+              <View style={s.cardHeaderRow}>
+                <View style={s.cardTitleRow}>
+                  <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+                  <Text style={s.cardTitle}>Friend Requests</Text>
+                  <View style={s.countBadge}><Text style={s.countBadgeText}>{pendingRequests.length}</Text></View>
+                </View>
+              </View>
+              {pendingRequests.map((req, idx) => (
+                <View key={req.requestId} style={[s.reqRow, idx < pendingRequests.length - 1 && s.rowDivider]}>
+                  <View style={s.reqAvatar}>
+                    {req.profileImageUrl
+                      ? <Image source={{ uri: req.profileImageUrl }} style={s.reqAvatarImg} resizeMode="cover" />
+                      : <Text style={{ fontSize: 22 }}>{req.avatarEmoji}</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.reqName}>{req.displayName} wants to join</Text>
+                    <Text style={s.reqSub}>@{req.username} · Score {req.trustScore}</Text>
+                  </View>
+                  <View style={s.frActions}>
+                    <TouchableOpacity style={s.acceptBtn} onPress={() => handleAcceptRequest(req.requestId)} activeOpacity={0.85}>
+                      <Text style={s.acceptText}>Accept</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.declineBtn} onPress={() => handleDeclineRequest(req.requestId)} activeOpacity={0.85}>
+                      <Text style={s.declineText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── REQUESTS CARD ───────────────────────────────────────── */}
+        <View style={s.cardOuter} onLayout={e => { requestsCardY.current = e.nativeEvent.layout.y; }}>
+          <View style={s.cardInner}>
+
+            {/* Title row */}
+            <View style={s.reqCardHeader}>
+              <Text style={s.cardTitle}>Requests</Text>
             </View>
 
-            {activeRequests.length === 0 && pendingRequests.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyEmoji}>💸</Text>
-                <Text style={styles.emptyTitle}>No active transactions</Text>
-                <Text style={styles.emptySubtitle}>When you borrow or lend money with your circle, it will show up here.</Text>
-              </View>
-            )}
-
-            {/* ── YOUR OWN FUNDED LOANS (need to repay) ── */}
-            {activeRequests.filter(r => r.isOwn && r.isFunded).map(req => (
-              <View key={req.id} style={[styles.activeLoanCard, styles.needsRepayCard]}>
-                <Text style={styles.cardTime}>{req.createdAt}</Text>
-                <View style={styles.fundedBadgeRow}>
-                  <View style={styles.fundedBadge}>
-                    <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-                    <Text style={styles.fundedBadgeText}>Funded by {req.fundedByName}</Text>
-                  </View>
-                </View>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: '#F0FDF4', marginRight: 12 }]}>
-                    <Text style={{ fontSize: 22 }}>{req.fundedByEmoji ?? '💚'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>£{fmtAmt(req.amount)} in your wallet</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
-                  </View>
-                </View>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.infoCellLabel}>borrowed</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.deadline}</Text>
-                    <Text style={styles.infoCellLabel}>agreed term</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={[styles.infoCellValue, { color: '#16A34A' }]}>{req.repayByDate}</Text>
-                    <Text style={styles.infoCellLabel}>repay by</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.repayBtn} onPress={() => handleRepay(req)} activeOpacity={0.85}>
-                  <Ionicons name="arrow-undo-outline" size={18} color="#fff" />
-                  <Text style={styles.repayBtnText}>Repay £{fmtAmt(req.amount)}</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {/* ── YOUR OWN REQUESTS (waiting to be funded) ── */}
-            {activeRequests.filter(r => r.isOwn && !r.isFunded).map(req => (
-              <View key={req.id} style={[styles.activeLoanCard, styles.ownRequestCard]}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTime}>{req.createdAt}</Text>
-                  <View style={styles.expiryPill}>
-                    <Ionicons name="time-outline" size={12} color="#D97706" />
-                    <Text style={styles.expiryText}>{req.expiresIn}h left</Text>
-                  </View>
-                </View>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                    <Text style={{ fontSize: 20 }}>{req.fromEmoji}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>You requested £{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason} · waiting for your circle</Text>
-                  </View>
-                </View>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.infoCellLabel}>amount</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.deadline}</Text>
-                    <Text style={styles.infoCellLabel}>repay by</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.repayByDate}</Text>
-                    <Text style={styles.infoCellLabel}>due date</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.cancelRequestBtn}
-                  onPress={async () => {
-                    setActiveRequests(prev => prev.filter(r => r.id !== req.id));
-                    removeActivity(`a_req_${req.id}`);
-                    removeActivity(`moneyreq_${req.id}`);
-                    if (childId) db.cancelMoneyRequest(req.id, childId).catch(() => {});
-                    db.removeRequestActivities(req.id).catch(() => {});
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.cancelRequestText}>Cancel request</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {/* ── 3. FRIENDS REQUESTING MONEY (pending) ── */}
-            {activeRequests.filter(r => !r.isOwn && !r.isFunded).map(req => (
-              <View key={req.id} style={styles.activeLoanCard}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTime}>{req.createdAt}</Text>
-                  <View style={styles.expiryPill}>
-                    <Ionicons name="time-outline" size={12} color="#D97706" />
-                    <Text style={styles.expiryText}>{req.expiresIn}h left</Text>
-                  </View>
-                </View>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                    <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>{req.fromName} needs £{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
-                  </View>
-                </View>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.infoCellLabel}>amount</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.deadline}</Text>
-                    <Text style={styles.infoCellLabel}>repay by</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.repayByDate}</Text>
-                    <Text style={styles.infoCellLabel}>deadline</Text>
-                  </View>
-                </View>
-                <View style={styles.reqActions}>
-                  <TouchableOpacity style={styles.fundBtn} onPress={() => handleFund(req)} activeOpacity={0.85}>
-                    <Text style={styles.fundBtnText}>Fund it 💚</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-
-            {/* Funded requests — awaiting repayment */}
-            {activeRequests.filter(r => !r.isOwn && r.isFunded).map(req => (
-              <View key={req.id} style={[styles.activeLoanCard, styles.fundedCard]}>
-                <Text style={styles.cardTime}>{req.createdAt}</Text>
-                <View style={styles.fundedBadgeRow}>
-                  <View style={styles.fundedBadge}>
-                    <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
-                    <Text style={styles.fundedBadgeText}>Funded</Text>
-                  </View>
-                </View>
-                <View style={styles.loanRow}>
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                    <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.loanTitle}>You funded {req.fromName}</Text>
-                    <Text style={styles.loanSub}>{req.reasonEmoji} {req.reason}</Text>
-                  </View>
-                  <Text style={styles.loanAmount}>£{fmtAmt(req.amount)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>£{fmtAmt(req.amount)}</Text>
-                    <Text style={styles.infoCellLabel}>lent</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={styles.infoCellValue}>{req.deadline}</Text>
-                    <Text style={styles.infoCellLabel}>agreed term</Text>
-                  </View>
-                  <View style={styles.infoDivider} />
-                  <View style={styles.infoCell}>
-                    <Text style={[styles.infoCellValue, { color: '#16A34A' }]}>{req.repayByDate}</Text>
-                    <Text style={styles.infoCellLabel}>repay by</Text>
-                  </View>
-                </View>
-                <View style={styles.awaitingRow}>
-                  <Ionicons name="time-outline" size={15} color={colors.textSecondary} />
-                  <Text style={styles.awaitingText}>Waiting for {req.fromName} to repay by {req.repayByDate}</Text>
-                </View>
-              </View>
-            ))}
-          </>
-        ) : (
-          <>
-            <View style={styles.sectionRow}>
-              <Ionicons name="time-outline" size={18} color="#1A1A3E" />
-              <Text style={styles.sectionHeading}>History</Text>
-              <TouchableOpacity onPress={loadHistory} style={{ marginLeft: 'auto' }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+            {/* Tab bar: To fund / Pending */}
+            <View style={s.reqTabsWrap}>
+              <TouchableOpacity style={s.reqTab} onPress={() => setReqTab('toFund')} activeOpacity={0.7}>
+                <Text style={[s.reqTabText, reqTab === 'toFund' && s.reqTabTextActive]}>To fund</Text>
+                {reqTab === 'toFund' && <View style={s.reqTabIndicator} />}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.reqTab} onPress={() => setReqTab('pending')} activeOpacity={0.7}>
+                <Text style={[s.reqTabText, reqTab === 'pending' && s.reqTabTextActive]}>Pending</Text>
+                {reqTab === 'pending' && <View style={s.reqTabIndicator} />}
               </TouchableOpacity>
             </View>
 
+            {/* ── TO FUND tab ──────────────────────────────────────── */}
+            {reqTab === 'toFund' && (
+              friendRequests.length === 0 ? (
+                <View style={s.emptyRequests}>
+                  <Text style={s.emptyEmoji}>💸</Text>
+                  <Text style={s.emptyTitle}>Nothing to fund yet</Text>
+                  <Text style={s.emptySub}>When friends in your circle request money, they'll appear here.</Text>
+                </View>
+              ) : (
+                <>
+                  {visibleFriendRequests.map((req, idx) => {
+                    const member = circle.find(m => m.id === req.fromId);
+                    return (
+                      <View key={req.id} style={[s.requestRow, idx < visibleFriendRequests.length - 1 && s.rowDivider]}>
+                        <View style={s.reqAvatar}>
+                          {member?.profileImageUrl
+                            ? <Image source={{ uri: member.profileImageUrl }} style={s.reqAvatarImg} resizeMode="cover" />
+                            : <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.reqName}>{firstNameOf(req.fromName)}</Text>
+                          <Text style={s.reqAmount}>£{fmtAmt(req.amount)} needed</Text>
+                          <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
+                        </View>
+                        <View style={s.reqRight}>
+                          <View style={s.reqTimeCol}>
+                            <Text style={s.reqTime}>{req.expiresIn}h left</Text>
+                            <Text style={s.reqDue}>Due {req.repayByDate}</Text>
+                          </View>
+                          <TouchableOpacity style={s.fundBtn} onPress={() => handleFund(req)} activeOpacity={0.85}>
+                            <Text style={s.fundBtnText}>Fund</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                  {friendRequests.length > TO_FUND_LIMIT && (
+                    <TouchableOpacity
+                      style={s.viewAllToFund}
+                      onPress={() => setShowAllToFund(v => !v)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.viewAllToFundText}>
+                        {showAllToFund
+                          ? 'Show less'
+                          : `View all ${friendRequests.length} requests`}
+                      </Text>
+                      <Ionicons
+                        name={showAllToFund ? 'chevron-up' : 'chevron-down'}
+                        size={14}
+                        color={colors.primary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </>
+              )
+            )}
+
+            {/* ── PENDING tab ──────────────────────────────────────── */}
+            {reqTab === 'pending' && (
+              pendingItems.length === 0 ? (
+                <>
+                  <View style={s.emptyRequests}>
+                    <Text style={s.emptyEmoji}>✅</Text>
+                    <Text style={s.emptyTitle}>All clear</Text>
+                    <Text style={s.emptySub}>No pending requests or outstanding loans right now.</Text>
+                  </View>
+                  {highlightedId && (
+                    <View style={s.staleLoanNote}>
+                      <Text style={s.staleLoanText}>This repayment is no longer outstanding.</Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                pendingItems.map((req, idx) => {
+                  const isOwnPending = req.isOwn && !req.isFunded;
+                  const isOwnFunded  = req.isOwn && req.isFunded;
+                  const isFundedByMe = !req.isOwn && req.isFunded;
+                  const member       = circle.find(m => m.id === req.fromId);
+                  const isHighlighted = req.id === highlightedId;
+
+                  return (
+                    <View key={req.id} style={[s.requestRow, idx < pendingItems.length - 1 && s.rowDivider, isHighlighted && s.requestRowHighlight]}>
+                      {/* Avatar */}
+                      <View style={s.reqAvatar}>
+                        {isOwnPending ? (
+                          child.profileImageUrl
+                            ? <Image source={{ uri: child.profileImageUrl }} style={s.reqAvatarImg} resizeMode="cover" />
+                            : <Text style={{ fontSize: 22 }}>{child.avatarEmoji}</Text>
+                        ) : isOwnFunded ? (
+                          <Text style={{ fontSize: 22 }}>{req.fundedByEmoji ?? '💚'}</Text>
+                        ) : member?.profileImageUrl ? (
+                          <Image source={{ uri: member.profileImageUrl }} style={s.reqAvatarImg} resizeMode="cover" />
+                        ) : (
+                          <Text style={{ fontSize: 22 }}>{req.fromEmoji}</Text>
+                        )}
+                      </View>
+
+                      {/* Text — 3 lines matching the To fund tab layout */}
+                      <View style={{ flex: 1 }}>
+                        {isOwnPending && (
+                          <>
+                            <Text style={s.reqName}>Your Request</Text>
+                            <Text style={s.reqAmount}>£{fmtAmt(req.amount)} requested</Text>
+                            <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
+                          </>
+                        )}
+                        {isOwnFunded && (
+                          <>
+                            <Text style={s.reqName}>{req.fundedByName ?? 'Friend'}</Text>
+                            <Text style={s.reqAmount}>£{fmtAmt(req.amount)} borrowed</Text>
+                            <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
+                          </>
+                        )}
+                        {isFundedByMe && (
+                          <>
+                            <Text style={s.reqName}>{req.fromName} owes you</Text>
+                            <Text style={s.reqAmount}>£{fmtAmt(req.amount)} outstanding</Text>
+                            <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
+                          </>
+                        )}
+                      </View>
+
+                      {/* Right column */}
+                      <View style={s.reqRight}>
+                        {isOwnPending && (
+                          <>
+                            <View style={s.reqTimeCol}>
+                              <Text style={s.reqTime}>{req.expiresIn}h left</Text>
+                              <Text style={s.reqDue}>Due {req.repayByDate}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={s.cancelPill}
+                              onPress={async () => {
+                                setActiveRequests(prev => prev.filter(r => r.id !== req.id));
+                                removeActivity(`a_req_${req.id}`);
+                                removeActivity(`moneyreq_${req.id}`);
+                                if (childId) db.cancelMoneyRequest(req.id, childId).catch(() => {});
+                                db.removeRequestActivities(req.id).catch(() => {});
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={s.cancelPillText}>Cancel</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        {isOwnFunded && (
+                          <>
+                            <View style={s.reqTimeCol}>
+                              <Text style={s.reqDue}>Due {req.repayByDate}</Text>
+                            </View>
+                            <TouchableOpacity style={s.repayPill} onPress={() => handleRepay(req)} activeOpacity={0.85}>
+                              <Text style={s.repayPillText}>Repay</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        {isFundedByMe && (
+                          <>
+                            <View style={s.reqTimeCol}>
+                              <Text style={s.reqDue}>Due {req.repayByDate}</Text>
+                            </View>
+                            <View style={s.awaitPill}>
+                              <Text style={s.awaitText}>Waiting</Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )
+            )}
+
+          </View>
+        </View>
+
+        {/* ── CIRCLE LEADERBOARD (purple hero card) ───────────────── */}
+        <LinearGradient
+          colors={['#6D28D9', '#7C3AED'] as const}
+          style={s.ldrCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Card header */}
+          <View style={s.ldrHeader}>
+            <Text style={s.ldrTrophy}>🏆</Text>
+            <Text style={s.ldrTitle}>Circle Leaderboard</Text>
+          </View>
+
+          {/* Columns: visual order rank-2 | rank-1 (gold) | rank-3 | rank-4 */}
+          <View style={s.ldrColumns}>
+            {ldrDisplay.length === 0 ? (
+              <Text style={s.ldrEmpty}>Add friends to see the leaderboard</Text>
+            ) : (
+              ldrDisplay.map((member, visIdx) => {
+                const isFirst = member.rank === 1;
+                return (
+                  <React.Fragment key={member.id}>
+                    {visIdx > 0 && <View style={s.ldrDivider} />}
+                    <View style={s.ldrCol}>
+                      {/* Rank badge */}
+                      {isFirst ? (
+                        <View style={s.goldBadge}>
+                          <Text style={s.goldBadgeText}>1</Text>
+                        </View>
+                      ) : (
+                        <Text style={s.ldrRankNum}>{member.rank}</Text>
+                      )}
+
+                      {/* Avatar */}
+                      <View style={[s.ldrAvatarWrap, isFirst && s.ldrAvatarWrap1]}>
+                        {member.photo ? (
+                          <Image
+                            source={{ uri: member.photo }}
+                            style={isFirst ? s.ldrAvatarImg1 : s.ldrAvatarImg}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[s.ldrAvatarFallback, isFirst && s.ldrAvatarFallback1]}>
+                            <Text style={{ fontSize: isFirst ? 28 : 22 }}>{member.emoji}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Name */}
+                      <Text style={[s.ldrName, member.isYou && s.ldrNameYou, isFirst && s.ldrNameFirst]} numberOfLines={1}>
+                        {member.isYou ? 'You' : firstNameOf(member.name)}
+                      </Text>
+                      {/* Points */}
+                      <Text style={[s.ldrPts, isFirst && s.ldrPtsFirst]}>{member.score} pts</Text>
+                    </View>
+                  </React.Fragment>
+                );
+              })
+            )}
+          </View>
+
+          {/* View Full Leaderboard button */}
+          <TouchableOpacity
+            style={s.fullLdrBtn}
+            onPress={() => navigation.navigate('Leaderboard')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="View Full Leaderboard"
+          >
+            <Text style={s.fullLdrText}>View Full Leaderboard</Text>
+            <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </LinearGradient>
+
+        {/* ── LOAN HISTORY (collapsible) ──────────────────────────── */}
+        <TouchableOpacity
+          style={s.historyToggle}
+          onPress={() => setShowHistory(v => !v)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="time-outline" size={18} color={colors.primary} />
+          <Text style={s.historyToggleText}>Loan History</Text>
+          <Ionicons name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
+
+        {showHistory && (
+          <View style={{ gap: 12 }}>
             {historyLoading && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptySubtitle}>Loading…</Text>
+              <View style={s.emptyRequests}>
+                <Text style={s.emptySub}>Loading…</Text>
               </View>
             )}
-
             {!historyLoading && loanHistory.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyEmoji}>📋</Text>
-                <Text style={styles.emptyTitle}>No history yet</Text>
-                <Text style={styles.emptySubtitle}>Completed loans and repayments will appear here once you repay or get repaid.</Text>
+              <View style={s.emptyRequests}>
+                <Text style={s.emptyEmoji}>📋</Text>
+                <Text style={s.emptyTitle}>No history yet</Text>
+                <Text style={s.emptySub}>Completed loans will appear here.</Text>
               </View>
             )}
-
             {loanHistory.map(loan => {
               const formatDate = (iso: string | null) => {
                 if (!iso) return '—';
-                const d = new Date(iso);
-                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
               };
               const counterparty = loan.isBorrower ? loan.funderName : loan.borrowerName;
               const counterpartyUser = loan.isBorrower ? loan.funderUsername : loan.borrowerUsername;
@@ -687,56 +717,99 @@ export const CircleScreen: React.FC = () => {
               const counterpartyAvatar = loan.isBorrower ? loan.funderAvatarUrl : loan.borrowerAvatarUrl;
 
               return (
-                <View key={loan.id} style={[styles.activeLoanCard, { borderWidth: 1, borderColor: loan.repaidOnTime ? '#D1FAE5' : '#FEE2E2' }]}>
-                  <View style={styles.loanRow}>
-                    {counterpartyAvatar ? (
-                      <View style={[styles.avatarCircle, { marginRight: 12, overflow: 'hidden', backgroundColor: 'transparent' }]}>
-                        <Image source={{ uri: counterpartyAvatar }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+                <View key={loan.id} style={[s.cardOuter, { borderWidth: 1, borderColor: loan.repaidOnTime ? '#D1FAE5' : '#FEE2E2', borderRadius: 16 }]}>
+                  <View style={s.cardInner}>
+                    <View style={s.requestRow}>
+                      <View style={s.reqAvatar}>
+                        {counterpartyAvatar
+                          ? <Image source={{ uri: counterpartyAvatar }} style={s.reqAvatarImg} resizeMode="cover" />
+                          : <Text style={{ fontSize: 22 }}>{counterpartyEmoji}</Text>}
                       </View>
-                    ) : (
-                      <View style={[styles.avatarCircle, { backgroundColor: colors.primaryLight, marginRight: 12 }]}>
-                        <Text style={{ fontSize: 22 }}>{counterpartyEmoji}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.reqName}>{loan.isBorrower ? 'Borrowed from' : 'Lent to'} @{counterpartyUser}</Text>
+                        <Text style={s.reqSub}>{loan.reasonEmoji} {loan.reason}</Text>
                       </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.loanTitle}>
-                        {loan.isBorrower ? 'Borrowed from' : 'Lent to'} @{counterpartyUser}
-                      </Text>
-                      <Text style={styles.loanSub}>{loan.reasonEmoji} {loan.reason}</Text>
+                      <Text style={s.reqName}>£{fmtAmt(loan.amount)}</Text>
                     </View>
-                    <Text style={styles.loanAmount}>£{fmtAmt(loan.amount)}</Text>
-                  </View>
 
-                  <View style={styles.infoRow}>
-                    <View style={styles.infoCell}>
-                      <Text style={styles.infoCellValue}>{formatDate(loan.createdAt)}</Text>
-                      <Text style={styles.infoCellLabel}>started</Text>
-                    </View>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoCell}>
-                      <Text style={styles.infoCellValue}>{formatDate(loan.repaidAt)}</Text>
-                      <Text style={styles.infoCellLabel}>repaid</Text>
-                    </View>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoCell}>
-                      <View style={[styles.fundedBadge, { backgroundColor: loan.repaidOnTime ? '#F0FDF4' : '#FEF2F2' }]}>
-                        <Ionicons name={loan.repaidOnTime ? 'checkmark-circle' : 'close-circle'} size={13} color={loan.repaidOnTime ? '#16A34A' : colors.error} />
-                        <Text style={[styles.fundedBadgeText, { color: loan.repaidOnTime ? '#16A34A' : colors.error }]}>
-                          {loan.repaidOnTime ? 'On time' : loan.status === 'defaulted' ? 'Defaulted' : 'Late'}
-                        </Text>
+                    <View style={s.historyMeta}>
+                      <View style={s.historyMetaItem}>
+                        <Text style={s.historyMetaLabel}>Started</Text>
+                        <Text style={s.historyMetaValue}>{formatDate(loan.createdAt)}</Text>
+                      </View>
+                      <View style={s.historyMetaDivider} />
+                      <View style={s.historyMetaItem}>
+                        <Text style={s.historyMetaLabel}>Repaid</Text>
+                        <Text style={s.historyMetaValue}>{formatDate(loan.repaidAt)}</Text>
+                      </View>
+                      <View style={s.historyMetaDivider} />
+                      <View style={s.historyMetaItem}>
+                        <Text style={s.historyMetaLabel}>Status</Text>
+                        <View style={[s.statusBadge, { backgroundColor: loan.repaidOnTime ? '#F0FDF4' : '#FEF2F2' }]}>
+                          <Ionicons name={loan.repaidOnTime ? 'checkmark-circle' : 'close-circle'} size={13} color={loan.repaidOnTime ? '#16A34A' : colors.error} />
+                          <Text style={[s.statusText, { color: loan.repaidOnTime ? '#16A34A' : colors.error }]}>
+                            {loan.repaidOnTime ? 'On time' : loan.status === 'defaulted' ? 'Defaulted' : 'Late'}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </View>
                 </View>
               );
             })}
-          </>
+          </View>
         )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* Fund confirmation sheet */}
+      {/* ── FRIEND PROFILE SHEET ───────────────────────────────── */}
+      <Modal
+        visible={selectedFriend !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedFriend(null)}
+      >
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setSelectedFriend(null)}>
+          <TouchableOpacity style={s.friendSheet} activeOpacity={1} onPress={() => {}}>
+            {/* Close */}
+            <TouchableOpacity style={s.sheetClose} onPress={() => setSelectedFriend(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color="#6B7280" />
+            </TouchableOpacity>
+
+            {/* Avatar */}
+            <View style={s.sheetAvatarWrap}>
+              {selectedFriend?.profileImageUrl ? (
+                <Image source={{ uri: selectedFriend.profileImageUrl }} style={s.sheetAvatarImg} resizeMode="cover" />
+              ) : (
+                <Text style={s.sheetAvatarEmoji}>{selectedFriend?.avatarEmoji}</Text>
+              )}
+            </View>
+
+            <Text style={s.sheetName}>{selectedFriend?.displayName}</Text>
+            <Text style={s.sheetUsername}>@{selectedFriend?.username}</Text>
+            <View style={s.sheetScorePill}>
+              <Text style={s.sheetScoreText}>Trust Score {selectedFriend?.trustScore}</Text>
+            </View>
+
+            <View style={s.sheetDivider} />
+
+            {/* Destructive secondary action */}
+            <TouchableOpacity
+              style={s.removeBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (selectedFriend) handleRemoveFriend(selectedFriend.id, selectedFriend.username);
+              }}
+            >
+              <Ionicons name="person-remove-outline" size={18} color={colors.error} />
+              <Text style={s.removeBtnText}>Remove from Circle</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── CONFIRM SHEETS (unchanged) ──────────────────────────── */}
       <ConfirmSheet
         visible={fundingRequest !== null}
         emoji="💚"
@@ -749,8 +822,6 @@ export const CircleScreen: React.FC = () => {
         onConfirm={confirmFund}
         onCancel={() => setFundingRequest(null)}
       />
-
-      {/* Repay confirmation sheet */}
       <ConfirmSheet
         visible={repayingRequest !== null}
         emoji="✅"
@@ -763,189 +834,189 @@ export const CircleScreen: React.FC = () => {
         onConfirm={confirmRepay}
         onCancel={() => setRepayingRequest(null)}
       />
-
-
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F4FC' },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  // Friends card
-  friendsCard: {
-    backgroundColor: '#fff', borderRadius: 20, paddingTop: 12, paddingBottom: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
-  },
-  friendsCardHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, marginBottom: 8,
-  },
-  friendsCardTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A3E' },
-  addBtn: {
-    backgroundColor: colors.primaryLight, borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 5,
-  },
-  addBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+const SCREEN_W   = Dimensions.get('window').width;
+const SLOT_W     = (SCREEN_W - 32) / 5;   // 5 equal slots across the padded row
+const FRIEND_SIZE = Math.round(SLOT_W * 0.78); // avatar is 78% of slot width
 
-  // Friends avatar row — compact, 4 per view, horizontally scrollable
-  friendsList: { paddingHorizontal: 12, paddingBottom: 14 },
-  friendItem: { width: FRIEND_ITEM_W, alignItems: 'center', paddingVertical: 6, gap: 5 },
-  friendAvatarContainer: { position: 'relative' },
-  removeBtn: {
-    position: 'absolute', top: -2, right: -2,
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: '#EF4444',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: '#fff',
-  },
-  friendAvatarPhotoWrap: { width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE, borderRadius: FRIEND_AVATAR_SIZE / 2, overflow: 'hidden' },
-  friendAvatarPhoto: { width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE },
-  friendAvatarBubble: {
-    width: FRIEND_AVATAR_SIZE, height: FRIEND_AVATAR_SIZE, borderRadius: FRIEND_AVATAR_SIZE / 2,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  friendAvatarEmoji: { fontSize: 24 },
-  friendUsername: { fontSize: 11, fontWeight: '600', color: '#1A1A3E', textAlign: 'center', maxWidth: FRIEND_ITEM_W - 8 },
-  friendsEmpty: { paddingHorizontal: 4, paddingBottom: 14, paddingTop: 4, justifyContent: 'center' },
-  friendsEmptyText: { fontSize: 13, color: colors.textSecondary },
+const s = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: '#FFFFFF' },
+  scroll: { backgroundColor: '#FFFFFF', paddingBottom: 16, gap: 16 },
 
-  // Tabs
-  tabsWrap: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderRadius: 20, padding: 5,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-  },
-  tab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 12, borderRadius: 16,
-  },
-  tabActive: { backgroundColor: colors.primary },
-  tabText: { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
-  tabTextActive: { color: '#fff' },
-  tabBadge: { backgroundColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  tabBadgeActive: { backgroundColor: 'rgba(255,255,255,0.3)' },
-  tabBadgeText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-  tabBadgeTextActive: { color: '#fff' },
+  // Page header
+  pageHeader:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
+  pageTitle:    { fontSize: 30, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: 14, color: '#6B7280', fontWeight: '400', marginTop: 3 },
 
-  scroll: { padding: 16, gap: 14 },
+  // Friends row — outer container holds scrollable friends + fixed Add button
+  friendsOuter:     { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 6, alignItems: 'flex-start' },
+  friendsScroll:    { alignItems: 'flex-start' },
+  friendSlot:       { width: SLOT_W, alignItems: 'center', gap: 6, paddingVertical: 6 },
 
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 2 },
-  sectionHeading: { fontSize: 17, fontWeight: '800', color: '#1A1A3E' },
+  // Avatar is a wrapper that carries shadow/dot WITHOUT overflow:hidden,
+  // so the online-dot isn't clipped by the ring's border-radius clip.
+  friendAvatarOuter: { width: FRIEND_SIZE, height: FRIEND_SIZE, position: 'relative' },
+  friendRingWrap:    { width: FRIEND_SIZE, height: FRIEND_SIZE, borderRadius: FRIEND_SIZE / 2, borderWidth: 2.5, borderColor: colors.primary, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight },
+  friendPhoto:       { width: FRIEND_SIZE - 6, height: FRIEND_SIZE - 6, borderRadius: (FRIEND_SIZE - 6) / 2 },
+  friendEmojiFill:   { width: FRIEND_SIZE, height: FRIEND_SIZE, alignItems: 'center', justifyContent: 'center' },
+  onlineDot:         { position: 'absolute', bottom: 0, right: 0, width: 13, height: 13, borderRadius: 7, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#FFFFFF' },
+  friendUsername:    { fontSize: 11, fontWeight: '600', color: '#374151', textAlign: 'center', width: SLOT_W - 4 },
 
-  // Active loan card
-  activeLoanCard: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 16, gap: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-    position: 'relative',
-  },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 10,
-  },
-  cardTime: {
-    fontSize: 11, color: colors.textLight, fontWeight: '500',
-  },
-  needsRepayBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-    backgroundColor: '#F0FDF4', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
-  },
-  needsRepayText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
-  expiryPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
-  expiryText: { fontSize: 12, fontWeight: '700', color: '#D97706' },
+  // Add Friend fixed slot
+  addRingWrap: { width: FRIEND_SIZE, height: FRIEND_SIZE, borderRadius: FRIEND_SIZE / 2, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  addLabel:    { fontSize: 11, fontWeight: '700', color: colors.primary, textAlign: 'center' },
 
-  loanRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarStack: { flexDirection: 'row', alignItems: 'center', marginRight: 12 },
-  avatarCircle: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff',
-  },
-  avatarInitial: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  loanTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A3E', marginBottom: 2 },
-  loanSub: { fontSize: 13, color: colors.textSecondary },
-  loanAmount: { fontSize: 20, fontWeight: '800', color: '#1A1A3E', marginLeft: 8 },
+  // Card wrapper (outer = shadow, inner = clip)
+  cardOuter: { marginHorizontal: 16, borderRadius: 16, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
+  cardInner: { borderRadius: 16, overflow: 'hidden' },
 
-  infoRow: { flexDirection: 'row', backgroundColor: '#F5F4FC', borderRadius: 14, overflow: 'hidden' },
-  infoCell: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  infoDivider: { width: 1, backgroundColor: '#E5E7EB' },
-  infoCellValue: { fontSize: 16, fontWeight: '800', color: '#1A1A3E' },
-  infoCellLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  // Card header
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
+  cardTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  cardTitle:     { fontSize: 22, fontWeight: '800', color: '#111827' },
+  seeAllLink:    { fontSize: 14, fontWeight: '700', color: colors.primary },
+  countBadge:    { backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  countBadgeText:{ fontSize: 12, fontWeight: '700', color: colors.primary },
 
-  repayBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#16A34A', borderRadius: 16, paddingVertical: 16,
-  },
-  repayBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  overdueLoanCard: { borderColor: colors.error, borderWidth: 1.5 },
-  missedHistoryCard: { borderWidth: 1.5, borderColor: '#FECACA' },
-  overdueBadgeRow: { flexDirection: 'row', marginBottom: 8 },
-  overdueBadge: { backgroundColor: '#FEE2E2', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  overdueBadgeText: { fontSize: 12, fontWeight: '700', color: colors.error },
-  overdueWarning: { backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12 },
-  overdueWarningText: { fontSize: 13, color: '#991B1B', lineHeight: 18 },
-  simulateBtn: { alignItems: 'center', paddingVertical: 10 },
-  simulateBtnText: { fontSize: 12, color: colors.textSecondary, textDecorationLine: 'underline' },
-  ownRequestCard: { borderWidth: 1.5, borderColor: colors.primary },
-  needsRepayCard: { borderWidth: 1.5, borderColor: '#16A34A' },
-  fundedCard: { borderWidth: 1.5, borderColor: '#16A34A' },
-  fundedBadgeRow: { flexDirection: 'row' },
-  fundedBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#F0FDF4', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  fundedBadgeText: { fontSize: 12, fontWeight: '700', color: '#16A34A' },
-  awaitingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F0FDF4', borderRadius: 12, padding: 12,
-  },
-  awaitingText: { fontSize: 13, color: '#16A34A', fontWeight: '600', flex: 1 },
-  cancelRequestBtn: { alignItems: 'center', paddingVertical: 4 },
-  cancelRequestText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
-  friendReqCard: { borderWidth: 1.5, borderColor: colors.primary },
-  acceptBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14,
-  },
-  acceptBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  declineBtn: {
-    flex: 0.5, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#F5F4FC', borderRadius: 14, paddingVertical: 14,
-  },
-  declineBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-  defaultedCard: { borderWidth: 1.5, borderColor: colors.error },
-  defaultedNote: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  // Requests card specific header (no "See all" link — just the title)
+  reqCardHeader: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 0 },
 
-  tierPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  tierPillText: { fontSize: 13, fontWeight: '700' },
-  reqActions: { flexDirection: 'row', gap: 10 },
-  fundBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  fundBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  passBtn: { flex: 0.45, backgroundColor: '#F5F4FC', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  passBtnText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
+  // Tab bar inside Requests card
+  reqTabsWrap:     { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', marginTop: 8 },
+  reqTab:          { flex: 1, alignItems: 'center', paddingVertical: 14, position: 'relative' },
+  reqTabText:      { fontSize: 15, fontWeight: '600', color: '#9CA3AF' },
+  reqTabTextActive:{ fontSize: 15, fontWeight: '700', color: colors.primary },
+  reqTabIndicator: { position: 'absolute', bottom: 0, left: 16, right: 16, height: 2.5, backgroundColor: colors.primary, borderRadius: 2 },
 
-  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyEmoji: { fontSize: 38 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A3E' },
-  emptySubtitle: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 16 },
+  // Amount line in request rows (between name and sub-text)
+  reqAmount: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 2 },
 
-  // History cards
-  historyCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
-    backgroundColor: '#fff', borderRadius: 20, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+  // Cancel pill (matches Fund/Repay style for visual consistency)
+  cancelPill:     { borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  cancelPillText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+
+  // Empty state
+  emptyRequests: { alignItems: 'center', paddingVertical: 32, gap: 6 },
+  emptyEmoji:    { fontSize: 34 },
+  emptyTitle:    { fontSize: 15, fontWeight: '700', color: '#111827' },
+  emptySub:      { fontSize: 13, color: '#6B7280', textAlign: 'center', paddingHorizontal: 16 },
+
+  // Request rows
+  reqRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 18 },
+  requestRow:{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 18 },
+  requestRowHighlight: { backgroundColor: '#F0FDF4', borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: 17 },
+  staleLoanNote: { marginHorizontal: 20, marginBottom: 16, padding: 12, backgroundColor: '#FFF7ED', borderRadius: 10 },
+  staleLoanText: { fontSize: 13, color: '#92400E', textAlign: 'center' },
+  rowDivider:{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
+
+  // Avatar with purple ring matching the screenshot
+  reqAvatar:    { width: 54, height: 54, borderRadius: 27, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  reqAvatarImg: { width: 54, height: 54 },
+  reqName:      { fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 },
+  reqSub:       { fontSize: 13, fontWeight: '400', color: '#6B7280' },
+
+  reqRight:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reqTimeCol: { alignItems: 'flex-end', gap: 2 },
+  reqTime:  { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  reqDue:   { fontSize: 11, color: '#9CA3AF' },
+
+  // Friend request accept/decline
+  frActions:  { flexDirection: 'row', gap: 8 },
+  acceptBtn:  { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  acceptText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  declineBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  declineText:{ fontSize: 13, fontWeight: '600', color: '#6B7280' },
+
+  // Fund button — white background, purple border, pill-shaped
+  fundBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#FFFFFF' },
+  fundBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+
+  // Repay button (pill style)
+  repayPill:     { backgroundColor: '#F0FDF4', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: '#16A34A' },
+  repayPillText: { fontSize: 14, fontWeight: '700', color: '#16A34A' },
+
+  cancelText: { fontSize: 12, fontWeight: '600', color: '#9CA3AF', textDecorationLine: 'underline' },
+
+  awaitPill: { backgroundColor: '#F0FDF4', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  awaitText: { fontSize: 11, fontWeight: '600', color: '#16A34A' },
+
+  // "See all requests" footer — text left, arrow right
+  viewAllToFund:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0F0F0' },
+  viewAllToFundText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  seeAllFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, paddingVertical: 16, paddingHorizontal: 20 },
+  seeAllFooterText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+
+  // ── Leaderboard purple card ────────────────────────────────────────────────
+  ldrCard: { marginHorizontal: 16, borderRadius: 24, paddingTop: 16, paddingBottom: 16, overflow: 'hidden' },
+
+  ldrHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 10 },
+  ldrTrophy:   { fontSize: 20 },
+  ldrTitle:    { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+
+  ldrColumns: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 8, marginBottom: 12 },
+  ldrDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'stretch' },
+
+  ldrCol:      { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 4 },
+  ldrEmpty:    { flex: 1, color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', padding: 24 },
+
+  goldBadge:     { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
+  goldBadgeText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
+  ldrRankNum:    { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)', height: 22, lineHeight: 22 },
+
+  ldrAvatarWrap:      { width: 58, height: 58, borderRadius: 29, overflow: 'hidden', borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarWrap1:     { width: 70, height: 70, borderRadius: 35, overflow: 'hidden', borderWidth: 2.5, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarImg:       { width: 58, height: 58 },
+  ldrAvatarImg1:      { width: 70, height: 70 },
+  ldrAvatarFallback:  { width: 58, height: 58, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarFallback1: { width: 70, height: 70, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+
+  ldrName:      { fontSize: 12, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  ldrNameFirst: { fontSize: 13, fontWeight: '800' },
+  ldrNameYou:   { color: '#E8F97A' },
+  ldrPts:       { fontSize: 11, fontWeight: '400', color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+  ldrPtsFirst:  { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
+
+  fullLdrBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingVertical: 12, marginHorizontal: 20 },
+  fullLdrText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+
+  // ── History toggle & rows ─────────────────────────────────────────────────
+  historyToggle:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.primaryLight, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  historyToggleText: { fontSize: 15, fontWeight: '700', color: colors.primary, flex: 1 },
+
+  historyMeta:        { flexDirection: 'row', backgroundColor: '#F9FAFB', marginHorizontal: 16, marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
+  historyMetaItem:    { flex: 1, alignItems: 'center', paddingVertical: 10 },
+  historyMetaLabel:   { fontSize: 11, color: '#9CA3AF', marginBottom: 3 },
+  historyMetaValue:   { fontSize: 13, fontWeight: '700', color: '#111827' },
+  historyMetaDivider: { width: 1, backgroundColor: '#E5E7EB' },
+  statusBadge:        { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  statusText:         { fontSize: 11, fontWeight: '700' },
+
+  // ── Friend profile sheet ──────────────────────────────────────────────────
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  friendSheet:  {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 36,
+    alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 20,
   },
-  historyAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  historyAvatarInitial: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  historyTime: { fontSize: 12, color: colors.textLight, marginTop: 4 },
-  historyRight: { alignItems: 'flex-end', gap: 6 },
-  historyAmount: { fontSize: 18, fontWeight: '800', color: '#1A1A3E' },
-  statusBadge: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
-  statusBadgeText: { fontSize: 13, fontWeight: '700' },
+  sheetClose: { alignSelf: 'flex-end', width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: 18, marginBottom: 8 },
+
+  sheetAvatarWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2.5, borderColor: colors.primary, marginBottom: 12 },
+  sheetAvatarImg:  { width: 80, height: 80 },
+  sheetAvatarEmoji:{ fontSize: 38 },
+
+  sheetName:     { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 3 },
+  sheetUsername: { fontSize: 15, color: '#6B7280', fontWeight: '500', marginBottom: 10 },
+  sheetScorePill:{ backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
+  sheetScoreText:{ fontSize: 13, fontWeight: '700', color: colors.primary },
+
+  sheetDivider: { width: '100%', height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB', marginVertical: 20 },
+
+  removeBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderWidth: 1.5, borderColor: colors.error, borderRadius: 14, paddingVertical: 15 },
+  removeBtnText: { fontSize: 15, fontWeight: '700', color: colors.error },
 });

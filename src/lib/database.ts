@@ -1,5 +1,6 @@
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
-import { readAsStringAsync } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { decode as base64Decode } from 'base64-arraybuffer';
 
 interface OnboardingParams {
@@ -113,8 +114,14 @@ export const db = {
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const path = `parent_${userId}.${ext}`;
 
-    const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
-    const arrayBuffer = base64Decode(base64);
+    let arrayBuffer: ArrayBuffer;
+    if (Platform.OS === 'web') {
+      const resp = await fetch(uri);
+      arrayBuffer = await resp.arrayBuffer();
+    } else {
+      const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+      arrayBuffer = base64Decode(base64);
+    }
 
     const { error: uploadErr } = await supabase.storage
       .from('avatars')
@@ -220,12 +227,12 @@ export const db = {
   },
 
   async createMoneyRequest(
-    fromId: string, amount: number, reason: string,
-    reasonEmoji: string, deadlineDays: number,
+    fromId: string, amount: number, deadlineDays: number,
+    viewerIds?: string[],
   ): Promise<{ requestId: string; pushTokens: string[] }> {
     const { data, error } = await supabase.rpc('create_money_request', {
-      p_from_id: fromId, p_amount: amount, p_reason: reason,
-      p_reason_emoji: reasonEmoji, p_deadline_days: deadlineDays,
+      p_from_id: fromId, p_amount: amount, p_deadline_days: deadlineDays,
+      p_viewer_ids: viewerIds ?? null,
     });
     if (error) throw new Error('create_money_request error: ' + error.message);
     const d = data as any;
@@ -336,10 +343,16 @@ export const db = {
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const path = `child_${childId}.${ext}`;
 
-    // Read as base64 via expo-file-system, then decode to ArrayBuffer.
-    // This is the only approach that works reliably on iOS and Android in React Native.
-    const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
-    const arrayBuffer = base64Decode(base64);
+    // On web, the image picker returns a blob URL; fetch() can read it directly.
+    // On native, expo-file-system's base64 read + arraybuffer decode is the reliable path.
+    let arrayBuffer: ArrayBuffer;
+    if (Platform.OS === 'web') {
+      const resp = await fetch(uri);
+      arrayBuffer = await resp.arrayBuffer();
+    } else {
+      const base64 = await readAsStringAsync(uri, { encoding: 'base64' });
+      arrayBuffer = base64Decode(base64);
+    }
 
     const { error: uploadErr } = await supabase.storage
       .from('avatars')

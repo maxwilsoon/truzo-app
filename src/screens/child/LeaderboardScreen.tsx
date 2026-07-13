@@ -1,94 +1,164 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Image, StatusBar,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, getTierInfo } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 
+const firstNameOf = (full: string) => full.split(' ')[0];
+
+const MEDAL: Record<number, { bg: string; fg: string }> = {
+  1: { bg: '#F59E0B', fg: '#FFFFFF' },
+  2: { bg: '#9CA3AF', fg: '#FFFFFF' },
+  3: { bg: '#CD7F32', fg: '#FFFFFF' },
+};
+
 export const LeaderboardScreen: React.FC = () => {
   const navigation = useNavigation();
   const { child, circle } = useApp();
 
   const all = [
-    { id: 'me', displayName: 'You', avatarEmoji: child.avatarEmoji, trustScore: child.trustScore, isYou: true },
-    ...circle.map(m => ({ ...m, isYou: false })),
-  ].sort((a, b) => b.trustScore - a.trustScore).map((m, i) => ({ ...m, rank: i + 1 }));
-
-  const medalColors: Record<number, string> = { 1: colors.gold, 2: colors.silver, 3: colors.bronze };
-  const tier = getTierInfo;
+    {
+      id: 'me',
+      displayName: child.displayName,
+      username: child.username,
+      avatarEmoji: child.avatarEmoji,
+      profileImageUrl: child.profileImageUrl,
+      trustScore: child.trustScore,
+      isYou: true,
+    },
+    ...circle.map(m => ({ ...m, isYou: false as const })),
+  ]
+    .sort((a, b) => b.trustScore - a.trustScore || a.id.localeCompare(b.id))
+    .map((m, i) => ({ ...m, rank: i + 1 }));
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" />
+
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity
+          style={s.backBtn}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>🏆 Leaderboard</Text>
+        <Text style={s.headerTitle}>Circle Leaderboard</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Top 3 podium */}
-      <View style={styles.podium}>
-        {all.slice(0, 3).map(m => (
-          <View key={m.id} style={[styles.podiumItem, m.rank === 1 && styles.podiumFirst]}>
-            {m.rank === 1 && <Text style={styles.crown}>👑</Text>}
-            <View style={[styles.podiumAvatar, { backgroundColor: m.isYou ? colors.primary : colors.primaryLight }]}>
-              <Text style={{ fontSize: m.rank === 1 ? 28 : 22 }}>{m.avatarEmoji}</Text>
-            </View>
-            <Text style={[styles.podiumName, m.rank === 1 && styles.podiumNameLarge]}>{m.isYou ? 'You' : m.displayName}</Text>
-            <Text style={[styles.podiumScore, { color: medalColors[m.rank] }]}>{m.trustScore} pts</Text>
-          </View>
-        ))}
-      </View>
+      {/* Empty state when no circle members */}
+      {circle.length === 0 ? (
+        <View style={s.emptyWrap} accessibilityRole="text">
+          <Text style={s.emptyEmoji}>🏆</Text>
+          <Text style={s.emptyTitle}>No circle members yet</Text>
+          <Text style={s.emptyBody}>Add friends to your circle to see how you all rank.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+          accessibilityRole="list"
+        >
+          {all.map(m => {
+            const tier = getTierInfo(m.trustScore);
+            const medal = MEDAL[m.rank];
+            return (
+              <View
+                key={m.id}
+                style={[s.row, m.isYou && s.rowYou]}
+                accessibilityRole="text"
+                accessibilityLabel={`Rank ${m.rank}: ${m.isYou ? 'You' : firstNameOf(m.displayName)}, ${m.trustScore} points`}
+              >
+                {/* Rank badge */}
+                <View style={[s.rankBadge, medal ? { backgroundColor: medal.bg } : s.rankBadgePlain]}>
+                  <Text style={[s.rankText, !medal && s.rankTextPlain]}>{m.rank}</Text>
+                </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {all.map(m => {
-          const t = tier(m.trustScore);
-          return (
-            <View key={m.id} style={[styles.row, m.isYou && styles.rowYou]}>
-              <View style={[styles.rankBadge, { backgroundColor: medalColors[m.rank] ?? colors.surface }]}>
-                <Text style={[styles.rankText, !medalColors[m.rank] && { color: colors.textSecondary }]}>{m.rank}</Text>
+                {/* Avatar */}
+                <View style={[s.avatar, m.isYou && s.avatarYou]}>
+                  {m.profileImageUrl ? (
+                    <Image source={{ uri: m.profileImageUrl }} style={s.avatarImg} resizeMode="cover" />
+                  ) : (
+                    <Text style={s.avatarEmoji}>{m.avatarEmoji}</Text>
+                  )}
+                </View>
+
+                {/* Name + tier */}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[s.name, m.isYou && s.nameYou]} numberOfLines={1}>
+                    {m.isYou ? 'You' : firstNameOf(m.displayName)}
+                  </Text>
+                  <Text style={[s.tierLabel, { color: tier.color }]} numberOfLines={1}>
+                    {tier.emoji} {tier.tier}
+                  </Text>
+                </View>
+
+                {/* Score */}
+                <View style={s.scoreWrap}>
+                  <Text style={[s.score, m.isYou && s.scoreYou]}>{m.trustScore}</Text>
+                  <Text style={s.scorePts}>pts</Text>
+                </View>
               </View>
-              <View style={[styles.avatar, { backgroundColor: m.isYou ? colors.primary : colors.primaryLight }]}>
-                <Text style={{ fontSize: 20 }}>{m.avatarEmoji}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.name, m.isYou && { color: colors.primary }]}>
-                  {m.isYou ? 'You' : m.displayName}{m.rank === 1 ? ' 👑' : ''}
-                </Text>
-                <Text style={[styles.tierLabel, { color: t.color }]}>{t.emoji} {t.tier}</Text>
-              </View>
-              <Text style={[styles.score, { color: m.isYou ? colors.primary : colors.text }]}>{m.trustScore}</Text>
-            </View>
-          );
-        })}
-        <View style={{ height: 24 }} />
-      </ScrollView>
+            );
+          })}
+          <View style={{ height: 32 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-  podium: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 16, padding: 24, backgroundColor: colors.primaryLight },
-  podiumItem: { alignItems: 'center', gap: 6 },
-  podiumFirst: { marginBottom: 12 },
-  crown: { fontSize: 24 },
-  podiumAvatar: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  podiumName: { fontSize: 13, fontWeight: '700', color: colors.text },
-  podiumNameLarge: { fontSize: 15 },
-  podiumScore: { fontSize: 14, fontWeight: '800' },
-  scroll: { padding: 16, gap: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderRadius: 14, padding: 14 },
-  rowYou: { borderWidth: 2, borderColor: colors.primary },
-  rankBadge: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  rankText: { fontSize: 13, fontWeight: '800', color: colors.white },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 15, fontWeight: '700', color: colors.text },
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 8, paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB',
+  },
+  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+
+  list: { padding: 16, gap: 10 },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  rowYou: { borderWidth: 2, borderColor: colors.primary, shadowOpacity: 0.12 },
+
+  rankBadge:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  rankBadgePlain: { backgroundColor: '#F3F4F6' },
+  rankText:       { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+  rankTextPlain:  { color: '#6B7280' },
+
+  avatar:      { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarYou:   { borderWidth: 2, borderColor: colors.primary },
+  avatarImg:   { width: 48, height: 48 },
+  avatarEmoji: { fontSize: 22 },
+
+  name:      { fontSize: 15, fontWeight: '700', color: '#111827' },
+  nameYou:   { color: colors.primary },
   tierLabel: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  score: { fontSize: 18, fontWeight: '800' },
+
+  scoreWrap: { alignItems: 'flex-end' },
+  score:     { fontSize: 20, fontWeight: '800', color: '#111827' },
+  scoreYou:  { color: colors.primary },
+  scorePts:  { fontSize: 11, fontWeight: '600', color: '#9CA3AF', marginTop: -2 },
+
+  emptyWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#111827', textAlign: 'center' },
+  emptyBody:  { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
 });

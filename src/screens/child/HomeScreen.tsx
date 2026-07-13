@@ -7,19 +7,86 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { RootStackParamList } from '../../navigation/types';
-import { colors, getTierInfo, getTierPercentile } from '../../theme/colors';
-import { TrustScoreRing } from '../../components/TrustScoreRing';
+import { colors, getTierInfo } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { fmtAmt } from '../../lib/utils';
+import { ActivityItem } from '../../context/AppContext';
+import { fmtAmt, repayDueLabel, repayCalendarDate } from '../../lib/utils';
+
+// ─── HomeGauge ────────────────────────────────────────────────────────────────
+// Arc-only gauge — no text inside, green fill on white track.
+// TrustScoreRing (used on TrustStats screen) is not changed.
+
+const GAUGE_START  = 225;
+const GAUGE_SWEEP  = 270;
+
+function gaugeXY(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function gaugePath(cx: number, cy: number, r: number, sweep: number): string {
+  if (sweep <= 0) return '';
+  const clamped = Math.min(sweep, GAUGE_SWEEP - 0.01);
+  const s = gaugeXY(cx, cy, r, GAUGE_START);
+  const e = gaugeXY(cx, cy, r, GAUGE_START + clamped);
+  const large = clamped > 180 ? 1 : 0;
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+}
+
+const HomeGauge: React.FC<{ score: number; size?: number }> = ({ score, size = 110 }) => {
+  const sw = 11;
+  const r  = (size - sw) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const filled = GAUGE_SWEEP * (Math.min(100, Math.max(0, score)) / 100);
+  return (
+    <Svg width={size} height={size}>
+      {/* Track */}
+      <Path d={gaugePath(cx, cy, r, GAUGE_SWEEP)} stroke="#E5E7EB" strokeWidth={sw} fill="none" strokeLinecap="round" />
+      {/* Fill */}
+      {filled > 0 && (
+        <Path d={gaugePath(cx, cy, r, filled)} stroke="#22C55E" strokeWidth={sw} fill="none" strokeLinecap="round" />
+      )}
+    </Svg>
+  );
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+const getSubtitle = (score: number): string => {
+  if (score >= 90) return "You're a trust legend! 🌟";
+  if (score >= 75) return "You're building amazing trust.";
+  if (score >= 60) return "Keep it up — trust is growing!";
+  return "Let's build your trust score!";
+};
+
+// Splits activity text into title + optional sub-line for two-line display.
+const parseActivity = (text: string): { title: string; sub?: string } => {
+  const reqM = text.match(/^(.+?)\s+needs\s+(£[\d,.]+)\s+for\s+(.+)$/);
+  if (reqM) {
+    const [, name, amt, reason] = reqM;
+    return { title: `${name} requested ${amt}`, sub: reason.charAt(0).toUpperCase() + reason.slice(1) };
+  }
+  const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+)$/);
+  if (repM) return { title: `${repM[1]} ${repM[3]}`, sub: repM[2] };
+  const funM = text.match(/^(.+?)\s+funded your request of\s+(£[\d,.]+)/);
+  if (funM) return { title: `${funM[1]} funded you`, sub: funM[2] };
+  const funA = text.match(/^(.+?)\s+funded your request\b/);
+  if (funA) { const a = text.match(/(£[\d,.]+)/); return { title: `${funA[1]} funded you`, sub: a?.[1] }; }
+  return { title: text };
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { child, circle, frozenAccount, parentDebt, activityFeed } = useApp();
-  const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
+  const { child, circle, frozenAccount, parentDebt, activityFeed, activeRequests, setRepayHighlightId } = useApp();
   const [showAllActivity, setShowAllActivity] = useState(false);
 
-  // Activity feed is the public circle feed — hide private wallet events, sort newest first
+  // Activity feed — circle-visible events sorted newest first
   const now = Date.now();
   const circleActivity = activityFeed
     .filter(a => a.type !== 'topup' && a.type !== 'spend')
@@ -30,200 +97,241 @@ export const HomeScreen: React.FC = () => {
     });
 
   const tier = getTierInfo(child.trustScore);
-  const percentile = getTierPercentile(child.trustScore);
 
-  const leaderboard = [
-    { rank: 1, name: 'You', emoji: child.avatarEmoji, photo: child.profileImageUrl, score: child.trustScore, isYou: true },
-    ...circle.map((m, i) => ({ rank: i + 2, name: m.displayName, emoji: m.avatarEmoji, photo: m.profileImageUrl, score: m.trustScore, isYou: false })),
-  ].sort((a, b) => b.score - a.score).map((m, i) => ({ ...m, rank: i + 1 }));
+  // Repayment reminder
+  const ownFunded  = activeRequests.find(r => r.isOwn && r.isFunded);
+  const repayDate  = ownFunded ? repayCalendarDate(ownFunded.repayByDate) : null;
+  const dueLabel   = ownFunded ? repayDueLabel(ownFunded.repayByDate) : '';
+  const isUrgent   = dueLabel.startsWith('Overdue') || dueLabel === 'Due today';
 
-  const visibleLeaderboard = showAllLeaderboard ? leaderboard : leaderboard.slice(0, 3);
-  const rankColors: Record<number, string> = { 1: colors.gold, 2: colors.silver, 3: colors.bronze };
+  const getMember = (text: string) => circle.find(m => m.displayName && text.includes(m.displayName));
+  const avatarBg  = (type: ActivityItem['type']) => {
+    if (type === 'tier')   return colors.primary;
+    if (type === 'joined') return colors.success;
+    if (type === 'missed') return colors.error;
+    return colors.primaryLight;
+  };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.profileBtn} onPress={() => navigation.navigate('AvatarPicker')}>
-          {child.profileImageUrl ? (
-            <View style={styles.profileAvatarWrap}>
-              <Image source={{ uri: child.profileImageUrl }} style={styles.profilePhoto} resizeMode="cover" />
-            </View>
-          ) : (
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileEmoji}>{child.avatarEmoji}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {frozenAccount && (
-        <View style={styles.frozenBanner}>
-          <Text style={styles.frozenText}>🔒 Account frozen — £{fmtAmt(parentDebt)} auto-paid to Jordan Lee from your parent's safety pool · -15 trust pts</Text>
-          <Text style={styles.frozenSub}>Pay your parent back £{fmtAmt(parentDebt)}, then ask them to confirm in their app to unfreeze your account.</Text>
+        {/* ── HEADER ──────────────────────────────────────────────── */}
+        <View style={s.header}>
+          <View style={s.greetCol}>
+            <Text style={s.greetName}>Hey {child.displayName.split(' ')[0]}! 👋</Text>
+            <Text style={s.greetSub}>{getSubtitle(child.trustScore)}</Text>
+          </View>
+          <TouchableOpacity
+            style={s.avatarBtn}
+            onPress={() => navigation.navigate('ChildProfile')}
+            activeOpacity={0.8}
+          >
+            {child.profileImageUrl ? (
+              <Image source={{ uri: child.profileImageUrl }} style={s.headerAvatar} resizeMode="cover" />
+            ) : (
+              <View style={s.headerAvatarFallback}>
+                <Text style={s.headerAvatarEmoji}>{child.avatarEmoji}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-      )}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Trust Score Card */}
-        <TouchableOpacity style={styles.trustCard} onPress={() => navigation.navigate('TrustStats')} activeOpacity={0.9}>
-          <View style={styles.sparkle}><Text>✦</Text></View>
-          <View style={styles.trustLeft}>
-            <TrustScoreRing score={child.trustScore} size={110} />
+        {/* ── FROZEN BANNER ───────────────────────────────────────── */}
+        {frozenAccount && (
+          <View style={s.frozenBanner}>
+            <Ionicons name="lock-closed" size={14} color="#991B1B" />
+            <Text style={s.frozenText}>
+              Account frozen — repay £{fmtAmt(parentDebt)} to your parent to unlock.
+            </Text>
           </View>
-          <View style={styles.trustRight}>
-            <Text style={styles.trustLabel}>TRUST SCORE</Text>
-            <Text style={styles.trustTier}>{tier.emoji} <Text style={{ color: tier.color }}>{tier.tier}</Text></Text>
-            <View style={styles.percentilePill}>
-              <Text style={styles.percentileText}>{percentile}</Text>
+        )}
+
+        {/* ── REPAYMENT CARD ──────────────────────────────────────── */}
+        {ownFunded && (
+          <View style={s.repayCard}>
+            <View style={s.repayLeft}>
+              <Text style={s.repayHeading}>You have a repayment</Text>
+              <Text style={s.repayAmount}>
+                £{fmtAmt(ownFunded.amount)} to {ownFunded.fundedByName ?? 'friend'}
+              </Text>
+              <Text style={[s.dueLabel, isUrgent && s.dueLabelUrgent]}>{dueLabel}</Text>
+              <TouchableOpacity
+                style={s.repayBtn}
+                onPress={() => {
+                  setRepayHighlightId(ownFunded.id);
+                  (navigation as any).navigate('ChildTabs', { screen: 'Circle' });
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.repayBtnText}>Repay Now  →</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.trustDesc} numberOfLines={2}>{tier.description}</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textLight} style={{ position: 'absolute', right: 0, top: 4 }} />
-          </View>
-          <View style={styles.trustStats}>
-            <View style={styles.statPill}>
-              <Text style={styles.statEmoji}>✅</Text>
-              <Text style={[styles.statText, { color: colors.primary }]}>Repaid {child.repaid}</Text>
-            </View>
-            <View style={styles.statPill}>
-              <Text style={styles.statEmoji}>⚠️</Text>
-              <Text style={styles.statText}>{child.missed} missed</Text>
-            </View>
-            {child.streak > 0 && (
-              <View style={styles.statPill}>
-                <Text style={styles.statEmoji}>🔥</Text>
-                <Text style={styles.statText}>{child.streak} week streak</Text>
+            {repayDate && (
+              <View style={s.cal}>
+                <View style={s.calTop}>
+                  <Text style={s.calMonth}>{repayDate.month}</Text>
+                </View>
+                <View style={s.calBody}>
+                  <Text style={s.calDay}>{repayDate.day}</Text>
+                </View>
               </View>
             )}
           </View>
-        </TouchableOpacity>
+        )}
 
-        {/* Balance Card */}
-        <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.balanceCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>£{fmtAmt(child.balance)}</Text>
-          <TouchableOpacity style={[styles.requestBtn, frozenAccount && styles.requestBtnDisabled]} onPress={() => !frozenAccount && navigation.navigate('RequestMoney')} activeOpacity={0.85}>
-            <View style={styles.requestIconWrap}>
-              <Text style={{ fontSize: 18 }}>💸</Text>
-            </View>
-            <Text style={[styles.requestBtnText, frozenAccount && { color: colors.textSecondary }]}>
-              {frozenAccount ? 'Account Frozen' : 'Request Money'}
-            </Text>
-            <Ionicons name={frozenAccount ? 'lock-closed-outline' : 'chevron-forward'} size={20} color={frozenAccount ? colors.textSecondary : colors.primary} />
-          </TouchableOpacity>
+        {/* ── BALANCE CARD ────────────────────────────────────────── */}
+        <LinearGradient
+          colors={['#7C3AED', '#5B21B6'] as const}
+          style={s.balCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={s.balLabel}>{frozenAccount ? '🔒 Account Frozen' : 'Balance'}</Text>
+          <Text style={s.balAmount}>£{fmtAmt(child.balance)}</Text>
         </LinearGradient>
 
-        {/* Leaderboard */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
-          <TouchableOpacity onPress={() => setShowAllLeaderboard(v => !v)}>
-            <Text style={styles.viewAll}>{showAllLeaderboard ? 'Show less' : 'View all'}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.card}>
-          {visibleLeaderboard.map(item => (
-            <View key={item.rank} style={styles.leaderRow}>
-              <View style={[styles.rankCircle, { backgroundColor: rankColors[item.rank] ?? '#D1D5DB' }]}>
-                <Text style={styles.rankText}>{item.rank}</Text>
-              </View>
-              {item.photo ? (
-                <View style={styles.leaderAvatarWrap}>
-                  <Image source={{ uri: item.photo }} style={styles.leaderAvatarPhoto} resizeMode="cover" />
-                </View>
-              ) : (
-                <View style={styles.leaderAvatar}>
-                  <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
+        {/* ── TRUST SCORE ─────────────────────────────────────────── */}
+        <TouchableOpacity activeOpacity={0.92} onPress={() => navigation.navigate('TrustStats')}>
+          <View style={s.trustCard}>
+            <View style={s.trustLeft}>
+              <Text style={s.trustLabel}>Trust Score</Text>
+              <Text style={s.trustBig}>{child.trustScore}</Text>
+              <Text style={s.trustTier}>{tier.tier}</Text>
+              {child.streak > 0 && (
+                <View style={s.streakPill}>
+                  <Text style={s.streakText}>🔥 {child.streak} week streak</Text>
                 </View>
               )}
-              <Text style={[styles.leaderName, item.isYou && styles.leaderNameYou]}>
-                {item.name}{item.rank === 1 ? ' 👑' : ''}
-              </Text>
-              <Text style={[styles.leaderScore, { color: item.isYou ? colors.primary : colors.text }]}>{item.score}</Text>
             </View>
-          ))}
-        </View>
+            <HomeGauge score={child.trustScore} size={110} />
+          </View>
+        </TouchableOpacity>
 
-        {/* Activity */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>⚡ Activity</Text>
+        {/* ── RECENT ACTIVITY ─────────────────────────────────────── */}
+        <View style={s.sectionRow}>
+          <Text style={s.sectionTitle}>Recent Activity</Text>
           <TouchableOpacity onPress={() => setShowAllActivity(v => !v)}>
-            <Text style={styles.viewAll}>{showAllActivity ? 'Show less' : 'View all'}</Text>
+            <Text style={s.seeAll}>{showAllActivity ? 'Show less' : 'See all'}</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.card}>
-          {(showAllActivity ? circleActivity : circleActivity.slice(0, 3)).map(a => (
-            <View key={a.id} style={styles.activityRow}>
-              <View style={styles.activityIconWrap}>
-                <Text style={{ fontSize: 16 }}>{a.emoji}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.activityText}>{a.text}</Text>
-                <Text style={styles.activityTime}>{a.time}</Text>
-              </View>
-            </View>
-          ))}
+
+        {/* Outer wrapper carries shadow; inner clips border-radius */}
+        <View style={s.cardOuter}>
+          <View style={s.cardInner}>
+            {circleActivity.length === 0 ? (
+              <Text style={s.emptyMsg}>No recent activity yet</Text>
+            ) : (
+              (showAllActivity ? circleActivity : circleActivity.slice(0, 6)).map((a, idx, arr) => {
+                const member  = getMember(a.text);
+                const { title, sub } = parseActivity(a.text);
+                const isBadge = !member && (a.type === 'tier' || a.type === 'joined' || a.type === 'missed');
+                const bg      = member ? colors.primaryLight : avatarBg(a.type);
+
+                return (
+                  <View key={a.id} style={[s.row, idx < arr.length - 1 && s.rowDivider]}>
+                    <View style={[s.avatar, { backgroundColor: bg }]}>
+                      {member?.profileImageUrl ? (
+                        <Image source={{ uri: member.profileImageUrl }} style={s.avatarImg} resizeMode="cover" />
+                      ) : (
+                        <Text style={[s.avatarEmoji, isBadge && { color: '#FFFFFF' }]}>
+                          {member ? member.avatarEmoji : a.emoji}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={s.rowText}>
+                      <Text style={s.rowTitle} numberOfLines={1}>{title}</Text>
+                      {sub ? <Text style={s.rowSub} numberOfLines={1}>{sub}</Text> : null}
+                    </View>
+                    <Text style={s.rowTime}>{a.time}</Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
         </View>
-        <View style={{ height: 24 }} />
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.white },
-  profileBtn: {},
-  profileAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
-  profilePhoto: { width: 40, height: 40 },
-  profileAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  profileEmoji: { fontSize: 20 },
-  leaderAvatarWrap: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden' },
-  leaderAvatarPhoto: { width: 40, height: 40 },
-  headerGreeting: { fontSize: 17, fontWeight: '700', color: colors.text },
-  frozenBanner: { backgroundColor: colors.errorLight, padding: 14, gap: 6 },
-  frozenText: { fontSize: 13, color: colors.error, fontWeight: '700' },
-  frozenSub: { fontSize: 13, color: '#991B1B', lineHeight: 18 },
-  scroll: { padding: 16, gap: 16 },
-  trustCard: {
-    backgroundColor: colors.primaryLight, borderRadius: 20, padding: 16,
-    flexDirection: 'row', flexWrap: 'wrap', gap: 12, position: 'relative',
-  },
-  sparkle: { position: 'absolute', top: 12, left: 12 },
-  trustLeft: { paddingTop: 8 },
-  trustRight: { flex: 1, justifyContent: 'center', paddingTop: 4, paddingRight: 20 },
-  trustLabel: { fontSize: 11, fontWeight: '700', color: colors.textSecondary, letterSpacing: 1, marginBottom: 4 },
-  trustTier: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 6 },
-  percentilePill: { alignSelf: 'flex-start', backgroundColor: colors.white, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 8 },
-  percentileText: { fontSize: 13, fontWeight: '600', color: colors.text },
-  trustDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  trustStats: { flexDirection: 'row', width: '100%', gap: 8 },
-  statPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  statEmoji: { fontSize: 13 },
-  statText: { fontSize: 12, fontWeight: '600', color: colors.text },
-  balanceCard: { borderRadius: 20, padding: 20 },
-  balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginBottom: 4 },
-  balanceAmount: { fontSize: 40, fontWeight: '900', color: colors.white, marginBottom: 16, letterSpacing: -1 },
-  requestBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
-    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-  },
-  requestIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  requestBtnText: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.primary },
-  requestBtnDisabled: { backgroundColor: colors.surface },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
-  viewAll: { fontSize: 14, fontWeight: '700', color: colors.primary },
-  card: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  leaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.surface },
-  rankCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  rankText: { fontSize: 13, fontWeight: '800', color: colors.text },
-  leaderAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  leaderName: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
-  leaderNameYou: { color: colors.primary },
-  leaderScore: { fontSize: 17, fontWeight: '800' },
-  activityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.surface },
-  activityIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  activityText: { fontSize: 14, color: colors.text, lineHeight: 20, fontWeight: '500' },
-  activityTime: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: '#FFFFFF' },
+  scroll: { backgroundColor: '#FFFFFF', paddingBottom: 16 },
+
+  // Header
+  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18 },
+  greetCol:  { flex: 1, marginRight: 12 },
+  greetName: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5, marginBottom: 3 },
+  greetSub:  { fontSize: 14, color: '#6B7280', fontWeight: '400' },
+  avatarBtn:           { padding: 2 },
+  headerAvatar:        { width: 46, height: 46, borderRadius: 23 },
+  headerAvatarFallback:{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarEmoji:   { fontSize: 24 },
+
+  // Frozen banner
+  frozenBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 12, backgroundColor: colors.errorLight, borderRadius: 12, padding: 12 },
+  frozenText:   { flex: 1, fontSize: 13, color: '#991B1B', fontWeight: '600', lineHeight: 18 },
+
+  // Repayment card (dark)
+  repayCard:    { marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0E0E2C', borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center' },
+  repayLeft:    { flex: 1, marginRight: 16 },
+  repayHeading: { fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginBottom: 6 },
+  repayAmount:  { fontSize: 28, color: '#FFFFFF', fontWeight: '800', letterSpacing: -0.5, lineHeight: 34, marginBottom: 8 },
+  dueLabel:       { fontSize: 13, fontWeight: '700', color: '#BFEF70', marginBottom: 16 },
+  dueLabelUrgent: { color: '#FCA5A5' },
+  repayBtn:     { backgroundColor: '#E8F97A', borderRadius: 50, paddingVertical: 13, alignItems: 'center' },
+  repayBtnText: { fontSize: 15, fontWeight: '700', color: '#1E2900' },
+
+  // Calendar widget
+  cal:      { borderRadius: 14, overflow: 'hidden', width: 70 },
+  calTop:   { backgroundColor: colors.primary, paddingVertical: 9, alignItems: 'center' },
+  calMonth: { fontSize: 11, fontWeight: '800', color: '#FFFFFF', letterSpacing: 1.5 },
+  calBody:  { backgroundColor: '#FFFFFF', paddingVertical: 9, alignItems: 'center' },
+  calDay:   { fontSize: 34, fontWeight: '900', color: '#111827', lineHeight: 38 },
+
+  // Balance card
+  balCard:   { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 22, minHeight: 96 },
+  balLabel:  { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500', marginBottom: 6 },
+  balAmount: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
+
+  // Trust Score card
+  trustCard:  { marginHorizontal: 16, marginBottom: 6, backgroundColor: '#FFFFFF', borderRadius: 16, paddingLeft: 22, paddingRight: 12, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
+  trustLeft:  { flex: 1 },
+  trustLabel: { fontSize: 13, color: '#6B7280', fontWeight: '500', marginBottom: 4 },
+  trustBig:   { fontSize: 48, fontWeight: '900', color: '#111827', letterSpacing: -2, lineHeight: 52 },
+  trustTier:  { fontSize: 15, color: '#6B7280', fontWeight: '400', marginTop: 2 },
+  streakPill: { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  streakText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+
+  // Section headers
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 10 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
+  seeAll:       { fontSize: 14, fontWeight: '600', color: colors.primary },
+
+  // Card wrapper — outer carries shadow, inner clips border-radius (iOS fix)
+  cardOuter: { marginHorizontal: 16, borderRadius: 16, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
+  cardInner: { borderRadius: 16, overflow: 'hidden' },
+  emptyMsg:  { padding: 20, textAlign: 'center', color: colors.textLight, fontSize: 14 },
+
+  // Rows (shared by activity + leaderboard)
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
+
+  // Activity avatars
+  avatar:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImg:   { width: 44, height: 44 },
+  avatarEmoji: { fontSize: 20 },
+
+  // Activity text
+  rowText:  { flex: 1 },
+  rowTitle: { fontSize: 14, fontWeight: '600', color: '#111827', lineHeight: 20 },
+  rowSub:   { fontSize: 12, fontWeight: '400', color: '#6B7280', lineHeight: 17, marginTop: 1 },
+  rowTime:  { fontSize: 12, color: '#9CA3AF', fontWeight: '400' },
+
 });
