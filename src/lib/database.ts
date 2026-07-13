@@ -160,7 +160,6 @@ export const db = {
         passcode_hash:       passcodeHash,
         passcode_created:    true,
         passcode_created_at: new Date().toISOString(),
-        passcode:            null,
       })
       .eq('id', userId);
     if (error) throw error;
