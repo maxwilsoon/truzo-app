@@ -7,7 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { fmtAmt } from '../lib/utils';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#2E7D32';
 const PRESETS = [10, 20, 50, 100];
 
 interface Props {
@@ -83,10 +84,10 @@ export const MoneySheet: React.FC<Props> = ({
                 onChangeText={handleChange}
                 keyboardType="decimal-pad"
                 placeholder="0"
-                placeholderTextColor="#C4B5F4"
+                placeholderTextColor="#A8D5AB"
                 autoFocus
                 returnKeyType="done"
-                selectionColor={PURPLE}
+                selectionColor={GREEN}
               />
             </View>
             <View style={[styles.amountUnderline, canConfirm && styles.amountUnderlineActive]} />
@@ -185,22 +186,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   currencySign: {
-    fontSize: 48, fontWeight: '300', color: PURPLE, lineHeight: 68,
+    fontSize: 48, fontWeight: '300', color: GREEN_DARK, lineHeight: 68,
   },
-  currencySignDim: { color: '#C4B5F4' },
+  currencySignDim: { color: '#A8D5AB' },
   amountInput: {
     fontSize: 72, fontWeight: '700', color: '#1A1A3E',
     minWidth: 80, textAlign: 'left',
     padding: 0,
     lineHeight: 80,
   },
-  amountInputDim: { color: '#C4B5F4' },
+  amountInputDim: { color: '#A8D5AB' },
   amountUnderline: {
     height: 3, borderRadius: 2,
     backgroundColor: '#E5E5EA',
     marginHorizontal: 8, marginBottom: 28,
   },
-  amountUnderlineActive: { backgroundColor: PURPLE },
+  amountUnderlineActive: { backgroundColor: GREEN_DARK },
 
   // Presets
   presetsRow: {
@@ -218,11 +219,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   presetActive: {
-    backgroundColor: '#EDE8FF',
-    borderColor: PURPLE,
+    backgroundColor: '#E8F5E9',
+    borderColor: GREEN,
   },
   presetText: { fontSize: 15, fontWeight: '700', color: '#636366' },
-  presetTextActive: { color: PURPLE },
+  presetTextActive: { color: GREEN_DARK },
 
   // Buttons
   payBtn: {
@@ -236,10 +237,10 @@ const styles = StyleSheet.create({
 
   saveBtn: {
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 16, paddingVertical: 18,
   },
-  saveBtnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  saveBtnText: { fontSize: 17, fontWeight: '700', color: '#1F2937' },
 
   btnDisabled: { opacity: 0.45 },
 });

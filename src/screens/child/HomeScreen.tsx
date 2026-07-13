@@ -183,7 +183,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* ── BALANCE CARD ────────────────────────────────────────── */}
         <LinearGradient
-          colors={['#7C3AED', '#5B21B6'] as const}
+          colors={['#C8E8CB', '#93C999'] as const}
           style={s.balCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -297,8 +297,8 @@ const s = StyleSheet.create({
 
   // Balance card
   balCard:   { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 22, minHeight: 96 },
-  balLabel:  { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500', marginBottom: 6 },
-  balAmount: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
+  balLabel:  { fontSize: 13, color: 'rgba(0,0,0,0.6)', fontWeight: '500', marginBottom: 6 },
+  balAmount: { fontSize: 36, fontWeight: '900', color: '#1F2937', letterSpacing: -1 },
 
   // Trust Score card
   trustCard:  { marginHorizontal: 16, marginBottom: 6, backgroundColor: '#FFFFFF', borderRadius: 16, paddingLeft: 22, paddingRight: 12, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },

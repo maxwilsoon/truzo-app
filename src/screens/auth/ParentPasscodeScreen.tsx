@@ -11,7 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { hashPasscode } from '../../lib/passcode';
 import { db } from '../../lib/database';
 
-const PURPLE = '#4F35F3';
+const GREEN_DARK = '#3D7A45';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
 type Props = {
@@ -185,7 +185,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
 };
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: PURPLE },
+  safe:    { flex: 1, backgroundColor: GREEN_DARK },
   back:    { position: 'absolute', top: 56, left: 24, zIndex: 10 },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
 

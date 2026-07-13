@@ -28,7 +28,7 @@ export const PrimaryButton: React.FC<Props> = ({
     activeOpacity={0.8}
   >
     {loading
-      ? <ActivityIndicator color={variant === 'primary' ? colors.white : colors.primary} />
+      ? <ActivityIndicator color={variant === 'primary' ? colors.text : colors.primary} />
       : <Text style={[styles.label, variant !== 'primary' && styles.labelAlt]}>{label}</Text>
     }
   </TouchableOpacity>
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.white,
+    color: colors.text,
     letterSpacing: 0.2,
   },
   labelAlt: {

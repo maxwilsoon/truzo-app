@@ -11,7 +11,7 @@ import { fmtAmt } from '../../lib/utils';
 
 const TX_ICONS: Record<string, { icon: string; bg: string; color: string }> = {
   parent_transfer: { icon: 'gift-outline',              bg: '#D1FAE5', color: '#10B981' },
-  topup:           { icon: 'shield-checkmark-outline',  bg: '#EDE9FE', color: '#7C3AED' },
+  topup:           { icon: 'shield-checkmark-outline',  bg: '#E8F5E9', color: '#C8E8CB' },
   allowance:       { icon: 'gift-outline',              bg: '#D1FAE5', color: '#10B981' },
   lend:            { icon: 'person-circle-outline',     bg: '#DBEAFE', color: '#3B82F6' },
   spend:           { icon: 'card-outline',              bg: '#F3F4F6', color: '#6B7280' },
@@ -55,7 +55,7 @@ export const WalletScreen: React.FC = () => {
 
         {/* Balance card */}
         <LinearGradient
-          colors={['#7C3AED', '#5B21B6'] as const}
+          colors={['#C8E8CB', '#93C999'] as const}
           style={s.balanceCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -160,10 +160,10 @@ const s = StyleSheet.create({
 
   // Balance card
   balanceCard:   { borderRadius: 24, padding: 22, minHeight: 158, justifyContent: 'space-between' },
-  balanceLabel:  { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
-  balanceAmount: { fontSize: 46, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1, marginTop: 4 },
+  balanceLabel:  { fontSize: 13, color: 'rgba(0,0,0,0.6)', fontWeight: '500' },
+  balanceAmount: { fontSize: 46, fontWeight: '900', color: '#1F2937', letterSpacing: -1, marginTop: 4 },
   cardFooter:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  cardNumber:    { fontSize: 15, color: 'rgba(255,255,255,0.8)', letterSpacing: 2, fontWeight: '500' },
+  cardNumber:    { fontSize: 15, color: 'rgba(0,0,0,0.55)', letterSpacing: 2, fontWeight: '500' },
 
   // Mastercard logo
   mastercardWrap:   { flexDirection: 'row', alignItems: 'center' },

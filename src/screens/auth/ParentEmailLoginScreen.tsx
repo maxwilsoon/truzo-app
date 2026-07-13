@@ -11,7 +11,8 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ParentEmailLogin'> };
@@ -158,7 +159,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.85}
           >
             {loading
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color="#1F2937" />
               : <Text style={styles.btnText}>Sign in</Text>
             }
           </TouchableOpacity>
@@ -186,7 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputWrapRow: { flexDirection: 'row', alignItems: 'center' },
-  inputFocused: { borderColor: PURPLE },
+  inputFocused: { borderColor: GREEN },
 
   input: { fontSize: 17, color: '#1C1C1E', padding: 0 },
 
@@ -194,11 +195,11 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

@@ -14,7 +14,7 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 
-const PURPLE = '#4F35F3';
+const BRAND = '#2E7D32';
 
 const MenuItem = ({
   icon, label, value, onPress, color,
@@ -249,14 +249,14 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: {
     fontSize: 38,
     fontWeight: '800',
-    color: PURPLE,
+    color: BRAND,
     letterSpacing: -1,
   },
   cameraBadge: {
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: PURPLE,
+    backgroundColor: BRAND,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

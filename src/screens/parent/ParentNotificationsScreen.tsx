@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 
 type RowProps = {
   icon: string;
@@ -38,7 +39,7 @@ const NotifRow: React.FC<RowProps> = ({ icon, iconBg, iconColor, title, subtitle
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#D1D1D6', true: PURPLE }}
+        trackColor={{ false: '#D1D1D6', true: GREEN }}
         thumbColor="#fff"
         ios_backgroundColor="#D1D1D6"
       />
@@ -72,7 +73,7 @@ export const ParentNotificationsScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         {saving ? (
-          <ActivityIndicator size="small" color={PURPLE} style={{ width: 40 }} />
+          <ActivityIndicator size="small" color={GREEN_DARK} style={{ width: 40 }} />
         ) : (
           <View style={{ width: 40 }} />
         )}
@@ -85,8 +86,8 @@ export const ParentNotificationsScreen: React.FC = () => {
         <View style={styles.card}>
           <NotifRow
             icon="megaphone-outline"
-            iconBg="#EDE8FF"
-            iconColor={PURPLE}
+            iconBg="#E8F5E9"
+            iconColor={GREEN_DARK}
             title="Product updates"
             subtitle="New features, app improvements and announcements"
             value={parent.marketingNotifications}
@@ -95,8 +96,8 @@ export const ParentNotificationsScreen: React.FC = () => {
           <View style={styles.divider} />
           <NotifRow
             icon="mail-outline"
-            iconBg="#EDE8FF"
-            iconColor={PURPLE}
+            iconBg="#E8F5E9"
+            iconColor={GREEN_DARK}
             title="Marketing emails"
             subtitle="Offers, tips and Truzo news delivered to your inbox"
             value={parent.marketingNotifications}
@@ -105,8 +106,8 @@ export const ParentNotificationsScreen: React.FC = () => {
           <View style={styles.divider} />
           <NotifRow
             icon="gift-outline"
-            iconBg="#EDE8FF"
-            iconColor={PURPLE}
+            iconBg="#E8F5E9"
+            iconColor={GREEN_DARK}
             title="Promotions & offers"
             subtitle="Special deals and partner offers relevant to your family"
             value={parent.marketingNotifications}

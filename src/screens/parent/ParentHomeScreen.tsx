@@ -115,7 +115,7 @@ export const ParentHomeScreen: React.FC = () => {
         </View>
 
         {/* Safety Pool */}
-        <LinearGradient colors={['#7C3AED', '#5B21B6']} style={styles.poolCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <LinearGradient colors={['#C8E8CB', '#93C999'] as const} style={styles.poolCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={styles.poolHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Ionicons name="shield-checkmark-outline" size={16} color="rgba(255,255,255,0.9)" />
@@ -313,15 +313,15 @@ const styles = StyleSheet.create({
   confirmRepayText: { fontSize: 14, fontWeight: '700', color: colors.white, flexShrink: 1 },
   poolCard: { borderRadius: 20, padding: 20 },
   poolHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  poolTitle: { fontSize: 16, fontWeight: '700', color: colors.white },
-  topUpChip: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  topUpChipText: { fontSize: 13, fontWeight: '700', color: colors.white },
-  poolAmount: { fontSize: 36, fontWeight: '900', color: colors.white, marginBottom: 12 },
-  poolSub: { fontSize: 16, fontWeight: '500', color: 'rgba(255,255,255,0.7)' },
-  poolBar: { height: 8, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 4, marginBottom: 8 },
-  poolFill: { height: 8, backgroundColor: colors.white, borderRadius: 4 },
+  poolTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  topUpChip: { backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  topUpChipText: { fontSize: 13, fontWeight: '700', color: '#1F2937' },
+  poolAmount: { fontSize: 36, fontWeight: '900', color: '#1F2937', marginBottom: 12 },
+  poolSub: { fontSize: 16, fontWeight: '500', color: 'rgba(0,0,0,0.55)' },
+  poolBar: { height: 8, backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: 4, marginBottom: 8 },
+  poolFill: { height: 8, backgroundColor: '#3D7A45', borderRadius: 4 },
   poolFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  poolFooterText: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+  poolFooterText: { fontSize: 13, color: 'rgba(0,0,0,0.6)' },
   poolWarning: { fontSize: 13, color: colors.warningLight, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 16, alignItems: 'center', gap: 6 },

@@ -609,7 +609,7 @@ export const CircleScreen: React.FC = () => {
 
         {/* ── CIRCLE LEADERBOARD (purple hero card) ───────────────── */}
         <LinearGradient
-          colors={['#6D28D9', '#7C3AED'] as const}
+          colors={['#93C999', '#C8E8CB'] as const}
           style={s.ldrCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -956,33 +956,33 @@ const s = StyleSheet.create({
 
   ldrHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 10 },
   ldrTrophy:   { fontSize: 20 },
-  ldrTitle:    { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  ldrTitle:    { fontSize: 17, fontWeight: '800', color: '#1F2937' },
 
   ldrColumns: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 8, marginBottom: 12 },
   ldrDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'stretch' },
 
   ldrCol:      { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 4 },
-  ldrEmpty:    { flex: 1, color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', padding: 24 },
+  ldrEmpty:    { flex: 1, color: 'rgba(0,0,0,0.55)', fontSize: 14, textAlign: 'center', padding: 24 },
 
   goldBadge:     { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
   goldBadgeText: { fontSize: 13, fontWeight: '900', color: '#FFFFFF' },
-  ldrRankNum:    { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.8)', height: 22, lineHeight: 22 },
+  ldrRankNum:    { fontSize: 14, fontWeight: '700', color: 'rgba(0,0,0,0.6)', height: 22, lineHeight: 22 },
 
-  ldrAvatarWrap:      { width: 58, height: 58, borderRadius: 29, overflow: 'hidden', borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarWrap:      { width: 58, height: 58, borderRadius: 29, overflow: 'hidden', borderWidth: 2.5, borderColor: 'rgba(0,0,0,0.15)', alignItems: 'center', justifyContent: 'center' },
   ldrAvatarWrap1:     { width: 70, height: 70, borderRadius: 35, overflow: 'hidden', borderWidth: 2.5, borderColor: '#F59E0B', alignItems: 'center', justifyContent: 'center' },
   ldrAvatarImg:       { width: 58, height: 58 },
   ldrAvatarImg1:      { width: 70, height: 70 },
-  ldrAvatarFallback:  { width: 58, height: 58, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  ldrAvatarFallback1: { width: 70, height: 70, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarFallback:  { width: 58, height: 58, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' },
+  ldrAvatarFallback1: { width: 70, height: 70, backgroundColor: 'rgba(0,0,0,0.08)', alignItems: 'center', justifyContent: 'center' },
 
-  ldrName:      { fontSize: 12, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  ldrName:      { fontSize: 12, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
   ldrNameFirst: { fontSize: 13, fontWeight: '800' },
-  ldrNameYou:   { color: '#E8F97A' },
-  ldrPts:       { fontSize: 11, fontWeight: '400', color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
-  ldrPtsFirst:  { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
+  ldrNameYou:   { color: '#2E7D32' },
+  ldrPts:       { fontSize: 11, fontWeight: '400', color: 'rgba(0,0,0,0.55)', textAlign: 'center' },
+  ldrPtsFirst:  { fontSize: 12, fontWeight: '600', color: 'rgba(0,0,0,0.75)' },
 
-  fullLdrBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingVertical: 12, marginHorizontal: 20 },
-  fullLdrText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  fullLdrBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 14, paddingVertical: 12, marginHorizontal: 20 },
+  fullLdrText: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
 
   // ── History toggle & rows ─────────────────────────────────────────────────
   historyToggle:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.primaryLight, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },

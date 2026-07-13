@@ -11,7 +11,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
 const PRESETS = [25, 50, 100, 200];
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'SafetyPool'> };
@@ -60,11 +60,11 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation }) => {
         >
           {/* Icon */}
           <LinearGradient
-            colors={['#4F35F3', '#7C3AED'] as const}
+            colors={['#C8E8CB', '#93C999'] as const}
             style={styles.iconWrap}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="shield-checkmark" size={36} color="#fff" />
+            <Ionicons name="shield-checkmark" size={36} color="#1F2937" />
           </LinearGradient>
 
           <Text style={styles.title}>Set up your Safety Pool</Text>
@@ -84,7 +84,7 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation }) => {
             ].map((row, i) => (
               <View key={i} style={styles.infoRow}>
                 <View style={styles.infoIcon}>
-                  <Ionicons name={row.icon as any} size={18} color={PURPLE} />
+                  <Ionicons name={row.icon as any} size={18} color={GREEN} />
                 </View>
                 <Text style={styles.infoText}>{row.text}</Text>
               </View>
@@ -138,7 +138,7 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.85}
           >
             {saving
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color="#1F2937" />
               : <Text style={styles.btnText}>Continue to Dashboard</Text>
             }
           </TouchableOpacity>
@@ -163,13 +163,13 @@ const styles = StyleSheet.create({
   sub:   { fontSize: 15, color: '#3C3C43', lineHeight: 22, textAlign: 'center' },
 
   infoCard: {
-    backgroundColor: '#F5F3FF', borderRadius: 16,
+    backgroundColor: '#F1FAF2', borderRadius: 16,
     padding: 16, gap: 12,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   infoIcon: {
     width: 34, height: 34, borderRadius: 10,
-    backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center',
   },
   infoText: { fontSize: 14, fontWeight: '600', color: '#1A1A3E', flex: 1 },
 
@@ -188,9 +188,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7', alignItems: 'center',
     borderWidth: 1.5, borderColor: 'transparent',
   },
-  presetActive:     { backgroundColor: '#EDE9FE', borderColor: PURPLE },
+  presetActive:     { backgroundColor: '#E8F5E9', borderColor: GREEN },
   presetText:       { fontSize: 15, fontWeight: '700', color: '#3C3C43' },
-  presetTextActive: { color: PURPLE },
+  presetTextActive: { color: '#2E7D32' },
 
   summaryCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -201,10 +201,10 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, gap: 10 },
   btn: {
-    backgroundColor: PURPLE, borderRadius: 50,
+    backgroundColor: GREEN, borderRadius: 50,
     paddingVertical: 18, alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { fontSize: 17, fontWeight: '700', color: '#fff' },
+  btnText:     { fontSize: 17, fontWeight: '700', color: '#1F2937' },
   footerNote:  { fontSize: 12, color: '#8E8E93', textAlign: 'center' },
 });

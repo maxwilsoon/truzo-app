@@ -7,7 +7,8 @@ import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 // Megaphone illustration built from Views + emoji
@@ -91,14 +92,14 @@ const styles = StyleSheet.create({
   },
   yesBtn: {
     width: '100%',
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  yesBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  yesBtnText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
   noBtn:      { paddingVertical: 4 },
-  noBtnText:  { color: PURPLE, fontSize: 16, fontWeight: '600' },
+  noBtnText:  { color: GREEN_DARK, fontSize: 16, fontWeight: '600' },
 });
 
 const il = StyleSheet.create({

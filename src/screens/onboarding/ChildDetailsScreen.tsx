@@ -11,7 +11,8 @@ import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildDetails'> };
@@ -256,11 +257,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minHeight: 62,
   },
-  inputFocused: { borderColor: PURPLE },
+  inputFocused: { borderColor: GREEN },
   inputError:   { borderColor: '#FF3B30' },
 
   floatLabel:       { fontSize: 12, fontWeight: '600', color: '#8E8E93', marginBottom: 2 },
-  floatLabelActive: { color: PURPLE },
+  floatLabelActive: { color: GREEN_DARK },
 
   input: { fontSize: 17, color: '#1C1C1E', padding: 0, flex: 1 },
 
@@ -269,11 +270,11 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

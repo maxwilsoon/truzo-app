@@ -11,7 +11,8 @@ import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 // UK mobile: starts with 07, total 11 digits (ignoring spaces/dashes)
@@ -152,13 +153,13 @@ const styles = StyleSheet.create({
     minHeight: 62,
     justifyContent: 'center',
   },
-  inputFocused: { borderColor: PURPLE },
+  inputFocused: { borderColor: GREEN },
   inputError:   { borderColor: '#FF3B30' },
 
   floatLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: PURPLE,
+    color: GREEN_DARK,
     marginBottom: 2,
   },
   input: { fontSize: 17, color: '#1C1C1E', padding: 0 },
@@ -172,11 +173,11 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

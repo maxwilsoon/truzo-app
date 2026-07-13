@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
 const { width } = Dimensions.get('window');
-const PURPLE = '#4F35F3';
+const GREEN      = '#C8E8CB';
+const GREEN_DARK = '#3D7A45'; // dark enough for white text (4.3:1 contrast)
 
 // ─── Slide 1: Peer-to-peer transaction ───────────────────────────────────────
 // Layout: two avatars connected by a transaction arrow (horizontal)
@@ -13,7 +14,7 @@ const Slide1 = () => (
   <View style={s1.wrap}>
     <View style={s1.row}>
       <View style={s1.person}>
-        <View style={[s1.avatar, { backgroundColor: '#C4B5F4' }]}>
+        <View style={[s1.avatar, { backgroundColor: '#C8E8CB' }]}>
           <Text style={s1.emoji}>😊</Text>
         </View>
         <Text style={s1.name}>You</Text>
@@ -258,8 +259,8 @@ export const CarouselScreen: React.FC<Props> = ({ navigation }) => {
 
 // ─── Main styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: PURPLE },
-  purple:    { flex: 1, backgroundColor: PURPLE },
+  root:      { flex: 1, backgroundColor: GREEN_DARK },
+  purple:    { flex: 1, backgroundColor: GREEN_DARK },
   bars:      { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 6 },
   bar:       { flex: 1, height: 3, borderRadius: 2, backgroundColor: '#fff' },
   slideWrap: { flex: 1, paddingHorizontal: 24, paddingTop: 8 },
@@ -268,11 +269,11 @@ const styles = StyleSheet.create({
   subtitle:  { color: 'rgba(255,255,255,0.82)', fontSize: 14, lineHeight: 21 },
   illuArea:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   tapZone:   { position: 'absolute', top: 0, width: '30%' },
-  footer:    { backgroundColor: '#F0EFF8', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, gap: 10 },
-  primaryBtn:  { backgroundColor: PURPLE, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
-  primaryText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  outlineBtn:  { borderRadius: 50, paddingVertical: 16, alignItems: 'center', borderWidth: 1.5, borderColor: PURPLE },
-  outlineText: { color: PURPLE, fontSize: 17, fontWeight: '600' },
+  footer:    { backgroundColor: '#E8F5E9', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, gap: 10 },
+  primaryBtn:  { backgroundColor: GREEN, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  primaryText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
+  outlineBtn:  { borderRadius: 50, paddingVertical: 16, alignItems: 'center', borderWidth: 1.5, borderColor: GREEN_DARK },
+  outlineText: { color: GREEN_DARK, fontSize: 17, fontWeight: '600' },
 });
 
 // ─── Illustration styles ──────────────────────────────────────────────────────
@@ -285,7 +286,7 @@ const s1 = StyleSheet.create({
   avatar:      { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   emoji:       { fontSize: 30 },
   name:        { color: '#fff', fontWeight: '700', fontSize: 14 },
-  badge:       { backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  badge:       { backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText:   { color: '#fff', fontSize: 10, fontWeight: '700' },
   mid:         { flex: 1, alignItems: 'center', gap: 4 },
   amtChip:     { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },

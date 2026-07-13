@@ -172,15 +172,15 @@ const s = StyleSheet.create({
   // Badge (hexagon approximation)
   badgeOuter: {
     width: 76, height: 76, borderRadius: 20,
-    backgroundColor: '#4C1D95',
+    backgroundColor: '#93C999',
     alignItems: 'center', justifyContent: 'center',
     transform: [{ rotate: '10deg' }],
-    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#6BBF71', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   badgeInner: {
     width: 64, height: 64, borderRadius: 16,
-    backgroundColor: '#5B21B6',
+    backgroundColor: '#C8E8CB',
     alignItems: 'center', justifyContent: 'center',
   },
   badgeStar: { fontSize: 32 },

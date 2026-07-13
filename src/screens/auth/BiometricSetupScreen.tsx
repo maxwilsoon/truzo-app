@@ -16,8 +16,9 @@ import {
   saveBiometricSession,
 } from '../../lib/biometrics';
 
-const PURPLE = '#4F35F3';
-const BG = '#EDE8FF';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
+const BG = '#E8F5E9';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'BiometricSetup'> };
 
@@ -53,7 +54,7 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.content}>
         <View style={styles.iconCircle}>
-          <Ionicons name="finger-print" size={56} color={PURPLE} />
+          <Ionicons name="finger-print" size={56} color={GREEN_DARK} />
         </View>
 
         <Text style={styles.title}>Use Face ID for{'\n'}faster login?</Text>
@@ -71,9 +72,9 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
           activeOpacity={0.85}
         >
           {loading
-            ? <ActivityIndicator color="#fff" />
+            ? <ActivityIndicator color="#1F2937" />
             : <>
-                <Ionicons name="finger-print" size={20} color="#fff" style={{ marginRight: 8 }} />
+                <Ionicons name="finger-print" size={20} color="#1F2937" style={{ marginRight: 8 }} />
                 <Text style={styles.primaryBtnText}>Enable Face ID</Text>
               </>
           }
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryBtn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     flexDirection: 'row',
@@ -137,10 +138,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  primaryBtnText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
   skipBtn: {
     alignItems: 'center',
     paddingVertical: 14,
   },
-  skipBtnText: { color: PURPLE, fontSize: 16, fontWeight: '600' },
+  skipBtnText: { color: GREEN_DARK, fontSize: 16, fontWeight: '600' },
 });

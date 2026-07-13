@@ -18,8 +18,9 @@ import {
   clearBiometricSession,
 } from '../../lib/biometrics';
 
-const PURPLE = '#4F35F3';
-const BG = '#EDE8FF';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
+const BG = '#E8F5E9';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'BiometricLogin'> };
 
@@ -143,12 +144,12 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.content}>
         <View style={[styles.iconCircle, status === 'failed' && styles.iconCircleFailed]}>
           {status === 'authenticating'
-            ? <ActivityIndicator size="large" color={PURPLE} />
+            ? <ActivityIndicator size="large" color={GREEN_DARK} />
             : status === 'success'
               ? <Ionicons name="checkmark-circle" size={56} color="#34C759" />
               : status === 'failed'
                 ? <Ionicons name="alert-circle" size={56} color="#FF3B30" />
-                : <Ionicons name="finger-print" size={56} color={PURPLE} />
+                : <Ionicons name="finger-print" size={56} color={GREEN_DARK} />
           }
         </View>
 
@@ -236,17 +237,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   retryBtn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  retryBtnText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
   passwordBtn: {
     alignItems: 'center',
     paddingVertical: 14,
   },
-  passwordBtnText: { color: PURPLE, fontSize: 16, fontWeight: '600' },
+  passwordBtnText: { color: GREEN_DARK, fontSize: 16, fontWeight: '600' },
 });

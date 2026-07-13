@@ -132,7 +132,7 @@ export const ChildSettingsScreen: React.FC = () => {
             <Text style={styles.sectionHeader}>Security</Text>
             <View style={[styles.row, styles.rowBorder]}>
               <View style={styles.rowLeft}>
-                <Ionicons name="finger-print" size={22} color="#4F35F3" style={{ marginRight: 12 }} />
+                <Ionicons name="finger-print" size={22} color="#2E7D32" style={{ marginRight: 12 }} />
                 <View>
                   <Text style={styles.rowLabel}>Face ID</Text>
                   <Text style={styles.rowSubLabel}>Sign in with biometrics</Text>
@@ -142,8 +142,8 @@ export const ChildSettingsScreen: React.FC = () => {
                 value={biometricEnabled}
                 onValueChange={handleToggleBiometric}
                 disabled={bioLoading}
-                trackColor={{ false: '#E5E7EB', true: '#C4B5F4' }}
-                thumbColor={biometricEnabled ? '#4F35F3' : '#fff'}
+                trackColor={{ false: '#E5E7EB', true: '#C8E8CB' }}
+                thumbColor={biometricEnabled ? '#2E7D32' : '#fff'}
               />
             </View>
           </View>

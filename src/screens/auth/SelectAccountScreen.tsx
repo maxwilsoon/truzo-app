@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 
-const PURPLE = '#4F35F3';
+const GREEN      = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 
 type AccountType = 'parent' | 'child';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'SelectAccount'> };
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#D1D1D6', borderRadius: 14,
     paddingHorizontal: 20, paddingVertical: 20, backgroundColor: '#fff',
   },
-  optionActive:      { borderColor: PURPLE, backgroundColor: '#EDE9FE' },
+  optionActive:      { borderColor: GREEN, backgroundColor: '#E8F5E9' },
   optionLabel:       { fontSize: 17, fontWeight: '500', color: '#1C1C1E' },
   optionLabelActive: { fontWeight: '600' },
 
@@ -97,11 +98,11 @@ const styles = StyleSheet.create({
     width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#C7C7CC',
     alignItems: 'center', justifyContent: 'center',
   },
-  radioActive: { borderColor: PURPLE, backgroundColor: PURPLE },
+  radioActive: { borderColor: GREEN, backgroundColor: GREEN },
   radioDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff' },
 
   footer:      { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8 },
-  btn:         { backgroundColor: PURPLE, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
+  btn:         { backgroundColor: GREEN, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
   btnDisabled: { opacity: 0.35 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

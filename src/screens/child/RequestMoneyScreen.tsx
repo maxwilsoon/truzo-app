@@ -194,7 +194,7 @@ export const RequestMoneyScreen: React.FC = () => {
           {/* Safety pool gate */}
           {parent.safetyPoolLimit === 0 && (
             <View style={s.safetyGate}>
-              <Ionicons name="shield-outline" size={20} color="#7C3AED" />
+              <Ionicons name="shield-outline" size={20} color="#C8E8CB" />
               <Text style={s.safetyGateText}>
                 Your parent hasn't set up a Safety Pool yet. Ask them to add one before you can borrow.
               </Text>
@@ -433,8 +433,8 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
 
   // Gates
-  safetyGate:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#F5F3FF', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#DDD6FE' },
-  safetyGateText: { flex: 1, fontSize: 14, color: '#4C1D95', lineHeight: 20 },
+  safetyGate:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: '#F1FAF2', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#C3E6C7' },
+  safetyGateText: { flex: 1, fontSize: 14, color: '#2E7D32', lineHeight: 20 },
 
   // Amount
   questionLabel: { fontSize: 16, fontWeight: '700', color: '#111827', textAlign: 'center' },
@@ -462,7 +462,7 @@ const s = StyleSheet.create({
   deadlineDateActive:  { color: colors.primary },
 
   // Audience card
-  audienceCard:  { backgroundColor: '#F5F3FF', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#DDD6FE' },
+  audienceCard:  { backgroundColor: '#F1FAF2', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#C3E6C7' },
   audienceTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
   audienceSub:   { fontSize: 13, color: '#6B7280', marginBottom: 14 },
   audienceEmpty: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 8 },

@@ -6,8 +6,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
-const BG = '#EDE8FF';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
+const BG = '#E8F5E9';
 
 // Simple hand-drawn QR code using a pixel grid
 const CELL = 7;
@@ -133,7 +134,7 @@ const styles = StyleSheet.create({
 
   badge: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#C4B5F4',
+    backgroundColor: '#C8E8CB',
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0, marginTop: 2,
   },
@@ -152,10 +153,10 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

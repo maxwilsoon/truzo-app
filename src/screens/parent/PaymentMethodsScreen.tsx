@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useApp, PaymentMethod, CardNetwork } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const BRAND = '#2E7D32';
 
 const detectNetwork = (num: string): CardNetwork => {
   const n = num.replace(/\s/g, '');
@@ -147,7 +147,7 @@ export const PaymentMethodsScreen: React.FC = () => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.infoBanner}>
-          <Ionicons name="information-circle-outline" size={20} color={PURPLE} />
+          <Ionicons name="information-circle-outline" size={20} color={BRAND} />
           <Text style={styles.infoText}>
             Your linked card or bank account will be charged automatically for allowances, money transfers, and safety pool top-ups.
           </Text>
@@ -178,8 +178,8 @@ export const PaymentMethodsScreen: React.FC = () => {
                 <View style={styles.cardTileActions}>
                   {!m.isDefault && (
                     <TouchableOpacity style={styles.cardAction} onPress={() => setDefaultPaymentMethod(m.id)}>
-                      <Ionicons name="star-outline" size={16} color={PURPLE} />
-                      <Text style={[styles.cardActionText, { color: PURPLE }]}>Set default</Text>
+                      <Ionicons name="star-outline" size={16} color={BRAND} />
+                      <Text style={[styles.cardActionText, { color: BRAND }]}>Set default</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity style={styles.cardAction} onPress={() => confirmRemove(m)}>
@@ -198,7 +198,7 @@ export const PaymentMethodsScreen: React.FC = () => {
             {banks.map(m => (
               <View key={m.id} style={styles.bankTile}>
                 <View style={styles.bankIcon}>
-                  <Ionicons name="business-outline" size={22} color={PURPLE} />
+                  <Ionicons name="business-outline" size={22} color={BRAND} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bankName}>{m.label}</Text>
@@ -230,7 +230,7 @@ export const PaymentMethodsScreen: React.FC = () => {
         {paymentMethods.length === 0 && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="card-outline" size={36} color={PURPLE} />
+              <Ionicons name="card-outline" size={36} color={BRAND} />
             </View>
             <Text style={styles.emptyTitle}>No payment methods yet</Text>
             <Text style={styles.emptySub}>
@@ -241,18 +241,18 @@ export const PaymentMethodsScreen: React.FC = () => {
 
         <TouchableOpacity style={styles.addBtn} onPress={() => openSheet('card')} activeOpacity={0.85}>
           <View style={styles.addBtnIcon}>
-            <Ionicons name="card-outline" size={20} color={PURPLE} />
+            <Ionicons name="card-outline" size={20} color={BRAND} />
           </View>
           <Text style={styles.addBtnText}>Add debit or credit card</Text>
-          <Ionicons name="chevron-forward" size={18} color="#C4B5F4" />
+          <Ionicons name="chevron-forward" size={18} color="#A8D5AB" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.addBtn} onPress={() => openSheet('bank')} activeOpacity={0.85}>
           <View style={styles.addBtnIcon}>
-            <Ionicons name="business-outline" size={20} color={PURPLE} />
+            <Ionicons name="business-outline" size={20} color={BRAND} />
           </View>
           <Text style={styles.addBtnText}>Link bank account</Text>
-          <Ionicons name="chevron-forward" size={18} color="#C4B5F4" />
+          <Ionicons name="chevron-forward" size={18} color="#A8D5AB" />
         </TouchableOpacity>
       </ScrollView>
 
@@ -287,7 +287,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                       onChangeText={t => setCardNum(formatCardNumber(t))}
                       keyboardType="number-pad"
                       placeholder="1234 5678 9012 3456"
-                      placeholderTextColor="#C4B5F4"
+                      placeholderTextColor="#A8D5AB"
                       autoFocus
                     />
                     {cardNetwork !== 'other' && (
@@ -305,7 +305,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     value={cardName}
                     onChangeText={setCardName}
                     placeholder="J. SMITH"
-                    placeholderTextColor="#C4B5F4"
+                    placeholderTextColor="#A8D5AB"
                     autoCapitalize="characters"
                     autoCorrect={false}
                   />
@@ -324,7 +324,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                       }}
                       keyboardType="number-pad"
                       placeholder="MM/YY"
-                      placeholderTextColor="#C4B5F4"
+                      placeholderTextColor="#A8D5AB"
                     />
                   </View>
                   <View style={[styles.fieldWrap, { flex: 1 }]}>
@@ -336,7 +336,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                         onChangeText={t => setCvv(t.replace(/\D/g, '').slice(0, 4))}
                         keyboardType="number-pad"
                         placeholder="•••"
-                        placeholderTextColor="#C4B5F4"
+                        placeholderTextColor="#A8D5AB"
                         secureTextEntry={!showCvv}
                       />
                       <TouchableOpacity onPress={() => setShowCvv(v => !v)} style={{ padding: 4 }}>
@@ -381,7 +381,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     value={bankName}
                     onChangeText={setBankName}
                     placeholder="e.g. Barclays"
-                    placeholderTextColor="#C4B5F4"
+                    placeholderTextColor="#A8D5AB"
                     autoCapitalize="words"
                     autoFocus
                   />
@@ -399,7 +399,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     }}
                     keyboardType="number-pad"
                     placeholder="XX-XX-XX"
-                    placeholderTextColor="#C4B5F4"
+                    placeholderTextColor="#A8D5AB"
                   />
                 </View>
 
@@ -411,7 +411,7 @@ export const PaymentMethodsScreen: React.FC = () => {
                     onChangeText={t => setAccNum(t.replace(/\D/g, '').slice(0, 8))}
                     keyboardType="number-pad"
                     placeholder="12345678"
-                    placeholderTextColor="#C4B5F4"
+                    placeholderTextColor="#A8D5AB"
                   />
                 </View>
 
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     borderRadius: 14,
     padding: 14,
     marginBottom: 14,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 24,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -547,14 +547,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: '#EDE8FF',
+    borderColor: '#E8F5E9',
     marginBottom: 10,
   },
   addBtnIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -609,11 +609,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     borderRadius: 8,
     marginLeft: 8,
   },
-  networkTagText: { fontSize: 13, fontWeight: '700', color: PURPLE },
+  networkTagText: { fontSize: 13, fontWeight: '700', color: BRAND },
   cvvRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
   },
 
   saveBtn: {
-    backgroundColor: PURPLE,
+    backgroundColor: BRAND,
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: 'center',

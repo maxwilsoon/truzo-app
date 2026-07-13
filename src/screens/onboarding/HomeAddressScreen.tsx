@@ -12,7 +12,8 @@ import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'HomeAddress'> };
@@ -185,7 +186,7 @@ export const HomeAddressScreen: React.FC<Props> = ({ navigation }) => {
                   }}
                   onFocus={() => setFocused('postcode')}
                 />
-                {lookingUp && <ActivityIndicator size="small" color={PURPLE} style={{ marginLeft: 8 }} />}
+                {lookingUp && <ActivityIndicator size="small" color={GREEN_DARK} style={{ marginLeft: 8 }} />}
               </View>
             </View>
           </View>
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
-  cardActive: { borderColor: PURPLE },
+  cardActive: { borderColor: GREEN },
 
   row: {
     paddingHorizontal: 18,
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#F2F2F7', marginHorizontal: 18 },
 
   label:       { fontSize: 12, fontWeight: '600', color: '#8E8E93', marginBottom: 6 },
-  labelActive: { color: PURPLE },
+  labelActive: { color: GREEN_DARK },
   optional:    { fontWeight: '400', color: '#AEAEB2' },
 
   // inputRow wraps TextInput + optional trailing icon side-by-side
@@ -251,11 +252,11 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

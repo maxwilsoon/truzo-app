@@ -8,7 +8,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 import { hasBiometricSession } from '../../lib/biometrics';
 
-const CIRCLE_BG = '#C4B5F4';
+const CIRCLE_BG = '#C8E8CB';
 const DARK = '#1A1A3E';
 
 type Props = {
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
 
   bannerLink: {
-    color: '#4F35F3',
+    color: '#2E7D32',
     fontWeight: '700',
   },
 });

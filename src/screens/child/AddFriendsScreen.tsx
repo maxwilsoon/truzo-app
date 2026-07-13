@@ -19,7 +19,7 @@ type SearchResult = {
   trust_score: number;
 };
 
-const AVATAR_COLORS = ['#7C3AED','#3B82F6','#10B981','#EF4444','#F59E0B','#EC4899','#06B6D4'];
+const AVATAR_COLORS = ['#C8E8CB','#3B82F6','#10B981','#EF4444','#F59E0B','#EC4899','#06B6D4'];
 const colorFor = (id: string) => AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.length];
 
 export const AddFriendsScreen: React.FC = () => {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   userCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     backgroundColor: '#F9F8FF', borderRadius: 16,
-    padding: 14, borderWidth: 1, borderColor: '#EDE9FE',
+    padding: 14, borderWidth: 1, borderColor: '#E8F5E9',
   },
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 26 },
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F5F3FF',
+    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1FAF2',
   },
   addBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 

@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { getTierInfo } from '../../theme/colors';
 import { fmtAmt } from '../../lib/utils';
 
-const PURPLE = '#4F35F3';
+const BRAND = '#2E7D32';
 const GREEN  = '#059669';
 const BG     = '#F2F2F7';
 
@@ -30,7 +30,7 @@ const InfoRow: React.FC<RowProps> = ({ label, value, icon, last, password }) => 
   return (
     <View style={[styles.row, !last && styles.rowBorder]}>
       <View style={styles.rowIconWrap}>
-        <Ionicons name={icon as any} size={18} color={PURPLE} />
+        <Ionicons name={icon as any} size={18} color={BRAND} />
       </View>
       <View style={styles.rowBody}>
         <Text style={styles.rowLabel}>{label}</Text>
@@ -75,7 +75,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── Parent ─────────────────────────────────────────── */}
-        <Section title="Parent account" icon="person-circle-outline" iconBg="#EDE8FF" iconColor={PURPLE}>
+        <Section title="Parent account" icon="person-circle-outline" iconBg="#E8F5E9" iconColor={BRAND}>
           {/* Name badge */}
           <View style={styles.nameBadge}>
             <View style={styles.avatarCircle}>
@@ -107,7 +107,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
         <View style={styles.connector}>
           <View style={styles.connectorLine} />
           <View style={styles.connectorDot}>
-            <Ionicons name="people-outline" size={16} color={PURPLE} />
+            <Ionicons name="people-outline" size={16} color={BRAND} />
           </View>
           <View style={styles.connectorLine} />
         </View>
@@ -116,7 +116,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
         <Section title="Linked child" icon="happy-outline" iconBg="#ECFDF5" iconColor={GREEN}>
           {/* Name badge */}
           <View style={styles.nameBadge}>
-            <View style={[styles.avatarCircle, { backgroundColor: '#C4B5F4' }]}>
+            <View style={[styles.avatarCircle, { backgroundColor: '#C8E8CB' }]}>
               <Text style={styles.avatarEmoji}>{child.avatarEmoji || '😊'}</Text>
             </View>
             <View style={{ flex: 1 }}>
@@ -133,7 +133,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
 
           {/* Quick stats row */}
           <View style={styles.statsRow}>
-            <Stat label="Balance"     value={`£${fmtAmt(child.balance)}`}     color={PURPLE}  />
+            <Stat label="Balance"     value={`£${fmtAmt(child.balance)}`}     color={BRAND}  />
             <View style={styles.statDivider} />
             <Stat label="Trust score" value={`${child.trustScore}`}            color={tier.color} />
             <View style={styles.statDivider} />
@@ -153,7 +153,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
 
         {/* Notice */}
         <View style={styles.notice}>
-          <Ionicons name="shield-checkmark-outline" size={16} color={PURPLE} />
+          <Ionicons name="shield-checkmark-outline" size={16} color={BRAND} />
           <Text style={styles.noticeText}>To update any details, please contact Truzo support.</Text>
         </View>
 
@@ -191,10 +191,10 @@ const styles = StyleSheet.create({
   },
   avatarCircle: {
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarInitial: { fontSize: 22, fontWeight: '800', color: PURPLE },
+  avatarInitial: { fontSize: 22, fontWeight: '800', color: BRAND },
   avatarEmoji:   { fontSize: 24 },
   fullName:      { fontSize: 17, fontWeight: '800', color: '#1A1A3E' },
   displayNameLabel: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
   rowIconWrap: {
     width: 34, height: 34, borderRadius: 10,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center', justifyContent: 'center',
     marginRight: 12, marginTop: 1,
   },
@@ -233,14 +233,14 @@ const styles = StyleSheet.create({
   connectorLine: { flex: 1, height: 1, backgroundColor: '#D1D1D6' },
   connectorDot:  {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#EDE8FF',
+    backgroundColor: '#E8F5E9',
     alignItems: 'center', justifyContent: 'center',
     marginHorizontal: 8,
   },
 
   notice: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#EDE8FF', borderRadius: 14, padding: 14, marginTop: 16,
+    backgroundColor: '#E8F5E9', borderRadius: 14, padding: 14, marginTop: 16,
   },
-  noticeText: { flex: 1, fontSize: 13, color: PURPLE, lineHeight: 19, fontWeight: '500' },
+  noticeText: { flex: 1, fontSize: 13, color: BRAND, lineHeight: 19, fontWeight: '500' },
 });

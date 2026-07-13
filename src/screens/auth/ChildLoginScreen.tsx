@@ -13,8 +13,9 @@ import { cache } from '../../lib/cache';
 import { registerPushToken } from '../../lib/notifications';
 import { getDeviceId, isBiometricAvailable, saveBiometricSession } from '../../lib/biometrics';
 
-const PURPLE = '#4F35F3';
-const BG = '#EDE8FF';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
+const BG = '#E8F5E9';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'> };
 
@@ -240,7 +241,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.85}
           >
             {loading
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color="#1F2937" />
               : <Text style={styles.btnText}>Continue</Text>
             }
           </TouchableOpacity>
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
 
   title: { fontSize: 28, fontWeight: '800', color: '#1A1A3E', marginBottom: 10 },
   sub:   { fontSize: 16, color: '#3C3C43', lineHeight: 24, marginBottom: 32 },
-  link:  { color: PURPLE, fontWeight: '600' },
+  link:  { color: GREEN_DARK, fontWeight: '600' },
 
   inputWrap: {
     backgroundColor: '#fff',
@@ -269,21 +270,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputWrapRow:  { flexDirection: 'row', alignItems: 'center' },
-  inputFocused:  { borderColor: PURPLE },
+  inputFocused:  { borderColor: GREEN },
   inputError:    { borderColor: '#FF3B30' },
 
   input: { fontSize: 17, color: '#1A1A3E', padding: 0 },
 
-  forgotLink: { color: PURPLE, fontSize: 14, fontWeight: '600', marginBottom: 24 },
+  forgotLink: { color: GREEN_DARK, fontSize: 14, fontWeight: '600', marginBottom: 24 },
   errorText:  { color: '#FF3B30', fontSize: 13, marginBottom: 20 },
 
   footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

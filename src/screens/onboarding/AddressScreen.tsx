@@ -10,7 +10,8 @@ import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 // Expand 2-digit year: "03" → 2003, "80" → 1980
@@ -156,10 +157,10 @@ const styles = StyleSheet.create({
     minHeight: 62,
     justifyContent: 'center',
   },
-  inputFocused: { borderColor: PURPLE },
+  inputFocused: { borderColor: GREEN },
 
   floatLabel:       { fontSize: 12, fontWeight: '600', color: '#8E8E93', marginBottom: 2 },
-  floatLabelActive: { color: PURPLE },
+  floatLabelActive: { color: GREEN_DARK },
 
   input: { fontSize: 17, color: '#1C1C1E', padding: 0 },
 
@@ -167,11 +168,11 @@ const styles = StyleSheet.create({
 
   footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.45 },
-  btnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });

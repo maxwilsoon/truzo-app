@@ -6,7 +6,8 @@ import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 
-const PURPLE = '#4F35F3';
+const GREEN = '#C8E8CB';
+const GREEN_DARK = '#3D7A45';
 const BG = '#F2F2F7';
 
 // ID card built from Views
@@ -81,7 +82,7 @@ const card = StyleSheet.create({
   },
   photo: {
     width: 120,
-    backgroundColor: '#C4B5F4',
+    backgroundColor: '#C8E8CB',
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingBottom: 0,
@@ -119,7 +120,7 @@ const card = StyleSheet.create({
     width: 32,
     height: 22,
     borderRadius: 4,
-    backgroundColor: '#C4B5F4',
+    backgroundColor: '#C8E8CB',
     opacity: 0.7,
   },
 });
@@ -133,10 +134,10 @@ const styles = StyleSheet.create({
   illuArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footer:   { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
   btn: {
-    backgroundColor: PURPLE,
+    backgroundColor: GREEN,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText: { color: '#1F2937', fontSize: 17, fontWeight: '700' },
 });
