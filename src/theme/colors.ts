@@ -3,6 +3,7 @@ export const colors = {
   primaryDark: '#93C999',
   primaryLight: '#E8F5E9',
   primaryXLight: '#F1FAF2',
+  accent: '#2E7D32',
   background: '#FFFFFF',
   surface: '#F7FDF8',
   text: '#1F2937',
@@ -26,7 +27,7 @@ export const colors = {
 export const getTierInfo = (score: number) => {
   if (score < 30) return { tier: 'Risky', emoji: '⚠️', color: colors.error, description: 'People avoid lending' };
   if (score < 50) return { tier: 'Unproven', emoji: '🔄', color: colors.warning, description: 'New or inconsistent' };
-  if (score < 70) return { tier: 'Reliable', emoji: '👍', color: colors.primary, description: 'Building trust. Consistent repayments unlock higher limits.' };
+  if (score < 70) return { tier: 'Reliable', emoji: '👍', color: '#2E7D32', description: 'Building trust. Consistent repayments unlock higher limits.' };
   if (score < 85) return { tier: 'Trusted', emoji: '⭐', color: colors.success, description: 'Strong reputation in your circle' };
   return { tier: 'Elite', emoji: '🏆', color: colors.gold, description: 'Top user — the circle trusts you completely' };
 };

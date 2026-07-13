@@ -368,7 +368,7 @@ export const CircleScreen: React.FC = () => {
             activeOpacity={0.75}
           >
             <View style={s.addRingWrap}>
-              <Ionicons name="add" size={26} color={colors.primary} />
+              <Ionicons name="add" size={26} color="#2E7D32" />
             </View>
             <Text style={s.addLabel}>Add</Text>
           </TouchableOpacity>
@@ -380,7 +380,7 @@ export const CircleScreen: React.FC = () => {
             <View style={s.cardInner}>
               <View style={s.cardHeaderRow}>
                 <View style={s.cardTitleRow}>
-                  <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+                  <Ionicons name="person-add-outline" size={18} color="#2E7D32" />
                   <Text style={s.cardTitle}>Friend Requests</Text>
                   <View style={s.countBadge}><Text style={s.countBadgeText}>{pendingRequests.length}</Text></View>
                 </View>
@@ -481,7 +481,7 @@ export const CircleScreen: React.FC = () => {
                       <Ionicons
                         name={showAllToFund ? 'chevron-up' : 'chevron-down'}
                         size={14}
-                        color={colors.primary}
+                        color="#2E7D32"
                       />
                     </TouchableOpacity>
                   )}
@@ -687,9 +687,9 @@ export const CircleScreen: React.FC = () => {
           onPress={() => setShowHistory(v => !v)}
           activeOpacity={0.8}
         >
-          <Ionicons name="time-outline" size={18} color={colors.primary} />
+          <Ionicons name="time-outline" size={18} color="#2E7D32" />
           <Text style={s.historyToggleText}>Loan History</Text>
-          <Ionicons name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
+          <Ionicons name={showHistory ? 'chevron-up' : 'chevron-down'} size={16} color="#2E7D32" style={{ marginLeft: 'auto' }} />
         </TouchableOpacity>
 
         {showHistory && (
@@ -818,7 +818,7 @@ export const CircleScreen: React.FC = () => {
         amount={fundingRequest?.amount ?? 0}
         balanceAfter={child.balance - (fundingRequest?.amount ?? 0)}
         confirmLabel={`Fund £${fmtAmt(fundingRequest?.amount ?? 0)}`}
-        confirmColor={colors.primary}
+        confirmColor="#2E7D32"
         onConfirm={confirmFund}
         onCancel={() => setFundingRequest(null)}
       />
@@ -869,7 +869,7 @@ const s = StyleSheet.create({
 
   // Add Friend fixed slot
   addRingWrap: { width: FRIEND_SIZE, height: FRIEND_SIZE, borderRadius: FRIEND_SIZE / 2, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  addLabel:    { fontSize: 11, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+  addLabel:    { fontSize: 11, fontWeight: '700', color: '#2E7D32', textAlign: 'center' },
 
   // Card wrapper (outer = shadow, inner = clip)
   cardOuter: { marginHorizontal: 16, borderRadius: 16, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
@@ -879,9 +879,9 @@ const s = StyleSheet.create({
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
   cardTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   cardTitle:     { fontSize: 22, fontWeight: '800', color: '#111827' },
-  seeAllLink:    { fontSize: 14, fontWeight: '700', color: colors.primary },
+  seeAllLink:    { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
   countBadge:    { backgroundColor: colors.primaryLight, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  countBadgeText:{ fontSize: 12, fontWeight: '700', color: colors.primary },
+  countBadgeText:{ fontSize: 12, fontWeight: '700', color: '#2E7D32' },
 
   // Requests card specific header (no "See all" link — just the title)
   reqCardHeader: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 0 },
@@ -890,7 +890,7 @@ const s = StyleSheet.create({
   reqTabsWrap:     { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', marginTop: 8 },
   reqTab:          { flex: 1, alignItems: 'center', paddingVertical: 14, position: 'relative' },
   reqTabText:      { fontSize: 15, fontWeight: '600', color: '#9CA3AF' },
-  reqTabTextActive:{ fontSize: 15, fontWeight: '700', color: colors.primary },
+  reqTabTextActive:{ fontSize: 15, fontWeight: '700', color: '#2E7D32' },
   reqTabIndicator: { position: 'absolute', bottom: 0, left: 16, right: 16, height: 2.5, backgroundColor: colors.primary, borderRadius: 2 },
 
   // Amount line in request rows (between name and sub-text)
@@ -927,14 +927,14 @@ const s = StyleSheet.create({
 
   // Friend request accept/decline
   frActions:  { flexDirection: 'row', gap: 8 },
-  acceptBtn:  { backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  acceptBtn:  { backgroundColor: '#2E7D32', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
   acceptText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   declineBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
   declineText:{ fontSize: 13, fontWeight: '600', color: '#6B7280' },
 
   // Fund button — white background, purple border, pill-shaped
   fundBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#FFFFFF' },
-  fundBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  fundBtnText: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
 
   // Repay button (pill style)
   repayPill:     { backgroundColor: '#F0FDF4', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: '#16A34A' },
@@ -947,9 +947,9 @@ const s = StyleSheet.create({
 
   // "See all requests" footer — text left, arrow right
   viewAllToFund:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0F0F0' },
-  viewAllToFundText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  viewAllToFundText: { fontSize: 13, fontWeight: '600', color: '#2E7D32' },
   seeAllFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primaryLight, paddingVertical: 16, paddingHorizontal: 20 },
-  seeAllFooterText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  seeAllFooterText: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
 
   // ── Leaderboard purple card ────────────────────────────────────────────────
   ldrCard: { marginHorizontal: 16, borderRadius: 24, paddingTop: 16, paddingBottom: 16, overflow: 'hidden' },
@@ -986,7 +986,7 @@ const s = StyleSheet.create({
 
   // ── History toggle & rows ─────────────────────────────────────────────────
   historyToggle:     { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.primaryLight, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
-  historyToggleText: { fontSize: 15, fontWeight: '700', color: colors.primary, flex: 1 },
+  historyToggleText: { fontSize: 15, fontWeight: '700', color: '#2E7D32', flex: 1 },
 
   historyMeta:        { flexDirection: 'row', backgroundColor: '#F9FAFB', marginHorizontal: 16, marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
   historyMetaItem:    { flex: 1, alignItems: 'center', paddingVertical: 10 },
@@ -1013,7 +1013,7 @@ const s = StyleSheet.create({
   sheetName:     { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 3 },
   sheetUsername: { fontSize: 15, color: '#6B7280', fontWeight: '500', marginBottom: 10 },
   sheetScorePill:{ backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
-  sheetScoreText:{ fontSize: 13, fontWeight: '700', color: colors.primary },
+  sheetScoreText:{ fontSize: 13, fontWeight: '700', color: '#2E7D32' },
 
   sheetDivider: { width: '100%', height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB', marginVertical: 20 },
 

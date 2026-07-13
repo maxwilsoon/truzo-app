@@ -25,7 +25,7 @@ const SHEET_H = 360;
 
 export const ConfirmSheet: React.FC<Props> = ({
   visible, emoji, title, subtitle, amount, balanceAfter,
-  confirmLabel, confirmColor = colors.primary, onConfirm, onCancel,
+  confirmLabel, confirmColor = '#2E7D32', onConfirm, onCancel,
 }) => {
   const slideY = useRef(new Animated.Value(SHEET_H)).current;
 

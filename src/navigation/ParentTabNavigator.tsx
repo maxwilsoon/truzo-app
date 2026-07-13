@@ -14,7 +14,7 @@ export const ParentTabNavigator = () => {
   <Tab.Navigator
     screenOptions={({ route }) => ({
       headerShown: false,
-      tabBarActiveTintColor: colors.primary,
+      tabBarActiveTintColor: '#2E7D32',
       tabBarInactiveTintColor: colors.textLight,
       tabBarStyle: {
         backgroundColor: colors.white,

@@ -34,9 +34,18 @@ const MastercardLogo: React.FC = () => (
 );
 
 export const WalletScreen: React.FC = () => {
-  const { child, transactions } = useApp();
+  const { child, transactions, activeRequests } = useApp();
   const [showAll, setShowAll] = useState(false);
   const displayTx = showAll ? transactions : transactions.slice(0, 4);
+
+  // Derive live outstanding balances from active funded loans only.
+  // isOwn+isFunded = I am the borrower; !isOwn+isFunded = I am the lender.
+  const amountBorrowed = activeRequests
+    .filter(r => r.isOwn && r.isFunded)
+    .reduce((sum, r) => sum + r.amount, 0);
+  const amountLentOut = activeRequests
+    .filter(r => !r.isOwn && r.isFunded)
+    .reduce((sum, r) => sum + r.amount, 0);
 
   const handleCardAction = (label: string) =>
     Alert.alert(label, `${label} is coming soon.`);
@@ -89,12 +98,12 @@ export const WalletScreen: React.FC = () => {
         <View style={s.statsRow}>
           <View style={s.statCard}>
             <Text style={s.statLabel}>Amount Lent Out</Text>
-            <Text style={s.statValue}>£{fmtAmt(child.loanedOut)}</Text>
+            <Text style={s.statValue}>£{fmtAmt(amountLentOut)}</Text>
           </View>
           <View style={s.statCard}>
             <Text style={s.statLabel}>Amount Borrowed</Text>
-            <Text style={[s.statValue, child.borrowed > 0 && s.statValueRed]}>
-              £{fmtAmt(child.borrowed)}
+            <Text style={[s.statValue, amountBorrowed > 0 && s.statValueRed]}>
+              £{fmtAmt(amountBorrowed)}
             </Text>
           </View>
         </View>
@@ -198,7 +207,7 @@ const s = StyleSheet.create({
   // Transactions section
   txHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   txSectionTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A3E' },
-  seeAll:         { fontSize: 14, fontWeight: '700', color: colors.primary },
+  seeAll:         { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
 
   // Transaction list
   txList: {

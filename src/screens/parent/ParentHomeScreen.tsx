@@ -143,7 +143,7 @@ export const ParentHomeScreen: React.FC = () => {
         {/* Quick actions */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => setAllowanceVisible(true)}>
-            <View style={styles.actionIcon}><Ionicons name="wallet-outline" size={24} color={colors.primary} /></View>
+            <View style={styles.actionIcon}><Ionicons name="wallet-outline" size={24} color="#2E7D32" /></View>
             <Text style={styles.actionLabel}>Set Allowance</Text>
             <Text style={styles.actionValue}>
               {parent.allowanceActive
@@ -152,7 +152,7 @@ export const ParentHomeScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => setSendMoneyVisible(true)}>
-            <View style={styles.actionIcon}><Ionicons name="send-outline" size={24} color={colors.primary} /></View>
+            <View style={styles.actionIcon}><Ionicons name="send-outline" size={24} color="#2E7D32" /></View>
             <Text style={styles.actionLabel}>Send Money</Text>
             <Text style={styles.actionValue}>Now</Text>
           </TouchableOpacity>
@@ -327,10 +327,10 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 16, alignItems: 'center', gap: 6 },
   actionIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
-  actionValue: { fontSize: 12, color: colors.primary, fontWeight: '700' },
+  actionValue: { fontSize: 12, color: '#2E7D32', fontWeight: '700' },
   sectionHeader: { paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
-  viewAllText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  viewAllText: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
   activityList: { backgroundColor: colors.white, borderRadius: 16, overflow: 'hidden' },
   activityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.surface },
   activityIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

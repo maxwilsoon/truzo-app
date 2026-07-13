@@ -155,7 +155,7 @@ export const AddFriendsScreen: React.FC = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />}
+        {loading && <ActivityIndicator size="small" color="#2E7D32" style={{ marginLeft: 4 }} />}
         {!loading && search.length > 0 && (
           <TouchableOpacity onPress={() => { setSearch(''); setResults([]); setError(''); }}>
             <Ionicons name="close-circle" size={18} color="#9CA3AF" />
@@ -210,7 +210,7 @@ export const AddFriendsScreen: React.FC = () => {
                           onPress={() => handleAdd(user)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="person-add-outline" size={15} color={colors.primary} />
+                          <Ionicons name="person-add-outline" size={15} color="#2E7D32" />
                           <Text style={styles.addBtnText}>Add</Text>
                         </TouchableOpacity>
                       )}
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1FAF2',
   },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  addBtnText: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
 
   requestedBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

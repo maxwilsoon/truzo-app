@@ -368,6 +368,14 @@ export const db = {
     return publicUrl;
   },
 
+  async updateChildAvatarEmoji(childId: string, emoji: string): Promise<void> {
+    const { error } = await supabase
+      .from('children')
+      .update({ avatar_emoji: emoji })
+      .eq('id', childId);
+    if (error) throw error;
+  },
+
   async persistTransaction(
     childId: string, type: string, amount: number,
     description: string, counterparty: string | null,

@@ -73,7 +73,7 @@ export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => 
               </View>
             ) : (
               <View style={styles.circle}>
-                <Text style={styles.initials}>{childFirstName.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.avatarEmoji}>{child.avatarEmoji || childFirstName.charAt(0).toUpperCase()}</Text>
               </View>
             )}
             <Text style={styles.name}>{childFirstName}</Text>
@@ -162,6 +162,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: DARK,
     letterSpacing: -0.5,
+  },
+
+  avatarEmoji: {
+    fontSize: 58,
   },
 
   plus: {

@@ -84,7 +84,7 @@ export const ChildSettingsScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitial}>{initial}</Text>
+                <Text style={styles.avatarEmoji}>{child.avatarEmoji || initial}</Text>
               </View>
             )}
             <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('AvatarPicker' as never)}>
@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarInitial: { fontSize: 44, fontWeight: '700', color: '#fff' },
+  avatarEmoji: { fontSize: 52 },
   editBtn: {
     position: 'absolute', bottom: 2, right: 2,
     width: 28, height: 28, borderRadius: 14,

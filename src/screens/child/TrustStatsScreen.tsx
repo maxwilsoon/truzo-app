@@ -11,7 +11,7 @@ import { useApp } from '../../context/AppContext';
 const TIERS = [
   { min: 0,  max: 29,  emoji: '⚠️', tier: 'Risky',    desc: 'People avoid lending', color: colors.error },
   { min: 30, max: 49,  emoji: '🔄', tier: 'Unproven', desc: 'New or inconsistent',  color: colors.warning },
-  { min: 50, max: 69,  emoji: '👍', tier: 'Reliable', desc: 'Default starting goal', color: colors.primary },
+  { min: 50, max: 69,  emoji: '👍', tier: 'Reliable', desc: 'Default starting goal', color: '#2E7D32' },
   { min: 70, max: 84,  emoji: '⭐', tier: 'Trusted',  desc: 'Strong reputation',    color: colors.success },
   { min: 85, max: 100, emoji: '🏆', tier: 'Elite',    desc: 'Top user',              color: colors.gold },
 ];
@@ -48,7 +48,7 @@ export const TrustStatsScreen: React.FC = () => {
           {[
             { label: 'On-time repayments', value: child.repaid, emoji: '✅', color: colors.success },
             { label: 'Missed repayments', value: child.missed, emoji: '❌', color: colors.error },
-            { label: 'Times borrowed', value: child.timesBorrowed, emoji: '📩', color: colors.primary },
+            { label: 'Times borrowed', value: child.timesBorrowed, emoji: '📩', color: '#2E7D32' },
             { label: 'Times lent', value: child.timesLent, emoji: '🤝', color: colors.cyan },
             { label: 'Amount borrowed', value: `£${fmtAmt(child.totalBorrowed)}`, emoji: '💸', color: colors.warning },
             { label: 'Amount lent', value: `£${fmtAmt(child.totalLent)}`, emoji: '💰', color: colors.success },

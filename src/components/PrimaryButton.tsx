@@ -63,6 +63,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   labelAlt: {
-    color: colors.primary,
+    color: '#2E7D32',
   },
 });

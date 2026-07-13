@@ -27,11 +27,22 @@ export const AvatarPickerScreen: React.FC = () => {
   const initialIndex = AVATARS.indexOf(child.avatarEmoji) >= 0 ? AVATARS.indexOf(child.avatarEmoji) : 0;
   const [selected, setSelected] = useState(AVATARS[initialIndex]);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const currentIndex = AVATARS.indexOf(selected) >= 0 ? AVATARS.indexOf(selected) : 0;
 
-  const confirm = () => {
+  const confirm = async () => {
     setChild(c => ({ ...c, avatarEmoji: selected }));
+    if (childId) {
+      setSaving(true);
+      try {
+        await db.updateChildAvatarEmoji(childId, selected);
+      } catch {
+        // best-effort — local state already updated
+      } finally {
+        setSaving(false);
+      }
+    }
     navigation.goBack();
   };
 
@@ -111,7 +122,7 @@ export const AvatarPickerScreen: React.FC = () => {
       {/* Swipe emoji picker */}
       <View style={styles.swipeArea}>
         <TouchableOpacity onPress={goLeft} style={styles.arrowBtn}>
-          <Ionicons name="chevron-back" size={32} color={colors.primary} />
+          <Ionicons name="chevron-back" size={32} color="#2E7D32" />
         </TouchableOpacity>
 
         <FlatList
@@ -136,7 +147,7 @@ export const AvatarPickerScreen: React.FC = () => {
         />
 
         <TouchableOpacity onPress={goRight} style={styles.arrowBtn}>
-          <Ionicons name="chevron-forward" size={32} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={32} color="#2E7D32" />
         </TouchableOpacity>
       </View>
 
@@ -155,7 +166,7 @@ export const AvatarPickerScreen: React.FC = () => {
 
       <TouchableOpacity style={styles.cameraCircle} onPress={handleAddPhoto} activeOpacity={0.8} disabled={uploading}>
         {uploading ? (
-          <ActivityIndicator color="#6366F1" />
+          <ActivityIndicator color="#2E7D32" />
         ) : child.profileImageUrl ? (
           <Image source={{ uri: child.profileImageUrl }} style={styles.profilePhoto} />
         ) : (
@@ -172,8 +183,12 @@ export const AvatarPickerScreen: React.FC = () => {
       <View style={{ flex: 1 }} />
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.confirmBtn} onPress={confirm} activeOpacity={0.85}>
-          <Text style={styles.confirmBtnText}>Looking good</Text>
+        <TouchableOpacity style={styles.confirmBtn} onPress={confirm} activeOpacity={0.85} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator color="#1F2937" />
+          ) : (
+            <Text style={styles.confirmBtnText}>Looking good</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -258,14 +273,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center', marginTop: 10,
   },
   changePhotoText: {
-    fontSize: 14, color: colors.primary, fontWeight: '600',
+    fontSize: 14, color: '#2E7D32', fontWeight: '600',
   },
 
   footer: { padding: 24, paddingBottom: 16 },
   confirmBtn: {
-    backgroundColor: '#6366F1',
+    backgroundColor: colors.primary,
     borderRadius: 50, paddingVertical: 20,
     alignItems: 'center',
   },
-  confirmBtnText: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  confirmBtnText: { fontSize: 18, fontWeight: '800', color: '#1F2937' },
 });

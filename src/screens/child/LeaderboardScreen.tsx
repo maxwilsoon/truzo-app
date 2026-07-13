@@ -149,12 +149,12 @@ const s = StyleSheet.create({
   avatarEmoji: { fontSize: 22 },
 
   name:      { fontSize: 15, fontWeight: '700', color: '#111827' },
-  nameYou:   { color: colors.primary },
+  nameYou:   { color: '#2E7D32' },
   tierLabel: { fontSize: 12, fontWeight: '600', marginTop: 2 },
 
   scoreWrap: { alignItems: 'flex-end' },
   score:     { fontSize: 20, fontWeight: '800', color: '#111827' },
-  scoreYou:  { color: colors.primary },
+  scoreYou:  { color: '#2E7D32' },
   scorePts:  { fontSize: 11, fontWeight: '600', color: '#9CA3AF', marginTop: -2 },
 
   emptyWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },

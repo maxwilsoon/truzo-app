@@ -25,7 +25,7 @@ export const VerifyingScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         <Text style={styles.title}>Verifying your identity</Text>
         <Text style={styles.sub}>This only takes a moment. Please don't close the app.</Text>
-        <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: 32 }} />
+        <ActivityIndicator color="#2E7D32" size="large" style={{ marginTop: 32 }} />
         <View style={styles.steps}>
           {['Checking your details', 'Verifying address', 'Confirming identity'].map((s, i) => (
             <View key={s} style={styles.step}>

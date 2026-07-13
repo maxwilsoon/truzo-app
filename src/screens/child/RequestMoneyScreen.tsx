@@ -259,7 +259,7 @@ export const RequestMoneyScreen: React.FC = () => {
             <Ionicons
               name={showDeadlineOpts ? 'calendar' : 'calendar-outline'}
               size={20}
-              color={colors.primary}
+              color="#2E7D32"
             />
           </TouchableOpacity>
 
@@ -278,7 +278,7 @@ export const RequestMoneyScreen: React.FC = () => {
                     <Text style={[s.deadlineDate, active && s.deadlineDateActive]}>
                       {formatDeadlineDate(d.days)}
                     </Text>
-                    {active && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                    {active && <Ionicons name="checkmark" size={16} color="#2E7D32" />}
                   </TouchableOpacity>
                 );
               })}
@@ -446,7 +446,7 @@ const s = StyleSheet.create({
   // Quick amounts
   quickRow:           { flexDirection: 'row', gap: 10 },
   quickChip:          { flex: 1, paddingVertical: 12, borderRadius: 50, borderWidth: 1.5, borderColor: '#E5E7EB', alignItems: 'center', backgroundColor: '#F9FAFB' },
-  quickChipActive:    { backgroundColor: colors.primary, borderColor: colors.primary },
+  quickChipActive:    { backgroundColor: '#2E7D32', borderColor: '#2E7D32' },
   quickChipText:      { fontSize: 15, fontWeight: '700', color: '#374151' },
   quickChipTextActive:{ color: '#FFFFFF' },
 
@@ -457,9 +457,9 @@ const s = StyleSheet.create({
   deadlineRow:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, backgroundColor: '#FFFFFF', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F3F4F6' },
   deadlineRowActive:   { backgroundColor: colors.primaryLight },
   deadlineLabel:       { fontSize: 14, fontWeight: '600', color: '#374151', width: 70 },
-  deadlineLabelActive: { color: colors.primary },
+  deadlineLabelActive: { color: '#2E7D32' },
   deadlineDate:        { flex: 1, fontSize: 13, color: '#9CA3AF' },
-  deadlineDateActive:  { color: colors.primary },
+  deadlineDateActive:  { color: '#2E7D32' },
 
   // Audience card
   audienceCard:  { backgroundColor: '#F1FAF2', borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: '#C3E6C7' },
@@ -480,14 +480,14 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  overflowChip: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  overflowChip: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, backgroundColor: '#2E7D32', alignItems: 'center', justifyContent: 'center' },
   overflowText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
 
   // Footer
   footer:             { paddingHorizontal: 20, paddingBottom: 8, paddingTop: 12 },
   requestBtn:         { backgroundColor: colors.primary, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  requestBtnDisabled: { backgroundColor: '#C4B5FD' },
-  requestBtnText:     { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
+  requestBtnDisabled: { backgroundColor: '#D1D5DB' },
+  requestBtnText:     { fontSize: 17, fontWeight: '800', color: '#1F2937' },
   disabledBtn:        { backgroundColor: '#F3F4F6', borderRadius: 50, paddingVertical: 18, alignItems: 'center', borderWidth: 1.5, borderColor: '#E5E7EB' },
   disabledBtnText:    { fontSize: 16, fontWeight: '700', color: '#9CA3AF' },
 
@@ -496,7 +496,7 @@ const s = StyleSheet.create({
   modalHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5E7EB' },
   modalTitle:       { fontSize: 17, fontWeight: '800', color: '#111827' },
   modalDone:        { paddingHorizontal: 4, paddingVertical: 4 },
-  modalDoneText:    { fontSize: 16, fontWeight: '700', color: colors.primary },
+  modalDoneText:    { fontSize: 16, fontWeight: '700', color: '#2E7D32' },
   modalSub:         { fontSize: 13, color: '#6B7280', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   modalList:        { paddingHorizontal: 16, paddingTop: 8, gap: 8, paddingBottom: 16 },
   modalRow:         { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#F3F4F6', opacity: 0.55 },
@@ -510,5 +510,5 @@ const s = StyleSheet.create({
   checkbox:        { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   modalFooter: { paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E5E7EB' },
-  modalCount:  { fontSize: 14, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+  modalCount:  { fontSize: 14, fontWeight: '700', color: '#2E7D32', textAlign: 'center' },
 });

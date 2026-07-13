@@ -188,6 +188,8 @@ export const HomeScreen: React.FC = () => {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
+          <View pointerEvents="none" style={s.balDecor1} />
+          <View pointerEvents="none" style={s.balDecor2} />
           <Text style={s.balLabel}>{frozenAccount ? '🔒 Account Frozen' : 'Balance'}</Text>
           <Text style={s.balAmount}>£{fmtAmt(child.balance)}</Text>
         </LinearGradient>
@@ -283,22 +285,24 @@ const s = StyleSheet.create({
   repayLeft:    { flex: 1, marginRight: 16 },
   repayHeading: { fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginBottom: 6 },
   repayAmount:  { fontSize: 28, color: '#FFFFFF', fontWeight: '800', letterSpacing: -0.5, lineHeight: 34, marginBottom: 8 },
-  dueLabel:       { fontSize: 13, fontWeight: '700', color: '#BFEF70', marginBottom: 16 },
+  dueLabel:       { fontSize: 13, fontWeight: '700', color: '#C8E8CB', marginBottom: 16 },
   dueLabelUrgent: { color: '#FCA5A5' },
-  repayBtn:     { backgroundColor: '#E8F97A', borderRadius: 50, paddingVertical: 13, alignItems: 'center' },
+  repayBtn:     { backgroundColor: '#C8E8CB', borderRadius: 50, paddingVertical: 13, alignItems: 'center' },
   repayBtnText: { fontSize: 15, fontWeight: '700', color: '#1E2900' },
 
   // Calendar widget
   cal:      { borderRadius: 14, overflow: 'hidden', width: 70 },
   calTop:   { backgroundColor: colors.primary, paddingVertical: 9, alignItems: 'center' },
-  calMonth: { fontSize: 11, fontWeight: '800', color: '#FFFFFF', letterSpacing: 1.5 },
+  calMonth: { fontSize: 11, fontWeight: '800', color: '#1F2937', letterSpacing: 1.5 },
   calBody:  { backgroundColor: '#FFFFFF', paddingVertical: 9, alignItems: 'center' },
   calDay:   { fontSize: 34, fontWeight: '900', color: '#111827', lineHeight: 38 },
 
   // Balance card
-  balCard:   { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 22, minHeight: 96 },
+  balCard:   { marginHorizontal: 16, marginBottom: 14, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 22, minHeight: 96, overflow: 'hidden' },
   balLabel:  { fontSize: 13, color: 'rgba(0,0,0,0.6)', fontWeight: '500', marginBottom: 6 },
   balAmount: { fontSize: 36, fontWeight: '900', color: '#1F2937', letterSpacing: -1 },
+  balDecor1: { position: 'absolute', top: -28, right: -18, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(255,255,255,0.22)' },
+  balDecor2: { position: 'absolute', top: 16, right: 34, width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.14)' },
 
   // Trust Score card
   trustCard:  { marginHorizontal: 16, marginBottom: 6, backgroundColor: '#FFFFFF', borderRadius: 16, paddingLeft: 22, paddingRight: 12, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },
@@ -307,12 +311,12 @@ const s = StyleSheet.create({
   trustBig:   { fontSize: 48, fontWeight: '900', color: '#111827', letterSpacing: -2, lineHeight: 52 },
   trustTier:  { fontSize: 15, color: '#6B7280', fontWeight: '400', marginTop: 2 },
   streakPill: { alignSelf: 'flex-start', marginTop: 10, backgroundColor: colors.primaryLight, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  streakText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  streakText: { fontSize: 12, fontWeight: '700', color: '#2E7D32' },
 
   // Section headers
   sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  seeAll:       { fontSize: 14, fontWeight: '600', color: colors.primary },
+  seeAll:       { fontSize: 14, fontWeight: '600', color: '#2E7D32' },
 
   // Card wrapper — outer carries shadow, inner clips border-radius (iOS fix)
   cardOuter: { marginHorizontal: 16, borderRadius: 16, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 },

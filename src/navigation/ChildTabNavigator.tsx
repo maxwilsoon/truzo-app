@@ -32,7 +32,7 @@ const BorrowTabButton: React.FC<{ onPress?: ((e: GestureResponderEvent) => void)
 
 const tb = StyleSheet.create({
   borrowWrap:  { flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 6 },
-  borrowPill:  { width: 60, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 3, shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
+  borrowPill:  { width: 60, height: 44, borderRadius: 22, backgroundColor: '#3D7A45', alignItems: 'center', justifyContent: 'center', marginBottom: 3, shadowColor: '#3D7A45', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
   borrowLabel: { fontSize: 11, fontWeight: '600', color: colors.textLight },
 });
 
@@ -43,7 +43,7 @@ export const ChildTabNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: '#2E7D32',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
