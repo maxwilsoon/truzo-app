@@ -123,14 +123,24 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
       if (msg === 'username_taken') {
         setUsernameError('That username is already taken. Please choose another.');
       } else if (msg.startsWith('account_created_but_login_failed')) {
-        // Auth account was created but the immediate sign-in failed (email confirmation may be on).
-        // Surface this clearly so the parent knows to check their email.
         Alert.alert('Check your email', 'Your account was created. Please confirm your email address, then sign in.');
       } else if (msg === 'not_authenticated') {
-        Alert.alert('Session error', 'Your session expired during setup. Please go back and try again.');
+        Alert.alert('Session expired', 'Your sign-up session has expired. Please go back and try again.');
+      } else if (msg === 'permission_denied') {
+        Alert.alert('Permissions error', 'The account could not be created because of a permissions problem. Please contact support.');
+      } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch')) {
+        Alert.alert('No connection', 'Please check your internet connection and try again.');
       } else {
-        if (__DEV__) console.warn('[Truzo] onboarding save failed:', err);
-        Alert.alert('Something went wrong', 'Could not create the account. Please check your connection and try again.');
+        if (__DEV__) {
+          console.error('[Truzo] ChildDetails unclassified error:', {
+            message: err?.message,
+            code:    err?.code,
+            details: err?.details,
+            hint:    err?.hint,
+            name:    err?.name,
+          });
+        }
+        Alert.alert('Could not create account', 'We could not create the child account. Please try again.');
       }
     } finally {
       setLoading(false);

@@ -69,6 +69,23 @@ export const db = {
     });
     if (parentErr) throw parentErr;
 
+    // Verify the session is established before calling insert_child.
+    // The RPC uses auth.uid() for parent_id — a missing session causes not_authenticated.
+    const { data: { session: preRpcSession } } = await supabase.auth.getSession();
+    if (__DEV__) {
+      console.log('[Truzo] insert_child pre-flight:', {
+        rpc: 'insert_child',
+        hasSession: !!preRpcSession,
+        userId: preRpcSession?.user?.id ?? null,
+        username: p.child.username,
+        displayName: p.child.displayName,
+        // p_password intentionally omitted
+      });
+    }
+    if (!preRpcSession) {
+      throw new Error('not_authenticated');
+    }
+
     // insert_child RPC bcrypt-hashes the password inside the database.
     // The plain-text password travels over TLS and is never stored anywhere.
     // Returns the new child's UUID which we store so the app knows who was just created.
@@ -81,8 +98,19 @@ export const db = {
       p_avatar_emoji: p.child.avatarEmoji,
     });
     if (childErr) {
+      if (__DEV__) {
+        console.error('[Truzo] insert_child RPC error:', {
+          message: childErr.message,
+          code:    childErr.code,
+          details: childErr.details,
+          hint:    childErr.hint,
+        });
+      }
       if (childErr.message?.includes('username_taken')) throw new Error('username_taken');
       if (childErr.message?.includes('not_authenticated')) throw new Error('not_authenticated');
+      if (childErr.code === '42501' || childErr.message?.includes('permission denied')) {
+        throw new Error('permission_denied');
+      }
       throw childErr;
     }
 
