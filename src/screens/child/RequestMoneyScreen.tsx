@@ -65,7 +65,9 @@ export const RequestMoneyScreen: React.FC = () => {
   const viewerIds   = circle.filter(m => !excludedIds.has(m.id)).map(m => m.id);
   const selectedCnt = viewerIds.length;
 
-  const isAlreadyBorrowing = child.borrowed > 0 || activeRequests.some(r => r.isOwn && !r.isFunded);
+  // isOwn = (from_id === currentUser), i.e. this user is the borrower on this request.
+  // Both pending and funded own requests block a new borrow. Lending (isOwn=false) does not.
+  const isAlreadyBorrowing = activeRequests.some(r => r.isOwn);
   const noMembersSelected  = circle.length > 0 && selectedCnt === 0;
 
   const canSend =
