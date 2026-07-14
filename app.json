@@ -5,22 +5,23 @@
     "version": "1.0.0",
     "scheme": "truzo",
     "orientation": "portrait",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#E6F4FE"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.truzo.app",
       "buildNumber": "1"
     },
-
     "android": {
       "package": "com.truzo.app",
       "versionCode": 1,
@@ -39,18 +40,16 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
-
     "web": {
       "favicon": "./assets/favicon.png"
     },
-
     "runtimeVersion": {
       "policy": "appVersion"
     },
-
     "plugins": [
       [
         "expo-notifications",
@@ -73,11 +72,11 @@
         }
       ]
     ],
-
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "e3c6b0a8-847a-4638-bfa4-15796e310396"
       }
-    }
+    },
+    "owner": "maxowilson"
   }
 }
