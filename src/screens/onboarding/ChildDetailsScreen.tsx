@@ -154,12 +154,12 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
       <View key={key}>
         <View style={[styles.inputWrap, isFocused && styles.inputFocused, !!opts?.error && styles.inputError]}>
           <View style={{ flex: 1 }}>
-            {(isFocused || hasValue) && (
+            {hasValue && (
               <Text style={[styles.floatLabel, isFocused && styles.floatLabelActive]}>{label}</Text>
             )}
             <TextInput
               style={[styles.input, opts?.showToggle && { paddingRight: 8 }]}
-              placeholder={isFocused || hasValue ? '' : label}
+              placeholder={hasValue ? '' : label}
               placeholderTextColor="#AEAEB2"
               value={value}
               onChangeText={onChange}

@@ -25,7 +25,35 @@ export const ParentHomeScreen: React.FC = () => {
   const poolPercent = (parent.safetyPoolUsed / parent.safetyPoolLimit) * 100;
 
   const [showAllActivity, setShowAllActivity] = useState(false);
-  const parentActivity = showAllActivity ? activityFeed : activityFeed.slice(0, 3);
+
+  // Derive the child's first name for parent-perspective activity wording.
+  const childFirstName = child.displayName.split(' ')[0] || 'Your child';
+
+  // Transform child-perspective activity text into parent-perspective at render time.
+  // Does NOT mutate the shared activityFeed state — child dashboard is unaffected.
+  const toParentText = (text: string): string => {
+    let t = text;
+    // Handle sentence-start cases first (capitalised)
+    if (t.startsWith('You ')) t = childFirstName + ' ' + t.slice(4);
+    else if (t.startsWith('Your ')) t = `${childFirstName}'s ` + t.slice(5);
+    // Handle contractions before their component words
+    t = t.replace(/\byou're\b/gi, `${childFirstName} is`);
+    t = t.replace(/\byou've\b/gi, `${childFirstName} has`);
+    // Replace remaining "your" and "you" (word-boundary, case-insensitive)
+    t = t.replace(/\byour\b/gi, `${childFirstName}'s`);
+    t = t.replace(/\byou\b/gi, childFirstName);
+    return t;
+  };
+
+  // Filter and transform the feed for the parent view:
+  //   • Hide 'topup' items (parent-to-child sends, allowances) — parent already knows
+  //   • Hide 'spend' items — not meaningful in parent oversight view
+  //   • Replace child-perspective "You/Your" wording with the child's first name
+  const parentActivityFeed = activityFeed
+    .filter(a => a.type !== 'topup' && a.type !== 'spend')
+    .map(a => ({ ...a, text: toParentText(a.text) }));
+
+  const parentActivity = showAllActivity ? parentActivityFeed : parentActivityFeed.slice(0, 3);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -164,7 +192,7 @@ export const ParentHomeScreen: React.FC = () => {
             <Ionicons name="flash-outline" size={16} color={colors.gold} />
             <Text style={styles.sectionTitle}>Recent Activity</Text>
           </View>
-          {activityFeed.length > 3 && (
+          {parentActivityFeed.length > 3 && (
             <TouchableOpacity onPress={() => setShowAllActivity(v => !v)}>
               <Text style={styles.viewAllText}>{showAllActivity ? 'Show less' : 'View all'}</Text>
             </TouchableOpacity>

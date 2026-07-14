@@ -93,14 +93,14 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
           {fields.map((f, i) => (
             <View key={f.key}>
               <View style={[styles.inputWrap, focused === f.key && styles.inputFocused]}>
-                {(focused === f.key || f.value.length > 0) && (
+                {f.value.length > 0 && (
                   <Text style={[styles.floatLabel, focused === f.key && styles.floatLabelActive]}>
                     {f.label}
                   </Text>
                 )}
                 <TextInput
                   style={styles.input}
-                  placeholder={focused === f.key || f.value.length > 0 ? '' : f.label}
+                  placeholder={f.value.length > 0 ? '' : f.label}
                   placeholderTextColor="#AEAEB2"
                   value={f.value}
                   onChangeText={f.onChange}
