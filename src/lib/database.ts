@@ -230,6 +230,7 @@ export const db = {
   ): Promise<{ requestId: string; pushTokens: string[] }> {
     const { data, error } = await supabase.rpc('create_money_request', {
       p_from_id: fromId, p_amount: amount, p_deadline_days: deadlineDays,
+      p_reason: '', p_reason_emoji: '💸',
       p_viewer_ids: viewerIds ?? null,
     });
     if (error) throw new Error('create_money_request error: ' + error.message);
