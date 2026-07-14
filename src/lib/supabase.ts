@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://biilrksornvoqtalftty.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_WFy3MKZimL3OcD35Tn6QBQ_jxzMaUCw';
+const SUPABASE_URL      = process.env.EXPO_PUBLIC_SUPABASE_URL      ?? '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 // No-op storage — sessions are in-memory only; we manage our own persistence via cache.ts
 const noopStorage = {

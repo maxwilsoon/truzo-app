@@ -43,21 +43,18 @@ import { BiometricLoginScreen } from '../screens/auth/BiometricLoginScreen';
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// ─── DEV ONLY: set to false to restore normal login ───────────────────────
-const DEV_AUTO_LOGIN = false;
-const DEV_ACCOUNTS = {
-  web:    { username: 'ava_m',   password: 'Ava12345'  }, // laptop / browser → Ava
-  native: { username: 'tyler_p', password: 'Tyler1234' }, // phone             → Tyler
-};
-// ───────────────────────────────────────────────────────────────────────────
-
 export const AppNavigator = () => {
   const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
   const [navReady, setNavReady] = useState(false);
 
+  // Dev-only auto-login: reads credentials from EXPO_PUBLIC_DEV_CHILD_USERNAME /
+  // EXPO_PUBLIC_DEV_CHILD_PASSWORD in your local .env.local (gitignored).
+  // __DEV__ is false in all production builds — Metro removes this entire block.
   useEffect(() => {
-    if (!navReady || !DEV_AUTO_LOGIN) return;
-    const { username, password } = Platform.OS === 'web' ? DEV_ACCOUNTS.web : DEV_ACCOUNTS.native;
+    if (!__DEV__ || !navReady) return;
+    const username = process.env.EXPO_PUBLIC_DEV_CHILD_USERNAME;
+    const password = process.env.EXPO_PUBLIC_DEV_CHILD_PASSWORD;
+    if (!username || !password) return;
     db.loginChild(username, password).then(result => {
       if (!result) return;
       const { child: row, parent: par } = result;

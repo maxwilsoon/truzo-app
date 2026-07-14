@@ -30,10 +30,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — .env.example is committed (no real values, just documentation)
 .env
 .env.*
 .env*.local
+!.env.example
 
 # Claude Code IDE settings (machine-specific)
 .claude/
