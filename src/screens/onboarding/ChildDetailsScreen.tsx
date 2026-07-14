@@ -105,7 +105,6 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
         ...c,
         displayName:   childDisplayName,
         username:      childUsername,
-        password,
         mobile:        childMobile,
         age,
         profileImageUrl: undefined,

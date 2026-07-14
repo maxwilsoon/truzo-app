@@ -94,7 +94,6 @@ interface ChildProfile {
   age: number;
   mobile: string;
   email: string;
-  password: string;
   profileImageUrl?: string;
   biometricEnabled: boolean;
 }
@@ -221,7 +220,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     age: 16,
     mobile: '',
     email: '',
-    password: '',
     biometricEnabled: false,
   });
 
@@ -268,7 +266,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]);
       if (cachedParent) setParent(p => ({ ...p, ...cachedParent }));
       if (cachedChild) {
-        setChild(c => ({ ...c, ...cachedChild }));
+        // Strip any plain-text password that may exist in caches written before
+        // migration 006. The password field was removed from ChildProfile in that
+        // migration — having it in cache state would expose a stale plain-text value.
+        const { password: _stripped, ...safeChildCache } = cachedChild as any;
+        setChild(c => ({ ...c, ...safeChildCache }));
         if (cachedChild.childId) setChildId(cachedChild.childId);
       }
       if (cachedUserId) setUserId(cachedUserId);
@@ -386,7 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       child: {
         displayName:   childOverride?.displayName   ?? child.displayName,
         username:      childOverride?.username      ?? child.username,
-        password:      childOverride?.password      ?? child.password,
+        password:      childOverride?.password      ?? '',
         mobile:        childOverride?.mobile        ?? child.mobile,
         age:           childOverride?.age           ?? child.age,
         avatarEmoji:   child.avatarEmoji,
@@ -729,7 +731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       displayName: '', username: '', avatarEmoji: '😊', trustScore: 50,
       balance: 0, loanedOut: 0, borrowed: 0, streak: 0, repaid: 0, missed: 0,
       totalBorrowed: 0, totalLent: 0, timesBorrowed: 0, timesLent: 0,
-      points: 0, age: 16, mobile: '', email: '', password: '',
+      points: 0, age: 16, mobile: '', email: '',
       biometricEnabled: false, profileImageUrl: undefined,
     });
     setChildId(null);

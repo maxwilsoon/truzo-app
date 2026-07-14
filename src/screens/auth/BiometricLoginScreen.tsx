@@ -40,7 +40,6 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       ...c,
       displayName:   row.display_name,
       username:      row.username,
-      password:      row.password ?? '',
       avatarEmoji:   row.avatar_emoji,
       avatarUrl:     row.avatar_url ?? undefined,
       trustScore:    row.trust_score,

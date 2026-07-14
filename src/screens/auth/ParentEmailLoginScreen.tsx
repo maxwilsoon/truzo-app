@@ -71,7 +71,6 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
           ...prev,
           displayName:   ch.display_name,
           username:      ch.username,
-          password:      ch.password,
           avatarEmoji:   ch.avatar_emoji,
           profileImageUrl: ch.profile_image_url ?? undefined,
           trustScore:    ch.trust_score,

@@ -69,7 +69,6 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         ...c,
         displayName:   row.display_name,
         username:      row.username,
-        password:      row.password,
         avatarEmoji:     row.avatar_emoji,
         profileImageUrl: row.profile_image_url ?? undefined,
         trustScore:    row.trust_score,
@@ -111,7 +110,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         }));
       }
       setChildId(row.id);
-      await cache.saveChild({ username: row.username, password: row.password, childId: row.id });
+      await cache.saveChild({ username: row.username, childId: row.id });
 
       // Register device for push notifications (best-effort, won't block login)
       registerPushToken(row.id).catch(() => {});

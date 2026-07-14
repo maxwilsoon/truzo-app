@@ -21,7 +21,6 @@ export const ChildSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { child, childId, biometricEnabled, setBiometricEnabled } = useApp();
   const initial = child.displayName.charAt(0).toUpperCase();
-  const [showPassword, setShowPassword] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
 
@@ -104,25 +103,7 @@ export const ChildSettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Your login details</Text>
           <Row label="Username" value={child.username} />
-          <View style={[styles.row, styles.rowBorder]}>
-            <Text style={styles.rowLabel}>Password</Text>
-            <View style={styles.passwordRow}>
-              <Text style={styles.rowValue}>
-                {showPassword ? child.password : '•'.repeat(child.password.length)}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowPassword(v => !v)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                style={{ marginLeft: 8 }}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color="#9CA3AF"
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <Row label="Password" value="••••••••" isLast={false} />
           <Row label="Date of birth" value={child.age ? `Age ${child.age}` : 'Not set'} isLast />
         </View>
 
@@ -198,7 +179,6 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
   rowLabel: { fontSize: 16, color: '#1A1A3E' },
   rowValue: { fontSize: 16, color: '#9CA3AF' },
-  passwordRow: { flexDirection: 'row', alignItems: 'center' },
   rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   rowSubLabel: { fontSize: 13, color: '#9CA3AF', marginTop: 1 },
 });

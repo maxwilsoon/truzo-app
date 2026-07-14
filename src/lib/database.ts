@@ -67,29 +67,18 @@ export const db = {
     });
     if (parentErr) throw parentErr;
 
-    const { error: childErr } = await supabase.from('children').insert({
-      parent_id:     userId,
-      display_name:  p.child.displayName,
-      username:      p.child.username,
-      password:      p.child.password,
-      mobile:        p.child.mobile,
-      age:           p.child.age,
-      avatar_emoji:  p.child.avatarEmoji,
-      trust_score:    p.child.trustScore,
-      wallet_balance: p.child.balance,
-      loaned_out:     p.child.loanedOut,
-      borrowed:      p.child.borrowed,
-      streak:        p.child.streak,
-      repaid:        p.child.repaid,
-      missed:        p.child.missed,
-      total_borrowed: p.child.totalBorrowed,
-      total_lent:    p.child.totalLent,
-      points:        p.child.points,
+    // insert_child RPC bcrypt-hashes the password inside the database.
+    // The plain-text password travels over TLS and is never stored anywhere.
+    const { error: childErr } = await supabase.rpc('insert_child', {
+      p_display_name: p.child.displayName,
+      p_username:     p.child.username,
+      p_password:     p.child.password,
+      p_mobile:       p.child.mobile,
+      p_age:          p.child.age,
+      p_avatar_emoji: p.child.avatarEmoji,
     });
     if (childErr) {
-      // Unique constraint violation on children.username — surface as a typed sentinel
-      // so callers can show "username already taken" rather than a raw DB error.
-      if (childErr.code === '23505') throw new Error('username_taken');
+      if (childErr.message?.includes('username_taken')) throw new Error('username_taken');
       throw childErr;
     }
 
@@ -496,7 +485,11 @@ export const db = {
       .select('*')
       .eq('id', userId)
       .single();
-    const { data: childData } = await supabase.from('children').select('*').eq('parent_id', userId).single();
+    const { data: childData } = await supabase
+      .from('children')
+      .select('id, display_name, username, avatar_emoji, profile_image_url, trust_score, wallet_balance, loaned_out, borrowed, streak, repaid, missed, total_borrowed, total_lent, times_borrowed, times_lent, points, age, mobile, account_frozen, parent_debt')
+      .eq('parent_id', userId)
+      .single();
     if (!parentData) return null;
     return { userId, parent: parentData, child: childData };
   },

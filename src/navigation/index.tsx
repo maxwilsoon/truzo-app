@@ -62,7 +62,6 @@ export const AppNavigator = () => {
         ...c,
         displayName:   row.display_name,
         username:      row.username,
-        password:      row.password,
         avatarEmoji:     row.avatar_emoji,
         profileImageUrl: row.profile_image_url ?? undefined,
         trustScore:    row.trust_score,
