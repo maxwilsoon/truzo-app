@@ -1,17 +1,9 @@
+import { NavigationProp } from '@react-navigation/native';
 import { db } from './database';
+import type { RootStackParamList } from '../navigation/types';
 
-/**
- * Central Parent Dashboard access guard.
- *
- * Fetches the parent's live Safety Pool status from Supabase and either
- * navigates to ParentTabs (pool funded) or redirects to SafetyPool setup
- * (pool at £0 — first-time or depleted).
- *
- * Call this instead of navigation.navigate('ParentTabs') at every entry
- * point so the check is always enforced, regardless of route.
- */
 export async function navigateToParentDash(
-  navigation: { navigate: (screen: string, params?: any) => void },
+  navigation: NavigationProp<RootStackParamList>,
   userId: string | null,
 ): Promise<void> {
   if (!userId) {
