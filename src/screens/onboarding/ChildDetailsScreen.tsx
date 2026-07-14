@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
-  Platform, TextInput, TouchableOpacity, ScrollView, ActivityIndicator,
+  Platform, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,10 +119,18 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
       await saveOnboardingToDb({ displayName: childDisplayName, username: childUsername, password, mobile: childMobile, age });
       navigation.navigate('WhoIsLoggingIn', { newAccount: true });
     } catch (err: any) {
-      if (err?.message === 'username_taken') {
+      const msg: string = err?.message ?? '';
+      if (msg === 'username_taken') {
         setUsernameError('That username is already taken. Please choose another.');
+      } else if (msg.startsWith('account_created_but_login_failed')) {
+        // Auth account was created but the immediate sign-in failed (email confirmation may be on).
+        // Surface this clearly so the parent knows to check their email.
+        Alert.alert('Check your email', 'Your account was created. Please confirm your email address, then sign in.');
+      } else if (msg === 'not_authenticated') {
+        Alert.alert('Session error', 'Your session expired during setup. Please go back and try again.');
       } else {
-        console.warn('[Truzo] onboarding save failed:', err);
+        if (__DEV__) console.warn('[Truzo] onboarding save failed:', err);
+        Alert.alert('Something went wrong', 'Could not create the account. Please check your connection and try again.');
       }
     } finally {
       setLoading(false);

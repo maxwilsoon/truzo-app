@@ -372,7 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const saveOnboardingToDb = async (childOverride?: { displayName?: string; username?: string; password?: string; mobile?: string; age?: number }) => {
-    const uid = await db.saveOnboarding({
+    const { userId: uid, childId: newChildId } = await db.saveOnboarding({
       email:    parent.email,
       password: pendingPasswordRef.current,
       parent: {
@@ -408,9 +408,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await cache.saveUserId(uid);
     // Erase the transient onboarding password from memory — it was only needed for signUp.
     pendingPasswordRef.current = '';
-    // Clear any stale child identity from a previous session so the fast-path
-    // login check in ChildLoginScreen can't fire with the wrong child UUID.
-    setChildId(null);
+    // Store the new child's UUID so the rest of the session knows who was just created.
+    if (newChildId) setChildId(newChildId);
     // New account has no passcode yet. Clear any stale passcode data that
     // may have been left in cache from a previous session or account.
     setParent(p => ({ ...p, passcode: '', passcodeHash: '', passcodeCreated: false }));

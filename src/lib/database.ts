@@ -37,8 +37,8 @@ interface OnboardingParams {
 }
 
 export const db = {
-  /** Sign up parent with Supabase Auth, then insert both profile rows. Returns the auth user ID. */
-  async saveOnboarding(p: OnboardingParams): Promise<string> {
+  /** Sign up parent with Supabase Auth, then insert both profile rows. Returns the auth user ID and new child UUID. */
+  async saveOnboarding(p: OnboardingParams): Promise<{ userId: string; childId: string }> {
     const { data: authData, error: authErr } = await supabase.auth.signUp({
       email: p.email,
       password: p.password,
@@ -50,7 +50,9 @@ export const db = {
     // required, or if the client's async initialise() races ahead and clears the
     // in-memory token). signInWithPassword immediately after guarantees the client
     // holds a valid JWT before the RLS-protected inserts below.
-    await supabase.auth.signInWithPassword({ email: p.email, password: p.password });
+    // insert_child uses auth.uid() for parent_id — a missing session causes not_authenticated.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: p.email, password: p.password });
+    if (signInErr) throw new Error('account_created_but_login_failed: ' + signInErr.message);
 
     const { error: parentErr } = await supabase.from('parents').insert({
       id:                        userId,
@@ -69,7 +71,8 @@ export const db = {
 
     // insert_child RPC bcrypt-hashes the password inside the database.
     // The plain-text password travels over TLS and is never stored anywhere.
-    const { error: childErr } = await supabase.rpc('insert_child', {
+    // Returns the new child's UUID which we store so the app knows who was just created.
+    const { data: newChildId, error: childErr } = await supabase.rpc('insert_child', {
       p_display_name: p.child.displayName,
       p_username:     p.child.username,
       p_password:     p.child.password,
@@ -79,10 +82,11 @@ export const db = {
     });
     if (childErr) {
       if (childErr.message?.includes('username_taken')) throw new Error('username_taken');
+      if (childErr.message?.includes('not_authenticated')) throw new Error('not_authenticated');
       throw childErr;
     }
 
-    return userId;
+    return { userId, childId: newChildId as string };
   },
 
   async checkUsernameExists(username: string): Promise<boolean> {
