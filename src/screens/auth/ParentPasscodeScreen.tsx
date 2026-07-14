@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 import { hashPasscode } from '../../lib/passcode';
 import { db } from '../../lib/database';
+import { navigateToParentDash } from '../../lib/parentAccessGuard';
 
 const GREEN_DARK = '#3D7A45';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
@@ -84,20 +85,26 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         const hash = await hashPasscode(userId ?? '', next);
         setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
         try { await savePasscodeToDb(hash); } catch { /* context + cache already updated */ }
-        setTimeout(() => {
-          if (onSuccess === 'ParentTabs') navigation.navigate('ParentTabs');
-          else navigation.navigate('SafetyPool');
+        setTimeout(async () => {
+          if (onSuccess === 'ParentTabs') {
+            // Login-time PIN creation: run Safety Pool guard before granting dashboard access.
+            await navigateToParentDash(navigation, userId);
+          } else {
+            // Onboarding PIN creation: proceed to Safety Pool setup (required step).
+            navigation.navigate('SafetyPool');
+          }
         }, 150);
       } else {
         shake();
       }
 
     } else {
-      // Enter mode — try hash comparison first, fall back to plain text for migrating old accounts
+      // Enter mode — try hash comparison first, fall back to plain text for migrating old accounts.
+      // Always run the Safety Pool guard before granting dashboard access.
       if (parent.passcodeHash) {
         const hash = await hashPasscode(userId ?? '', next);
         if (hash === parent.passcodeHash) {
-          setTimeout(() => navigation.navigate('ParentTabs'), 150);
+          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
         } else {
           shake();
         }
@@ -108,7 +115,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
           const hash = await hashPasscode(userId ?? '', next);
           setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
           savePasscodeToDb(hash).catch(() => {});
-          setTimeout(() => navigation.navigate('ParentTabs'), 150);
+          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
         } else {
           shake();
         }

@@ -70,9 +70,14 @@ export const RequestMoneyScreen: React.FC = () => {
   const isAlreadyBorrowing = activeRequests.some(r => r.isOwn);
   const noMembersSelected  = circle.length > 0 && selectedCnt === 0;
 
+  // Borrowing requires the parent's Safety Pool to have a positive available balance.
+  // Cover both: pool never set up (limit=0) and pool fully depleted (limit <= used).
+  const parentPoolEmpty = parent.safetyPoolLimit - parent.safetyPoolUsed <= 0;
+
   const canSend =
     !frozenAccount &&
     !isAlreadyBorrowing &&
+    !parentPoolEmpty &&
     amountNum > 0 &&
     amountNum <= maxBorrow &&
     deadlineDays > 0 &&
@@ -193,12 +198,14 @@ export const RequestMoneyScreen: React.FC = () => {
           contentContainerStyle={s.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Safety pool gate */}
-          {parent.safetyPoolLimit === 0 && (
+          {/* Safety pool gate — covers both "never set up" and "fully depleted" cases */}
+          {parentPoolEmpty && (
             <View style={s.safetyGate}>
               <Ionicons name="shield-outline" size={20} color="#C8E8CB" />
               <Text style={s.safetyGateText}>
-                Your parent hasn't set up a Safety Pool yet. Ask them to add one before you can borrow.
+                {parent.safetyPoolLimit === 0
+                  ? "Your parent hasn't set up a Safety Pool yet. Ask them to add one before you can borrow."
+                  : "Your parent's Safety Pool is empty. Ask them to top it up before you can borrow."}
               </Text>
             </View>
           )}

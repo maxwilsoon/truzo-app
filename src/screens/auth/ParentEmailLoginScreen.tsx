@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
+import { navigateToParentDash } from '../../lib/parentAccessGuard';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -89,11 +90,12 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       // Email + password is full authentication.
-      // First-time parents (no passcode yet) must create their PIN before entering the app.
+      // First-time parents (no passcode yet) must create their PIN.
+      // All paths then run through the central Safety Pool guard before entering the dashboard.
       if (!par.passcode_created && !par.passcode_hash) {
         navigation.navigate('ParentPasscode', { mode: 'create', onSuccess: 'ParentTabs' });
       } else {
-        navigation.navigate('ParentTabs');
+        await navigateToParentDash(navigation, userId);
       }
     } catch (err) {
       Alert.alert('Login failed', 'Please check your email and password.');

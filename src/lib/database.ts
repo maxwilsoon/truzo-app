@@ -456,6 +456,20 @@ export const db = {
     return { hash: data.passcode_hash ?? null, created: data.passcode_created ?? false };
   },
 
+  /** Fetch live Safety Pool balance from DB — used by the access guard. */
+  async getSafetyPoolStatus(userId: string): Promise<{ limit: number; used: number } | null> {
+    const { data } = await supabase
+      .from('parents')
+      .select('safety_pool_limit, safety_pool_used')
+      .eq('id', userId)
+      .single();
+    if (!data) return null;
+    return {
+      limit: Number(data.safety_pool_limit ?? 0),
+      used:  Number(data.safety_pool_used  ?? 0),
+    };
+  },
+
   /** Refresh parent financial data from DB (safety pool, allowance). */
   async getParentStats(userId: string) {
     const { data } = await supabase

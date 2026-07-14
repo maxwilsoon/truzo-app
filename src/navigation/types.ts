@@ -10,7 +10,7 @@ export type RootStackParamList = {
   HomeAddress: undefined;
   Verifying: undefined;
   ChildDetails: undefined;
-  SafetyPool: undefined;
+  SafetyPool: { required?: boolean } | undefined;
   SelectAccount: undefined;
   WhoIsLoggingIn: { newAccount?: boolean } | undefined;
   GetApp: undefined;
