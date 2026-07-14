@@ -86,9 +86,21 @@ export const db = {
       total_lent:    p.child.totalLent,
       points:        p.child.points,
     });
-    if (childErr) throw childErr;
+    if (childErr) {
+      // Unique constraint violation on children.username — surface as a typed sentinel
+      // so callers can show "username already taken" rather than a raw DB error.
+      if (childErr.code === '23505') throw new Error('username_taken');
+      throw childErr;
+    }
 
     return userId;
+  },
+
+  async checkUsernameExists(username: string): Promise<boolean> {
+    const { data } = await supabase.rpc('check_username_exists', {
+      p_username: username.toLowerCase().trim(),
+    });
+    return !!data;
   },
 
   async loadParent(userId: string) {

@@ -36,15 +36,9 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
     const u = username.trim().toLowerCase();
     const p = password;
 
-    // Try local context first (for accounts created in same session)
-    // Only skip the DB call if childId is already known — without it we can't do any DB operations
-    if (child.username && u === child.username && p === child.password && childId) {
-      setIsChildLoggedIn(true);
-      navigation.navigate('ChildTabs');
-      return;
-    }
-
-    // Fall back to Supabase
+    // Always authenticate via Supabase so the DB can verify parent ownership.
+    // Never use cached credentials — stale state from a previous session could
+    // grant access to a different family's child account.
     setLoading(true);
     try {
       const result = await db.loginChild(u, p);

@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { StepProgress } from '../../components/StepProgress';
 import { BackButton } from '../../components/BackButton';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -36,8 +37,9 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
   const [focused, setFocused]     = useState<string | null>(null);
   const [showPass, setShowPass]   = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [dobError, setDobError]   = useState('');
-  const [passError, setPassError] = useState('');
+  const [dobError, setDobError]       = useState('');
+  const [passError, setPassError]     = useState('');
+  const [usernameError, setUsernameError] = useState('');
 
   const passwordsMatch = password.length >= 8 && confirm === password;
   const canContinue =
@@ -87,32 +89,45 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
     const childUsername    = username.trim();
     const childMobile      = phone.trim();
 
-    setChild(c => ({
-      ...c,
-      displayName:   childDisplayName,
-      username:      childUsername,
-      password,
-      mobile:        childMobile,
-      age,
-      profileImageUrl: undefined,
-      // Reset all stats so a new account always starts clean
-      balance: 0, loanedOut: 0, borrowed: 0,
-      streak: 0, repaid: 0, missed: 0,
-      totalBorrowed: 0, totalLent: 0,
-      timesBorrowed: 0, timesLent: 0,
-      points: 0, trustScore: 50,
-    }));
-
     setLoading(true);
     try {
+      // Pre-check username uniqueness for immediate user feedback.
+      // The UNIQUE constraint on children.username is the authoritative guard;
+      // this call just avoids waiting for the full account-creation round-trip.
+      let usernameTaken = false;
+      try { usernameTaken = await db.checkUsernameExists(childUsername); } catch { /* network error — let DB constraint catch it */ }
+      if (usernameTaken) {
+        setUsernameError('That username is already taken. Please choose another.');
+        return;
+      }
+
+      setChild(c => ({
+        ...c,
+        displayName:   childDisplayName,
+        username:      childUsername,
+        password,
+        mobile:        childMobile,
+        age,
+        profileImageUrl: undefined,
+        // Reset all stats so a new account always starts clean
+        balance: 0, loanedOut: 0, borrowed: 0,
+        streak: 0, repaid: 0, missed: 0,
+        totalBorrowed: 0, totalLent: 0,
+        timesBorrowed: 0, timesLent: 0,
+        points: 0, trustScore: 50,
+      }));
+
       await saveOnboardingToDb({ displayName: childDisplayName, username: childUsername, password, mobile: childMobile, age });
-    } catch (err) {
-      console.warn('[Truzo] onboarding save failed:', err);
+      navigation.navigate('WhoIsLoggingIn', { newAccount: true });
+    } catch (err: any) {
+      if (err?.message === 'username_taken') {
+        setUsernameError('That username is already taken. Please choose another.');
+      } else {
+        console.warn('[Truzo] onboarding save failed:', err);
+      }
     } finally {
       setLoading(false);
     }
-
-    navigation.navigate('WhoIsLoggingIn', { newAccount: true });
   };
 
   const field = (
@@ -201,7 +216,8 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
           })}
           <View style={styles.gap} />
           {field('username', 'Username', username,
-            t => setUsername(t.toLowerCase().replace(/\s/g, '_'))
+            t => { setUsername(t.toLowerCase().replace(/\s/g, '_')); setUsernameError(''); },
+            { error: usernameError }
           )}
           <View style={styles.gap} />
           {field('password', 'Password', password, t => { setPassword(t); setPassError(''); }, {
