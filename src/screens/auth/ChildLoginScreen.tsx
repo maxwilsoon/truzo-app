@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
   TextInput, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
@@ -11,7 +11,10 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
 import { registerPushToken } from '../../lib/notifications';
-import { getDeviceId, isBiometricAvailable, saveBiometricSession } from '../../lib/biometrics';
+import {
+  getDeviceId, isBiometricAvailable,
+  saveBiometricForChild, isBiometricDeclined, clearBiometricDeclined,
+} from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -29,6 +32,20 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
   const [userFocused, setUserFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+  // True when this device has a record that the cached child previously
+  // declined Face ID setup — used to show the opt-in link.
+  const [showBioSetupLink, setShowBioSetupLink] = useState(false);
+
+  // Check declined state for the cached child on mount so we can show
+  // the "Set up Face ID" link without waiting for a login attempt.
+  useEffect(() => {
+    if (Platform.OS === 'web' || !childId) return;
+    isBiometricAvailable().then(async available => {
+      if (!available) return;
+      const declined = await isBiometricDeclined(childId);
+      setShowBioSetupLink(declined);
+    }).catch(() => {});
+  }, [childId]);
 
   const canContinue = username.trim().length > 0 && password.length > 0;
 
@@ -129,12 +146,16 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           if (biometricsAvailable) {
             const deviceId = await getDeviceId();
             if (row.biometric_enabled && row.last_device_id === deviceId) {
-              // Already set up on this device — silently restore the session
-              await saveBiometricSession(row.id);
+              // Biometric was previously set up for this child on this device.
+              // Refresh the child-scoped local token so WhoIsLoggingIn can
+              // offer Face ID next time (even after an app reinstall).
+              await saveBiometricForChild(row.id);
               setBiometricEnabled(true);
             } else {
-              // Not yet set up (new account or new device) — offer the prompt
-              destination = 'BiometricSetup';
+              // Not yet set up (new account or new device).
+              // Only show the setup prompt if the child hasn't already declined.
+              const declined = await isBiometricDeclined(row.id);
+              if (!declined) destination = 'BiometricSetup';
             }
           }
         } catch {
@@ -239,6 +260,27 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
               : <Text style={styles.btnText}>Continue</Text>
             }
           </TouchableOpacity>
+
+          {/* Shown only after the cached child has previously declined Face ID —
+              lets them opt in later without being prompted automatically. */}
+          {showBioSetupLink && (
+            <TouchableOpacity
+              style={styles.bioSetupLink}
+              onPress={async () => {
+                if (childId) await clearBiometricDeclined(childId);
+                setShowBioSetupLink(false);
+                Alert.alert(
+                  'Face ID',
+                  "You'll be asked to set up Face ID after you sign in.",
+                  [{ text: 'OK' }],
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="finger-print" size={16} color={GREEN_DARK} style={{ marginRight: 6 }} />
+              <Text style={styles.bioSetupLinkText}>Set up Face ID</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -281,4 +323,10 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.45 },
   btnText:     { color: '#1F2937', fontSize: 17, fontWeight: '700' },
+
+  bioSetupLink: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', paddingVertical: 12, marginTop: 4,
+  },
+  bioSetupLinkText: { color: GREEN_DARK, fontSize: 14, fontWeight: '600' },
 });

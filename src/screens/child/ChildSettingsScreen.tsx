@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import {
   isBiometricAvailable, promptBiometric, getDeviceId,
-  saveBiometricSession, clearBiometricSession,
+  saveBiometricForChild, clearBiometricForChild,
 } from '../../lib/biometrics';
 
 const Row: React.FC<{ label: string; value: string; isLast?: boolean }> = ({ label, value, isLast }) => (
@@ -41,7 +41,7 @@ export const ChildSettingsScreen: React.FC = () => {
         if (!ok) { setBioLoading(false); return; }
         const deviceId = await getDeviceId();
         await db.enableBiometric(childId, deviceId);
-        await saveBiometricSession(childId);
+        await saveBiometricForChild(childId);
         setBiometricEnabled(true);
       } else {
         // Disable — confirm then clear
@@ -53,7 +53,7 @@ export const ChildSettingsScreen: React.FC = () => {
         });
         const confirmed = await confirm();
         if (!confirmed) { setBioLoading(false); return; }
-        await clearBiometricSession();
+        await clearBiometricForChild(childId);
         await db.disableBiometric(childId);
         setBiometricEnabled(false);
       }

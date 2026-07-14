@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
-import { hasBiometricSession } from '../../lib/biometrics';
+import { isBiometricAvailable, hasBiometricForChild } from '../../lib/biometrics';
 
 const CIRCLE_BG = '#C8E8CB';
 const DARK = '#1A1A3E';
@@ -23,7 +23,7 @@ const getInitials = (name: string) => {
 };
 
 export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { parent, child } = useApp();
+  const { parent, child, childId } = useApp();
   const newAccount = route.params?.newAccount ?? false;
   const childFirstName = (child.displayName || 'Child').split(' ')[0];
 
@@ -42,12 +42,20 @@ export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const goChild = async () => {
-    if (Platform.OS !== 'web') {
-      const hasBio = await hasBiometricSession();
-      if (hasBio) {
-        navigation.navigate('BiometricLogin');
-        return;
-      }
+    // Only offer biometric login when we know which child this is (childId is set)
+    // AND the device has a valid biometric token scoped to that specific child.
+    // Avoids showing Face ID from a previous child to a new or different child.
+    if (Platform.OS !== 'web' && childId) {
+      try {
+        const [available, hasBio] = await Promise.all([
+          isBiometricAvailable(),
+          hasBiometricForChild(childId),
+        ]);
+        if (available && hasBio) {
+          navigation.navigate('BiometricLogin');
+          return;
+        }
+      } catch { /* fall through to password login */ }
     }
     navigation.navigate('ChildLogin');
   };

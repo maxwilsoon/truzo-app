@@ -13,7 +13,8 @@ import { db } from '../../lib/database';
 import {
   getDeviceId,
   promptBiometric,
-  saveBiometricSession,
+  saveBiometricForChild,
+  setBiometricDeclined,
 } from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
@@ -30,6 +31,13 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
     navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'ChildTabs' }] }));
   };
 
+  const handleNotNow = async () => {
+    // Persist the declined state so this prompt is not shown again automatically.
+    // The child can still enable Face ID later via Settings or the login-screen link.
+    if (childId) await setBiometricDeclined(childId);
+    goToDashboard();
+  };
+
   const handleEnable = async () => {
     if (!childId) { goToDashboard(); return; }
     setLoading(true);
@@ -41,7 +49,8 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
       }
       const deviceId = await getDeviceId();
       await db.enableBiometric(childId, deviceId);
-      await saveBiometricSession(childId);
+      // Store a child-ID-scoped token so biometric login is tied to THIS child.
+      await saveBiometricForChild(childId);
       setBiometricEnabled(true);
       goToDashboard();
     } catch {
@@ -80,7 +89,7 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
           }
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.skipBtn} onPress={goToDashboard} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.skipBtn} onPress={handleNotNow} activeOpacity={0.7}>
           <Text style={styles.skipBtnText}>Not Now</Text>
         </TouchableOpacity>
       </View>

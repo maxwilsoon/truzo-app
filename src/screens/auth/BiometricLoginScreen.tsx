@@ -13,9 +13,9 @@ import { db } from '../../lib/database';
 import { registerPushToken } from '../../lib/notifications';
 import {
   getDeviceId,
-  getStoredBiometricChildId,
+  hasBiometricForChild,
   promptBiometric,
-  clearBiometricSession,
+  clearBiometricForChild,
 } from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
@@ -28,7 +28,7 @@ type Status = 'idle' | 'authenticating' | 'success' | 'failed';
 
 export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
   const {
-    setChild, setChildId, setParent, setIsChildLoggedIn,
+    setChild, setChildId, childId, setParent, setIsChildLoggedIn,
     setCircle, setPendingRequests, setUserId, setBiometricEnabled,
   } = useApp();
   const [status, setStatus] = useState<Status>('idle');
@@ -97,10 +97,20 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     setStatus('authenticating');
     setErrorMsg('');
     try {
-      const childId = await getStoredBiometricChildId();
+      // Use the childId already in context — it was validated by WhoIsLoggingInScreen
+      // (hasBiometricForChild check) before navigating here, so we know the token
+      // exists for this specific child on this device.
       if (!childId) {
         setStatus('failed');
         setErrorMsg('No saved login found on this device.');
+        return;
+      }
+      // Double-check the child-scoped token still exists (guards against
+      // reinstall or explicit disable between WhoIsLoggingIn and this screen).
+      const hasBio = await hasBiometricForChild(childId);
+      if (!hasBio) {
+        setStatus('failed');
+        setErrorMsg('Face ID is no longer set up. Please sign in with your password.');
         return;
       }
       const success = await promptBiometric('Unlock your TRUZO account');
@@ -112,8 +122,9 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       const deviceId = await getDeviceId();
       const result = await db.biometricLoginChild(childId, deviceId);
       if (!result) {
-        // Biometric was revoked or device changed — clear the stored session
-        await clearBiometricSession();
+        // DB rejected — biometric was disabled server-side or device changed.
+        // Clear the stale local token so WhoIsLoggingIn won't offer Face ID again.
+        await clearBiometricForChild(childId);
         setStatus('failed');
         setErrorMsg('Face ID login is no longer active. Please sign in with your password.');
         return;
@@ -125,7 +136,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       setStatus('failed');
       setErrorMsg('Something went wrong. Please try again.');
     }
-  }, [applyLoginResult, navigation]);
+  }, [childId, applyLoginResult, navigation]);
 
   useEffect(() => {
     authenticate();
