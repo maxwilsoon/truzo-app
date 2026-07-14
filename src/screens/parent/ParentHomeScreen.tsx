@@ -129,7 +129,7 @@ export const ParentHomeScreen: React.FC = () => {
                   addActivity({
                     id: `a_repayparent_${Date.now()}`,
                     emoji: '✅',
-                    text: `${parent.displayName} confirmed repayment of £${fmtAmt(parentDebt)} · ${child.displayName}'s account unfrozen`,
+                    text: `Repayment confirmed · ${childFirstName}'s account unfrozen`,
                     time: 'Just now',
                     type: 'repaid',
                   });

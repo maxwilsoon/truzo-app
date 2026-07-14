@@ -156,7 +156,7 @@ export const RequestMoneyScreen: React.FC = () => {
       addActivity({
         id: `a_req_${requestId}`,
         emoji: '💸',
-        text: `You requested £${fmtAmt(amountNum)} — expires in 24h`,
+        text: `You requested £${fmtAmt(amountNum)}`,
         time: 'Just now',
         type: 'request',
       });

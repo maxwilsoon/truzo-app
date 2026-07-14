@@ -107,7 +107,7 @@ export const CircleScreen: React.FC = () => {
         }]);
         addActivity({
           id: `a_friend_${Date.now()}`, emoji: '🤝',
-          text: `${accepted.displayName} has joined your circle!`,
+          text: `${accepted.displayName.split(' ')[0]} joined your circle`,
           time: 'Just now', type: 'joined',
         });
         if (fromPushToken) {
@@ -128,7 +128,7 @@ export const CircleScreen: React.FC = () => {
       if (declined) {
         addActivity({
           id: `a_decline_${Date.now()}`, emoji: '❌',
-          text: `You declined ${declined.displayName}'s request`,
+          text: `You declined ${declined.displayName.split(' ')[0]}'s request`,
           time: 'Just now', type: 'request',
         });
         if (fromPushToken) {

@@ -243,8 +243,8 @@ export const HomeScreen: React.FC = () => {
                       )}
                     </View>
                     <View style={s.rowText}>
-                      <Text style={s.rowTitle} numberOfLines={1}>{title}</Text>
-                      {sub ? <Text style={s.rowSub} numberOfLines={1}>{sub}</Text> : null}
+                      <Text style={s.rowTitle}>{title}</Text>
+                      {sub ? <Text style={s.rowSub}>{sub}</Text> : null}
                     </View>
                     <Text style={s.rowTime}>{a.time}</Text>
                   </View>
@@ -324,7 +324,7 @@ const s = StyleSheet.create({
   emptyMsg:  { padding: 20, textAlign: 'center', color: colors.textLight, fontSize: 14 },
 
   // Rows (shared by activity + leaderboard)
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  row:        { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
 
   // Activity avatars
