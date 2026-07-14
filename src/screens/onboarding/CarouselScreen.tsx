@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useApp } from '../../context/AppContext';
 
 const { width } = Dimensions.get('window');
 const GREEN      = '#C8E8CB';
@@ -176,6 +177,7 @@ const SLIDES = [
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Carousel'> };
 
 export const CarouselScreen: React.FC<Props> = ({ navigation }) => {
+  const { resetSession } = useApp();
   const [idx, setIdx] = useState(0);
   const [footerH, setFooterH] = useState(140);
   const opacity = useRef(new Animated.Value(1)).current;
@@ -246,7 +248,7 @@ export const CarouselScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Fixed footer */}
       <SafeAreaView style={styles.footer} edges={['bottom']} onLayout={e => setFooterH(e.nativeEvent.layout.height)}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('Email')}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => { resetSession(); navigation.navigate('Email'); }}>
           <Text style={styles.primaryText}>Parent sign up</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.outlineBtn} onPress={() => navigation.navigate('SelectAccount')}>

@@ -20,7 +20,7 @@ type Props = {
 };
 
 export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { mode, pinToConfirm } = route.params;
+  const { mode, pinToConfirm, onSuccess } = route.params;
   const { parent, setParent, savePasscodeToDb, userId } = useApp();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
@@ -76,7 +76,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
 
     if (mode === 'create') {
       setTimeout(() => {
-        navigation.push('ParentPasscode', { mode: 'confirm', pinToConfirm: next });
+        navigation.push('ParentPasscode', { mode: 'confirm', pinToConfirm: next, onSuccess });
       }, 150);
 
     } else if (mode === 'confirm') {
@@ -84,7 +84,10 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         const hash = await hashPasscode(userId ?? '', next);
         setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
         try { await savePasscodeToDb(hash); } catch { /* context + cache already updated */ }
-        setTimeout(() => navigation.navigate('SafetyPool'), 150);
+        setTimeout(() => {
+          if (onSuccess === 'ParentTabs') navigation.navigate('ParentTabs');
+          else navigation.navigate('SafetyPool');
+        }, 150);
       } else {
         shake();
       }

@@ -88,9 +88,13 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
         }));
       }
 
-      // Email + password is full authentication — always go straight to dashboard.
-      // The reactive cache effect in AppContext will persist the full parent state.
-      navigation.navigate('ParentTabs');
+      // Email + password is full authentication.
+      // First-time parents (no passcode yet) must create their PIN before entering the app.
+      if (!par.passcode_created && !par.passcode_hash) {
+        navigation.navigate('ParentPasscode', { mode: 'create', onSuccess: 'ParentTabs' });
+      } else {
+        navigation.navigate('ParentTabs');
+      }
     } catch (err) {
       Alert.alert('Login failed', 'Please check your email and password.');
     } finally {

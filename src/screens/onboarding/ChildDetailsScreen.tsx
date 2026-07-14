@@ -94,6 +94,7 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
       password,
       mobile:        childMobile,
       age,
+      profileImageUrl: undefined,
       // Reset all stats so a new account always starts clean
       balance: 0, loanedOut: 0, borrowed: 0,
       streak: 0, repaid: 0, missed: 0,

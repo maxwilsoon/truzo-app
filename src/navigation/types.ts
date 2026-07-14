@@ -16,7 +16,7 @@ export type RootStackParamList = {
   GetApp: undefined;
   ParentEmailLogin: undefined;
   ChildLogin: undefined;
-  ParentPasscode: { mode: 'create' | 'confirm' | 'enter'; pinToConfirm?: string };
+  ParentPasscode: { mode: 'create' | 'confirm' | 'enter'; pinToConfirm?: string; onSuccess?: 'SafetyPool' | 'ParentTabs' };
   ChildTabs: undefined;
   ParentTabs: undefined;
   TrustStats: undefined;

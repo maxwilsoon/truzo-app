@@ -168,6 +168,7 @@ interface AppContextType {
   setBiometricEnabled: (v: boolean) => void;
   repayHighlightId: string | null;
   setRepayHighlightId: (id: string | null) => void;
+  resetSession: () => void;
 }
 
 const defaultCircle: CircleMember[] = [];
@@ -723,6 +724,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(id);
   }, [childId]);
 
+  const resetSession = () => {
+    setChild({
+      displayName: '', username: '', avatarEmoji: '😊', trustScore: 50,
+      balance: 0, loanedOut: 0, borrowed: 0, streak: 0, repaid: 0, missed: 0,
+      totalBorrowed: 0, totalLent: 0, timesBorrowed: 0, timesLent: 0,
+      points: 0, age: 16, mobile: '', email: '', password: '',
+      biometricEnabled: false, profileImageUrl: undefined,
+    });
+    setChildId(null);
+    setParent({
+      firstName: '', lastName: '', displayName: '', email: '', mobile: '',
+      address: '', safetyPoolLimit: 0, safetyPoolUsed: 0, weeklyAllowance: 10,
+      allowanceFrequency: 'weekly', allowanceNextPayment: '', allowanceActive: false,
+      passcode: '', passcodeHash: '', passcodeCreated: false, marketingNotifications: false,
+    });
+    setUserId(null);
+    setActivityFeed([]);
+    setTransactions([]);
+    setActiveRequests([]);
+    setCircle([]);
+    setPendingRequests([]);
+    setFrozenAccount(false);
+    setParentDebt(0);
+    setPaymentMethods([]);
+    setBiometricEnabled(false);
+    cache.clear();
+  };
+
   return (
     <AppContext.Provider value={{
       paymentMethods, addPaymentMethod, removePaymentMethod, setDefaultPaymentMethod,
@@ -754,6 +783,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBiometricEnabled,
       repayHighlightId,
       setRepayHighlightId,
+      resetSession,
     }}>
       {children}
     </AppContext.Provider>
