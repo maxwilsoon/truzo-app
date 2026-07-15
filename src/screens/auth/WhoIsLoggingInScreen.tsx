@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
-import { isBiometricAvailable, hasBiometricForChild } from '../../lib/biometrics';
+import { isBiometricAvailable, hasBiometricForChild, getLastChildForBiometric } from '../../lib/biometrics';
 
 const CIRCLE_BG = '#C8E8CB';
 const DARK = '#1A1A3E';
@@ -23,7 +23,7 @@ const getInitials = (name: string) => {
 };
 
 export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { parent, child, childId } = useApp();
+  const { parent, child, childId, setChildId } = useApp();
   const newAccount = route.params?.newAccount ?? false;
   const childFirstName = (child.displayName || 'Child').split(' ')[0];
 
@@ -42,18 +42,23 @@ export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const goChild = async () => {
-    // Only offer biometric login when we know which child this is (childId is set)
-    // AND the device has a valid biometric token scoped to that specific child.
-    // Avoids showing Face ID from a previous child to a new or different child.
-    if (Platform.OS !== 'web' && childId) {
+    if (Platform.OS !== 'web') {
       try {
-        const [available, hasBio] = await Promise.all([
-          isBiometricAvailable(),
-          hasBiometricForChild(childId),
-        ]);
-        if (available && hasBio) {
-          navigation.navigate('BiometricLogin');
-          return;
+        // Context childId is set during an active session but cleared by logout.
+        // Fall back to SecureStore so Face ID can be offered after a cold restart
+        // or logout, as long as the biometric token is still on this device.
+        const effectiveChildId = childId ?? await getLastChildForBiometric();
+        if (effectiveChildId) {
+          const [available, hasBio] = await Promise.all([
+            isBiometricAvailable(),
+            hasBiometricForChild(effectiveChildId),
+          ]);
+          if (available && hasBio) {
+            // Restore childId in context so BiometricLoginScreen can read it.
+            if (!childId) setChildId(effectiveChildId);
+            navigation.navigate('BiometricLogin');
+            return;
+          }
         }
       } catch { /* fall through to password login */ }
     }

@@ -15,6 +15,7 @@ import {
   promptBiometric,
   saveBiometricForChild,
   setBiometricDeclined,
+  setLastChildForBiometric,
 } from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
@@ -39,7 +40,11 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleEnable = async () => {
-    if (!childId) { goToDashboard(); return; }
+    if (!childId) {
+      Alert.alert('Error', 'Session expired. Please sign in again.');
+      goToDashboard();
+      return;
+    }
     setLoading(true);
     try {
       const success = await promptBiometric('Verify your identity to enable Face ID login');
@@ -49,8 +54,10 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
       }
       const deviceId = await getDeviceId();
       await db.enableBiometric(childId, deviceId);
-      // Store a child-ID-scoped token so biometric login is tied to THIS child.
+      // Store a child-ID-scoped token and persist the childId so that
+      // WhoIsLoggingInScreen can offer Face ID even after logout or a cold restart.
       await saveBiometricForChild(childId);
+      await setLastChildForBiometric(childId);
       setBiometricEnabled(true);
       goToDashboard();
     } catch {

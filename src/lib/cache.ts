@@ -39,7 +39,7 @@ export const cache = {
   loadParent:  <T>()           => safeLoad<T>(KEYS.PARENT),
   saveChild:   (data: object)  => safeSave(KEYS.CHILD,   JSON.stringify(data)),
   loadChild:   <T>()           => safeLoad<T>(KEYS.CHILD),
-  saveUserId:  (id: string)    => safeSave(KEYS.USER_ID, id),
+  saveUserId:  (id: string)    => safeSave(KEYS.USER_ID, JSON.stringify(id)),
   loadUserId:  ()              => safeLoad<string>(KEYS.USER_ID),
   clear:       ()              => safeClear(Object.values(KEYS)),
 };

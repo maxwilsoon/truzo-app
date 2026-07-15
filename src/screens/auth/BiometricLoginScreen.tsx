@@ -16,7 +16,10 @@ import {
   hasBiometricForChild,
   promptBiometric,
   clearBiometricForChild,
+  setLastChildForBiometric,
+  setLastParentForPasscode,
 } from '../../lib/biometrics';
+import { cache } from '../../lib/cache';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -59,6 +62,8 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     }));
     if (par) {
       setUserId(par.id);
+      cache.saveUserId(par.id).catch(() => {});
+      setLastParentForPasscode(par.id).catch(() => {});
       setParent(prev => ({
         ...prev,
         firstName:       par.first_name ?? '',
@@ -75,6 +80,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     }
     setChildId(row.id);
     setBiometricEnabled(true);
+    setLastChildForBiometric(row.id).catch(() => {});
     registerPushToken(row.id).catch(() => {});
     db.getCircle(row.id).then(members => {
       setCircle(members.map(m => ({

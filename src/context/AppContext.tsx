@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { cache } from '../lib/cache';
 import { db } from '../lib/database';
 import { fmtAmt } from '../lib/utils';
+import { setLastParentForPasscode, getLastParentForPasscode } from '../lib/biometrics';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -273,7 +274,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setChild(c => ({ ...c, ...safeChildCache }));
         if (cachedChild.childId) setChildId(cachedChild.childId);
       }
-      if (cachedUserId) setUserId(cachedUserId);
+      if (cachedUserId) {
+        setUserId(cachedUserId);
+      } else {
+        // AsyncStorage cache miss (old cache format, reinstall, or first launch).
+        // SecureStore is not cleared by cache.clear() or app reinstall on Android —
+        // use the persisted parent UUID as a fallback so PasscodeScreen can compute
+        // hashPasscode(parentId, pin) without requiring a fresh email login.
+        const secureParentId = await getLastParentForPasscode();
+        if (secureParentId) setUserId(secureParentId);
+      }
       hydrated.current = true;
     };
     hydrate();
@@ -406,6 +416,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setUserId(uid);
     await cache.saveUserId(uid);
+    setLastParentForPasscode(uid).catch(() => {});
     // Erase the transient onboarding password from memory — it was only needed for signUp.
     pendingPasswordRef.current = '';
     // Store the new child's UUID so the rest of the session knows who was just created.

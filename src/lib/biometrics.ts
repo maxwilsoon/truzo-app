@@ -21,9 +21,11 @@ async function secureDel(key: string): Promise<void> {
 // All biometric state is scoped by childId so Child A's Face ID setup never
 // leaks to Child B (even on the same device).
 
-const DEVICE_KEY   = 'truzo_device_id';
-const tokenKey     = (childId: string) => `truzo_bio_token:${childId}`;
-const declinedKey  = (childId: string) => `truzo_bio_declined:${childId}`;
+const DEVICE_KEY      = 'truzo_device_id';
+const LAST_CHILD_KEY  = 'truzo_last_child';
+const LAST_PARENT_KEY = 'truzo_last_parent_id';
+const tokenKey       = (childId: string) => `truzo_bio_token:${childId}`;
+const declinedKey    = (childId: string) => `truzo_bio_declined:${childId}`;
 
 // ─── Device ID (stable, per-install) ─────────────────────────────────────────
 
@@ -82,10 +84,39 @@ export async function saveBiometricForChild(childId: string): Promise<void> {
 }
 
 export async function clearBiometricForChild(childId: string): Promise<void> {
+  const stored = await secureGet(LAST_CHILD_KEY);
   await Promise.all([
     secureDel(tokenKey(childId)),
     secureDel(declinedKey(childId)),
+    ...(stored === childId ? [secureDel(LAST_CHILD_KEY)] : []),
   ]);
+}
+
+// ─── Last-child persistence (survives logout) ────────────────────────────────
+// Stores the childId of the most recently authenticated child in SecureStore so
+// WhoIsLoggingInScreen can offer Face ID after logout or a cold app restart,
+// even though the regular AsyncStorage cache is cleared on logout.
+
+export async function setLastChildForBiometric(childId: string): Promise<void> {
+  await secureSet(LAST_CHILD_KEY, childId);
+}
+
+export async function getLastChildForBiometric(): Promise<string | null> {
+  return secureGet(LAST_CHILD_KEY);
+}
+
+// ─── Last-parent persistence (survives logout and app restart) ────────────────
+// Stores the parent UUID so ParentPasscodeScreen can compute the correct
+// hashPasscode(parentId, pin) even when the AsyncStorage userId cache is stale
+// or the parent has not done a fresh email login in this session.
+// Contains only the UUID — no passcode or hash is stored here.
+
+export async function setLastParentForPasscode(parentId: string): Promise<void> {
+  await secureSet(LAST_PARENT_KEY, parentId);
+}
+
+export async function getLastParentForPasscode(): Promise<string | null> {
+  return secureGet(LAST_PARENT_KEY);
 }
 
 // ─── Declined state ───────────────────────────────────────────────────────────

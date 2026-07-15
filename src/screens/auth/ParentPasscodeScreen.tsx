@@ -11,6 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { hashPasscode } from '../../lib/passcode';
 import { db } from '../../lib/database';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
+import { getLastParentForPasscode } from '../../lib/biometrics';
 
 const GREEN_DARK = '#3D7A45';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
@@ -22,30 +23,38 @@ type Props = {
 
 export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { mode, pinToConfirm, onSuccess } = route.params;
-  const { parent, setParent, savePasscodeToDb, userId } = useApp();
+  const { parent, setParent, savePasscodeToDb, userId, setUserId } = useApp();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
 
-  // If we arrive in 'enter' mode with no hash in context (e.g. child login cleared it),
-  // fetch the hash from DB so the parent can still verify their PIN.
-  // If the DB also has no hash (legacy account), fall back to email login.
+  // If we arrive in 'enter' mode with no hash in context (e.g. after child logout),
+  // fetch the hash from DB so the parent can verify their PIN without re-entering email.
+  // When userId is missing from context (AsyncStorage cleared), fall back to the
+  // SecureStore key written at child login / parent login time before going to email.
   useEffect(() => {
     if (mode !== 'enter') return;
-    if (parent.passcodeHash || parent.passcode) return; // already have what we need
-    if (!userId) {
-      navigation.replace('ParentEmailLogin');
-      return;
-    }
-    db.getParentPasscodeHash(userId).then(result => {
-      if (result?.hash) {
-        setParent(p => ({ ...p, passcodeHash: result.hash!, passcodeCreated: true }));
-      } else {
-        // No passcode in DB — should only happen for pre-PIN legacy accounts
+    if (parent.passcodeHash || parent.passcode) return;
+    (async () => {
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        effectiveUserId = await getLastParentForPasscode();
+        if (effectiveUserId) setUserId(effectiveUserId);
+      }
+      if (!effectiveUserId) {
+        navigation.replace('ParentEmailLogin');
+        return;
+      }
+      try {
+        const result = await db.getParentPasscodeHash(effectiveUserId);
+        if (result?.hash) {
+          setParent(p => ({ ...p, passcodeHash: result.hash!, passcodeCreated: true }));
+        } else {
+          navigation.replace('ParentEmailLogin');
+        }
+      } catch {
         navigation.replace('ParentEmailLogin');
       }
-    }).catch(() => {
-      navigation.replace('ParentEmailLogin');
-    });
+    })();
   }, []);
 
   const firstName = (parent.displayName || 'there').split(' ')[0];

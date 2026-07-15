@@ -14,6 +14,7 @@ import { registerPushToken } from '../../lib/notifications';
 import {
   getDeviceId, isBiometricAvailable,
   saveBiometricForChild, isBiometricDeclined, clearBiometricDeclined,
+  setLastChildForBiometric, setLastParentForPasscode,
 } from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
@@ -23,7 +24,7 @@ const BG = '#E8F5E9';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'> };
 
 export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { child, setChild, childId, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests, setBiometricEnabled, setFrozenAccount, setParentDebt } = useApp();
+  const { child, setChild, childId, setChildId, setParent, setUserId, setIsChildLoggedIn, setCircle, setPendingRequests, setBiometricEnabled, setFrozenAccount, setParentDebt } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass]  = useState(false);
@@ -111,6 +112,18 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
       }
       setChildId(row.id);
       await cache.saveChild({ username: row.username, childId: row.id });
+      // Persist childId in SecureStore so WhoIsLoggingInScreen can offer Face ID
+      // on the next visit even after logout clears the AsyncStorage cache.
+      setLastChildForBiometric(row.id).catch(() => {});
+      // Set the parent's userId from the login response so PasscodeScreen can
+      // verify the PIN with hashPasscode(userId, pin) even without a prior parent
+      // email login in this session. Also persist to cache and SecureStore so the
+      // value survives a fresh app restart.
+      if (par?.id) {
+        setUserId(par.id);
+        cache.saveUserId(par.id).catch(() => {});
+        setLastParentForPasscode(par.id).catch(() => {});
+      }
 
       // Register device for push notifications (best-effort, won't block login)
       registerPushToken(row.id).catch(() => {});

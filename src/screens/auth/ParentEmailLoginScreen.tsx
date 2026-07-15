@@ -11,6 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
+import { setLastParentForPasscode } from '../../lib/biometrics';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -43,6 +44,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
 
       setUserId(userId);
       await cache.saveUserId(userId);
+      setLastParentForPasscode(userId).catch(() => {});
 
       setParent(prev => ({
         ...prev,
