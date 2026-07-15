@@ -674,7 +674,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `moneyreq_${r.id}`,
                 emoji: '💸',
-                text: `${r.from_name.split(' ')[0]} needs £${fmtAmt(Number(r.amount))} for ${r.reason}`,
+                text: `${r.from_name.split(' ')[0]} requested £${fmtAmt(Number(r.amount))}${r.reason?.trim() ? ` for ${r.reason.trim()}` : ''}`,
                 time: 'Just now',
                 type: 'request' as const,
               });
@@ -687,7 +687,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `expired_${r.id}`,
                 emoji: '⏰',
-                text: `Your request for £${fmtAmt(Number(r.amount))} expired unfunded`,
+                text: `Your £${fmtAmt(Number(r.amount))} request expired unfunded`,
                 time: 'Just now',
                 type: 'missed' as const,
               });

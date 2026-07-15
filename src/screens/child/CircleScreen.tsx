@@ -248,7 +248,7 @@ export const CircleScreen: React.FC = () => {
       const borrowerUser = circle.find(m => m.id === req.fromId)?.username ?? req.fromName;
       addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`, time: 'Just now', type: 'funded' });
       addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
-      if (borrowerPushToken) sendPushNotification(borrowerPushToken, `💚 ${child.displayName} funded your request!`, `${child.displayName} sent you £${fmtAmt(req.amount)} for ${req.reason}`).catch(() => {});
+      if (borrowerPushToken) sendPushNotification(borrowerPushToken, `💚 ${child.displayName} funded your request!`, `${child.displayName} sent you £${fmtAmt(req.amount)}${req.reason?.trim() ? ` for ${req.reason.trim()}` : ''}`).catch(() => {});
     } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not fund request.'); }
   };
 
@@ -452,7 +452,7 @@ export const CircleScreen: React.FC = () => {
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={s.reqName}>{firstNameOf(req.fromName)}</Text>
-                          <Text style={s.reqAmount}>£{fmtAmt(req.amount)} needed</Text>
+                          <Text style={s.reqAmount}>needs £{fmtAmt(req.amount)}</Text>
                           <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
                         </View>
                         <View style={s.reqRight}>
@@ -534,7 +534,7 @@ export const CircleScreen: React.FC = () => {
                         {isOwnPending && (
                           <>
                             <Text style={s.reqName}>Your Request</Text>
-                            <Text style={s.reqAmount}>£{fmtAmt(req.amount)} requested</Text>
+                            <Text style={s.reqAmount}>You requested £{fmtAmt(req.amount)}</Text>
                             <Text style={s.reqSub}>{req.reasonEmoji} {req.reason}</Text>
                           </>
                         )}

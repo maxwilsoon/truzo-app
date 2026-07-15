@@ -65,10 +65,10 @@ const getSubtitle = (score: number): string => {
 
 // Splits activity text into title + optional sub-line for two-line display.
 const parseActivity = (text: string): { title: string; sub?: string } => {
-  const reqM = text.match(/^(.+?)\s+needs\s+(£[\d,.]+)\s+for\s+(.+)$/);
+  const reqM = text.match(/^(.+?)\s+requested\s+(£[\d,.]+)(?:\s+for\s+(.+))?$/);
   if (reqM) {
     const [, name, amt, reason] = reqM;
-    return { title: `${name} requested ${amt}`, sub: reason.charAt(0).toUpperCase() + reason.slice(1) };
+    return { title: `${name} requested ${amt}`, sub: reason ? reason.charAt(0).toUpperCase() + reason.slice(1) : undefined };
   }
   const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+)$/);
   if (repM) return { title: `${repM[1]} ${repM[3]}`, sub: repM[2] };
