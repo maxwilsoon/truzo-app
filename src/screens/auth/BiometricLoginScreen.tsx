@@ -105,6 +105,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       // Use the childId already in context — it was validated by WhoIsLoggingInScreen
       // (hasBiometricForChild check) before navigating here, so we know the token
       // exists for this specific child on this device.
+      if (__DEV__) console.log('[BiometricLogin] authenticate: childId=', childId?.slice(0,8) ?? 'null');
       if (!childId) {
         setStatus('failed');
         setErrorMsg('No saved login found on this device.');
@@ -113,19 +114,23 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       // Double-check the child-scoped token still exists (guards against
       // reinstall or explicit disable between WhoIsLoggingIn and this screen).
       const hasBio = await hasBiometricForChild(childId);
+      if (__DEV__) console.log('[BiometricLogin] hasBiometricForChild=', hasBio);
       if (!hasBio) {
         setStatus('failed');
         setErrorMsg('Face ID is no longer set up. Please sign in with your password.');
         return;
       }
       const success = await promptBiometric('Unlock your TRUZO account');
+      if (__DEV__) console.log('[BiometricLogin] promptBiometric success=', success);
       if (!success) {
         setStatus('failed');
         setErrorMsg('Biometric authentication was cancelled or failed.');
         return;
       }
       const deviceId = await getDeviceId();
+      if (__DEV__) console.log('[BiometricLogin] deviceId=', deviceId, 'calling biometric_login_child RPC');
       const result = await db.biometricLoginChild(childId, deviceId);
+      if (__DEV__) console.log('[BiometricLogin] biometric_login_child result:', result ? 'ok' : 'null (rejected)');
       if (!result) {
         // DB rejected — biometric was disabled server-side or device changed.
         // Clear the stale local token so WhoIsLoggingIn won't offer Face ID again.
@@ -137,7 +142,8 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
       setStatus('success');
       await applyLoginResult(result);
       navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'ChildTabs' }] }));
-    } catch {
+    } catch (e) {
+      if (__DEV__) console.warn('[BiometricLogin] authenticate error:', String(e));
       setStatus('failed');
       setErrorMsg('Something went wrong. Please try again.');
     }

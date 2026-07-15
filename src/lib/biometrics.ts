@@ -2,30 +2,46 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// expo-secure-store requires a native build and is unavailable in Expo Go
-// and web. Every call is wrapped so failures degrade gracefully.
+// expo-secure-store key validation: /^[\w.-]+$/ — only alphanumeric, ".", "-", "_".
+// Colons are NOT allowed. All compound keys here use "_" as separator.
+
+// ─── Secure helpers ───────────────────────────────────────────────────────────
 
 async function secureGet(key: string): Promise<string | null> {
-  try { return await SecureStore.getItemAsync(key); } catch { return null; }
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch (e) {
+    if (__DEV__) console.warn('[biometrics] secureGet error for key', key, String(e));
+    return null;
+  }
 }
 
 async function secureSet(key: string, value: string): Promise<void> {
-  try { await SecureStore.setItemAsync(key, value); } catch {}
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch (e) {
+    if (__DEV__) console.warn('[biometrics] secureSet error for key', key, String(e));
+  }
 }
 
 async function secureDel(key: string): Promise<void> {
-  try { await SecureStore.deleteItemAsync(key); } catch {}
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch (e) {
+    if (__DEV__) console.warn('[biometrics] secureDel error for key', key, String(e));
+  }
 }
 
 // ─── Key helpers ─────────────────────────────────────────────────────────────
 // All biometric state is scoped by childId so Child A's Face ID setup never
 // leaks to Child B (even on the same device).
+// Separator is "_" — colon ":" is rejected by SecureStore key validation.
 
 const DEVICE_KEY      = 'truzo_device_id';
 const LAST_CHILD_KEY  = 'truzo_last_child';
 const LAST_PARENT_KEY = 'truzo_last_parent_id';
-const tokenKey       = (childId: string) => `truzo_bio_token:${childId}`;
-const declinedKey    = (childId: string) => `truzo_bio_declined:${childId}`;
+const tokenKey        = (childId: string) => `truzo_bio_token_${childId}`;
+const declinedKey     = (childId: string) => `truzo_bio_declined_${childId}`;
 
 // ─── Device ID (stable, per-install) ─────────────────────────────────────────
 
@@ -37,6 +53,7 @@ export async function getDeviceId(): Promise<string> {
     id = `${rand()}${rand()}${Date.now().toString(36)}`;
     await secureSet(DEVICE_KEY, id);
   }
+  if (__DEV__) console.log('[biometrics] getDeviceId:', id);
   return id;
 }
 
@@ -47,8 +64,12 @@ export async function isBiometricAvailable(): Promise<boolean> {
   try {
     const hasHw    = await LocalAuthentication.hasHardwareAsync();
     const enrolled = await LocalAuthentication.isEnrolledAsync();
+    if (__DEV__) console.log('[biometrics] isBiometricAvailable: hasHw=', hasHw, 'enrolled=', enrolled);
     return hasHw && enrolled;
-  } catch { return false; }
+  } catch (e) {
+    if (__DEV__) console.warn('[biometrics] isBiometricAvailable error:', String(e));
+    return false;
+  }
 }
 
 // ─── Prompt ───────────────────────────────────────────────────────────────────
@@ -61,8 +82,12 @@ export async function promptBiometric(reason: string): Promise<boolean> {
       cancelLabel: 'Cancel',
       disableDeviceFallback: false,
     });
+    if (__DEV__) console.log('[biometrics] promptBiometric result:', result);
     return result.success;
-  } catch { return false; }
+  } catch (e) {
+    if (__DEV__) console.warn('[biometrics] promptBiometric error:', String(e));
+    return false;
+  }
 }
 
 // ─── Per-child biometric token ────────────────────────────────────────────────
@@ -73,18 +98,24 @@ export async function promptBiometric(reason: string): Promise<boolean> {
 
 export async function hasBiometricForChild(childId: string): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  const token = await secureGet(tokenKey(childId));
-  return !!token;
+  const key   = tokenKey(childId);
+  const token = await secureGet(key);
+  const has   = !!token;
+  if (__DEV__) console.log('[biometrics] hasBiometricForChild', childId.slice(0, 8), '→', has, '(key:', key + ')');
+  return has;
 }
 
 export async function saveBiometricForChild(childId: string): Promise<void> {
-  const rand = () => Math.random().toString(36).slice(2);
+  const rand  = () => Math.random().toString(36).slice(2);
   const token = `${rand()}${rand()}${rand()}${Date.now().toString(36)}`;
-  await secureSet(tokenKey(childId), token);
+  const key   = tokenKey(childId);
+  await secureSet(key, token);
+  if (__DEV__) console.log('[biometrics] saveBiometricForChild: wrote token to', key);
 }
 
 export async function clearBiometricForChild(childId: string): Promise<void> {
   const stored = await secureGet(LAST_CHILD_KEY);
+  if (__DEV__) console.log('[biometrics] clearBiometricForChild', childId.slice(0, 8), 'LAST_CHILD_KEY matches:', stored === childId);
   await Promise.all([
     secureDel(tokenKey(childId)),
     secureDel(declinedKey(childId)),
@@ -99,10 +130,13 @@ export async function clearBiometricForChild(childId: string): Promise<void> {
 
 export async function setLastChildForBiometric(childId: string): Promise<void> {
   await secureSet(LAST_CHILD_KEY, childId);
+  if (__DEV__) console.log('[biometrics] setLastChildForBiometric:', childId.slice(0, 8));
 }
 
 export async function getLastChildForBiometric(): Promise<string | null> {
-  return secureGet(LAST_CHILD_KEY);
+  const id = await secureGet(LAST_CHILD_KEY);
+  if (__DEV__) console.log('[biometrics] getLastChildForBiometric:', id ? id.slice(0, 8) : 'null');
+  return id;
 }
 
 // ─── Last-parent persistence (survives logout and app restart) ────────────────
@@ -126,13 +160,18 @@ export async function getLastParentForPasscode(): Promise<string | null> {
 // fresh setup offer after their own first successful username/password login.
 
 export async function setBiometricDeclined(childId: string): Promise<void> {
-  await secureSet(declinedKey(childId), '1');
+  const key = declinedKey(childId);
+  await secureSet(key, '1');
+  if (__DEV__) console.log('[biometrics] setBiometricDeclined:', childId.slice(0, 8));
 }
 
 export async function isBiometricDeclined(childId: string): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  const val = await secureGet(declinedKey(childId));
-  return val === '1';
+  const key = declinedKey(childId);
+  const val = await secureGet(key);
+  const declined = val === '1';
+  if (__DEV__) console.log('[biometrics] isBiometricDeclined', childId.slice(0, 8), '→', declined);
+  return declined;
 }
 
 export async function clearBiometricDeclined(childId: string): Promise<void> {

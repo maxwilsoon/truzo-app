@@ -14,6 +14,7 @@ import {
   getDeviceId,
   promptBiometric,
   saveBiometricForChild,
+  hasBiometricForChild,
   setBiometricDeclined,
   setLastChildForBiometric,
 } from '../../lib/biometrics';
@@ -45,23 +46,31 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
       goToDashboard();
       return;
     }
+    if (__DEV__) console.log('[BiometricSetup] handleEnable: childId=', childId.slice(0,8));
     setLoading(true);
     try {
       const success = await promptBiometric('Verify your identity to enable Face ID login');
       if (!success) {
+        if (__DEV__) console.log('[BiometricSetup] promptBiometric cancelled or failed');
         setLoading(false);
         return;
       }
       const deviceId = await getDeviceId();
+      if (__DEV__) console.log('[BiometricSetup] deviceId=', deviceId);
       await db.enableBiometric(childId, deviceId);
+      if (__DEV__) console.log('[BiometricSetup] DB biometric_enabled=true');
       // Store a child-ID-scoped token and persist the childId so that
       // WhoIsLoggingInScreen can offer Face ID even after logout or a cold restart.
       await saveBiometricForChild(childId);
       await setLastChildForBiometric(childId);
+      // Verify the token was actually stored before declaring success.
+      const tokenOk = await hasBiometricForChild(childId);
+      if (__DEV__) console.log('[BiometricSetup] token verified in SecureStore:', tokenOk);
       setBiometricEnabled(true);
       goToDashboard();
-    } catch {
+    } catch (e) {
       setLoading(false);
+      if (__DEV__) console.warn('[BiometricSetup] handleEnable error:', String(e));
       Alert.alert('Error', 'Could not enable Face ID. Please try again.');
     }
   };

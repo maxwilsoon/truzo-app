@@ -48,11 +48,13 @@ export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => 
         // Fall back to SecureStore so Face ID can be offered after a cold restart
         // or logout, as long as the biometric token is still on this device.
         const effectiveChildId = childId ?? await getLastChildForBiometric();
+        if (__DEV__) console.log('[WhoIsLoggingIn] goChild: childId=', childId?.slice(0,8), 'effectiveChildId=', effectiveChildId?.slice(0,8));
         if (effectiveChildId) {
           const [available, hasBio] = await Promise.all([
             isBiometricAvailable(),
             hasBiometricForChild(effectiveChildId),
           ]);
+          if (__DEV__) console.log('[WhoIsLoggingIn] available=', available, 'hasBio=', hasBio, 'shouldOfferFaceId=', available && hasBio);
           if (available && hasBio) {
             // Restore childId in context so BiometricLoginScreen can read it.
             if (!childId) setChildId(effectiveChildId);
@@ -60,7 +62,9 @@ export const WhoIsLoggingInScreen: React.FC<Props> = ({ navigation, route }) => 
             return;
           }
         }
-      } catch { /* fall through to password login */ }
+      } catch (e) {
+        if (__DEV__) console.warn('[WhoIsLoggingIn] goChild error:', String(e));
+      }
     }
     navigation.navigate('ChildLogin');
   };
