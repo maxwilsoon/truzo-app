@@ -477,17 +477,18 @@ export const db = {
     return { hash: data.passcode_hash ?? null, created: data.passcode_created ?? false };
   },
 
-  /** Fetch live Safety Pool balance from DB — used by the access guard. */
+  /** Fetch live Safety Pool balance from DB — used by the access guard.
+   *  Uses a SECURITY DEFINER RPC so this works without an active parent
+   *  Supabase Auth session (e.g. after child logout → parent passcode entry).
+   */
   async getSafetyPoolStatus(userId: string): Promise<{ limit: number; used: number } | null> {
     const { data } = await supabase
-      .from('parents')
-      .select('safety_pool_limit, safety_pool_used')
-      .eq('id', userId)
+      .rpc('get_parent_safety_pool_status', { p_parent_id: userId })
       .single();
     if (!data) return null;
     return {
-      limit: Number(data.safety_pool_limit ?? 0),
-      used:  Number(data.safety_pool_used  ?? 0),
+      limit: Number((data as any).pool_limit ?? 0),
+      used:  Number((data as any).pool_used  ?? 0),
     };
   },
 
