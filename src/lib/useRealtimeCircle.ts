@@ -40,19 +40,20 @@ export function useRealtimeCircle({ childId, onNewRequest, onCircleUpdated }: Ha
       )
       .subscribe();
 
-    // Listen for new circle entries where this child is the owner (someone accepted my request)
+    // Listen for circle entries where this child is the owner becoming active.
+    // INSERT covers first-time friendships; UPDATE covers re-activated friendships
+    // (remove_from_circle soft-deletes, so accept_circle_request fires an UPDATE).
+    const handleCircleChange = async () => {
+      try {
+        const members = await db.getCircle(childId);
+        onCircleUpdated(members);
+      } catch {}
+    };
+
     const circleChannel = supabase
       .channel(`ci_${childId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'circles', filter: `child_id=eq.${childId}` },
-        async () => {
-          try {
-            const members = await db.getCircle(childId);
-            onCircleUpdated(members);
-          } catch {}
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'circles', filter: `child_id=eq.${childId}` }, handleCircleChange)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'circles', filter: `child_id=eq.${childId}` }, handleCircleChange)
       .subscribe();
 
     return () => {
