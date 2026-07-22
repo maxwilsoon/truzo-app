@@ -12,6 +12,7 @@ import { hashPasscode } from '../../lib/passcode';
 import { db } from '../../lib/database';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
 import { getLastParentForPasscode } from '../../lib/biometrics';
+import { registerPushToken } from '../../lib/notifications';
 
 const GREEN_DARK = '#3D7A45';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
@@ -113,6 +114,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       if (parent.passcodeHash) {
         const hash = await hashPasscode(userId ?? '', next);
         if (hash === parent.passcodeHash) {
+          if (userId) registerPushToken(userId, 'parent').catch(() => {});
           setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
         } else {
           shake();
@@ -124,6 +126,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
           const hash = await hashPasscode(userId ?? '', next);
           setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
           savePasscodeToDb(hash).catch(() => {});
+          if (userId) registerPushToken(userId, 'parent').catch(() => {});
           setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
         } else {
           shake();

@@ -3,6 +3,7 @@ import { cache } from '../lib/cache';
 import { db } from '../lib/database';
 import { fmtAmt } from '../lib/utils';
 import { setLastParentForPasscode, getLastParentForPasscode } from '../lib/biometrics';
+import { deregisterCurrentPushToken } from '../lib/notifications';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -737,6 +738,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [childId]);
 
   const resetSession = () => {
+    // Deactivate the device push token before clearing session state so the
+    // device stops receiving notifications while logged out.
+    deregisterCurrentPushToken().catch(() => {});
+
     setChild({
       displayName: '', username: '', avatarEmoji: '😊', trustScore: 50,
       balance: 0, loanedOut: 0, borrowed: 0, streak: 0, repaid: 0, missed: 0,

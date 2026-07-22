@@ -12,6 +12,7 @@ import { db } from '../../lib/database';
 import { cache } from '../../lib/cache';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
 import { setLastParentForPasscode } from '../../lib/biometrics';
+import { registerPushToken } from '../../lib/notifications';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
@@ -89,6 +90,9 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
           mobile:        ch.mobile ?? '',
         }));
       }
+
+      // Register parent device for push notifications (best-effort)
+      registerPushToken(userId, 'parent').catch(() => {});
 
       // Email + password is full authentication.
       // First-time parents (no passcode yet) must create their PIN.

@@ -240,6 +240,36 @@ export const db = {
     if (error) console.warn('save_push_token error:', error.message);
   },
 
+  /** Register a device push token for server-side notification delivery. */
+  async registerDeviceToken(
+    userId: string,
+    userType: 'child' | 'parent',
+    expoPushToken: string,
+    platform?: string,
+    appVersion?: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('register_device_token', {
+      p_user_id:         userId,
+      p_user_type:       userType,
+      p_expo_push_token: expoPushToken,
+      p_platform:        platform ?? null,
+      p_app_version:     appVersion ?? null,
+    });
+    if (error) {
+      if (__DEV__) console.warn('[Truzo] register_device_token error:', error.message);
+    }
+  },
+
+  /** Deactivate a push token on logout so the device stops receiving notifications. */
+  async deregisterDeviceToken(expoPushToken: string): Promise<void> {
+    const { error } = await supabase.rpc('deregister_device_token', {
+      p_expo_push_token: expoPushToken,
+    });
+    if (error) {
+      if (__DEV__) console.warn('[Truzo] deregister_device_token error:', error.message);
+    }
+  },
+
   async getCircle(childId: string) {
     const { data, error } = await supabase.rpc('get_circle', { p_child_id: childId });
     if (error) throw new Error('get_circle error: ' + error.message);

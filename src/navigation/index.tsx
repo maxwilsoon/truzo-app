@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useApp } from '../context/AppContext';
@@ -46,6 +47,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export const AppNavigator = () => {
   const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
   const [navReady, setNavReady] = useState(false);
+  const notifSubRef = useRef<Notifications.EventSubscription | null>(null);
 
   // Dev-only auto-login: reads credentials from EXPO_PUBLIC_DEV_CHILD_USERNAME /
   // EXPO_PUBLIC_DEV_CHILD_PASSWORD in your local .env.local (gitignored).
@@ -119,6 +121,41 @@ export const AppNavigator = () => {
       setIsChildLoggedIn(true);
       navigationRef.navigate('ChildTabs' as never);
     }).catch(() => {});
+  }, [navReady]);
+
+  // Deep link: navigate to the correct screen when the user taps a push notification
+  useEffect(() => {
+    if (!navReady) return;
+
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as {
+        type?: string;
+        screen?: string;
+        request_id?: string;
+      } | undefined;
+
+      if (!data?.screen || !navigationRef.isReady()) return;
+
+      switch (data.screen) {
+        case 'Circle':
+          // Friend request / accepted / declined — open Circle tab
+          navigationRef.navigate('ChildTabs' as never);
+          break;
+        case 'Home':
+          // Funding, repayment — open Home / activity feed
+          navigationRef.navigate('ChildTabs' as never);
+          break;
+        case 'Borrow':
+          // Money request — open the Borrow flow
+          navigationRef.navigate('ChildTabs' as never);
+          break;
+        default:
+          break;
+      }
+    };
+
+    notifSubRef.current = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    return () => { notifSubRef.current?.remove(); notifSubRef.current = null; };
   }, [navReady]);
 
   return (

@@ -14,14 +14,28 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerPushToken(childId: string): Promise<string | null> {
+// Holds the last successfully registered Expo push token for the current session.
+// Used by deregisterCurrentPushToken() on logout.
+let _currentPushToken: string | null = null;
+
+/**
+ * Requests push permission, obtains an Expo push token, and registers it in the
+ * device_tokens table (plus the legacy children.push_token column).
+ *
+ * @param userId   - UUID of the logged-in user (child or parent)
+ * @param userType - 'child' | 'parent'
+ */
+export async function registerPushToken(
+  userId: string,
+  userType: 'child' | 'parent' = 'child',
+): Promise<string | null> {
   if (!Device.isDevice) return null;
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     (Constants as any).easConfig?.projectId;
   if (!projectId) {
-    console.warn('No Expo project ID configured — push notifications disabled.');
+    if (__DEV__) console.warn('[Truzo] No Expo project ID — push notifications disabled.');
     return null;
   }
 
@@ -43,27 +57,43 @@ export async function registerPushToken(childId: string): Promise<string | null>
 
   try {
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    await db.savePushToken(childId, token);
+    _currentPushToken = token;
+
+    // Register in device_tokens table (and keep legacy children.push_token in sync)
+    await db.registerDeviceToken(
+      userId,
+      userType,
+      token,
+      Platform.OS,
+      Constants.expoConfig?.version ?? undefined,
+    );
+
     return token;
   } catch (e) {
-    console.warn('Push token registration failed:', e);
+    if (__DEV__) console.warn('[Truzo] Push token registration failed:', e);
     return null;
   }
 }
 
-export async function sendPushNotification(
-  expoPushToken: string,
-  title: string,
-  body: string,
-) {
-  if (!expoPushToken) return;
+/**
+ * Deactivates the push token registered during the current session.
+ * Call this on logout so the device stops receiving notifications while logged out.
+ */
+export async function deregisterCurrentPushToken(): Promise<void> {
+  if (!_currentPushToken) return;
   try {
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: expoPushToken, title, body, sound: 'default' }),
-    });
+    await db.deregisterDeviceToken(_currentPushToken);
   } catch (e) {
-    console.warn('Push send failed:', e);
+    if (__DEV__) console.warn('[Truzo] Push token deregistration failed:', e);
+  } finally {
+    _currentPushToken = null;
   }
+}
+
+/**
+ * Returns the Expo push token registered in the current session (if any).
+ * Useful for passing to deregistration flows outside of this module.
+ */
+export function getCurrentPushToken(): string | null {
+  return _currentPushToken;
 }

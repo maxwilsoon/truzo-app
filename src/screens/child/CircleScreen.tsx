@@ -12,7 +12,6 @@ import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { ActiveRequest, useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
-import { sendPushNotification } from '../../lib/notifications';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
 import { fmtAmt } from '../../lib/utils';
 
@@ -96,7 +95,7 @@ export const CircleScreen: React.FC = () => {
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      const { fromPushToken } = await db.acceptCircleRequest(requestId);
+      await db.acceptCircleRequest(requestId);
       const accepted = pendingRequests.find(r => r.requestId === requestId);
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (accepted) {
@@ -110,12 +109,7 @@ export const CircleScreen: React.FC = () => {
           text: `${accepted.displayName.split(' ')[0]} joined your circle`,
           time: 'Just now', type: 'joined',
         });
-        if (fromPushToken) {
-          sendPushNotification(
-            fromPushToken, 'Friend request accepted ✅',
-            `${child.displayName} accepted your request — you're now in each other's circles!`,
-          ).catch(() => {});
-        }
+        // Notification to requester delivered server-side via Edge Function
       }
     } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not accept request.'); }
   };
@@ -123,7 +117,7 @@ export const CircleScreen: React.FC = () => {
   const handleDeclineRequest = async (requestId: string) => {
     try {
       const declined = pendingRequests.find(r => r.requestId === requestId);
-      const { fromPushToken } = await db.declineCircleRequest(requestId);
+      await db.declineCircleRequest(requestId);
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (declined) {
         addActivity({
@@ -131,12 +125,7 @@ export const CircleScreen: React.FC = () => {
           text: `You declined ${declined.displayName.split(' ')[0]}'s request`,
           time: 'Just now', type: 'request',
         });
-        if (fromPushToken) {
-          sendPushNotification(
-            fromPushToken, 'Friend request declined',
-            `${child.displayName} didn't accept your request`,
-          ).catch(() => {});
-        }
+        // Notification to requester delivered server-side via Edge Function
       }
     } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not decline request.'); }
   };
@@ -248,7 +237,7 @@ export const CircleScreen: React.FC = () => {
       const borrowerUser = circle.find(m => m.id === req.fromId)?.username ?? req.fromName;
       addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`, time: 'Just now', type: 'funded' });
       addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
-      if (borrowerPushToken) sendPushNotification(borrowerPushToken, `💚 ${child.displayName} funded your request!`, `${child.displayName} sent you £${fmtAmt(req.amount)}${req.reason?.trim() ? ` for ${req.reason.trim()}` : ''}`).catch(() => {});
+      // Notification to borrower delivered server-side via Edge Function
     } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not fund request.'); }
   };
 
@@ -265,14 +254,14 @@ export const CircleScreen: React.FC = () => {
     const req = repayingRequest;
     setRepayingRequest(null);
     try {
-      const { funderPushToken, amount: paidAmount } = await db.repayMoneyRequest(req.id, childId);
+      const { amount: paidAmount } = await db.repayMoneyRequest(req.id, childId);
       const amt = paidAmount ?? req.amount;
       setActiveRequests(prev => prev.filter(r => r.id !== req.id));
       setChild(c => ({ ...c, balance: c.balance - amt, borrowed: Math.max(0, c.borrowed - amt), trustScore: Math.min(100, c.trustScore + 5), points: c.points + 5, repaid: c.repaid + 1 }));
       const funderUser = circle.find(m => m.id === req.fundedById)?.username ?? req.fundedByName ?? 'friend';
       addActivity({ id: `repay_${req.id}`, emoji: '✅', text: `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`, time: 'Just now', type: 'repaid' });
       addTransaction({ id: `t_repay_${Date.now()}`, type: 'repay', amount: -amt, description: `Repaid £${fmtAmt(amt)} to @${funderUser}`, date: 'Just now', counterparty: req.fundedByName, status: 'completed' });
-      if (funderPushToken) sendPushNotification(funderPushToken, `✅ ${child.displayName} repaid you!`, `${child.displayName} repaid £${fmtAmt(amt)}`).catch(() => {});
+      // Notification to funder delivered server-side via Edge Function
     } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not repay.'); }
   };
 

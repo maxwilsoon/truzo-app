@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
-import { sendPushNotification } from '../../lib/notifications';
 
 type SearchResult = {
   id: string;
@@ -108,15 +107,8 @@ export const AddFriendsScreen: React.FC = () => {
     setRequestedIds(new Set(requestedIdsRef.current));
 
     try {
-      const pushToken = await db.sendCircleRequest(childId, user.id);
-      // Notify the recipient (best-effort)
-      if (pushToken) {
-        sendPushNotification(
-          pushToken,
-          'New friend request 👋',
-          `${child.displayName} wants to join your circle`,
-        ).catch(() => {});
-      }
+      await db.sendCircleRequest(childId, user.id);
+      // Notification delivered server-side via Edge Function
     } catch (e: any) {
       requestedIdsRef.current.delete(user.id);
       setRequestedIds(new Set(requestedIdsRef.current));

@@ -11,7 +11,6 @@ import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { ActiveRequest } from '../../context/AppContext';
 import { db } from '../../lib/database';
-import { sendPushNotification } from '../../lib/notifications';
 import { fmtAmt } from '../../lib/utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -161,14 +160,7 @@ export const RequestMoneyScreen: React.FC = () => {
         type: 'request',
       });
 
-      pushTokens.forEach(token => {
-        sendPushNotification(
-          token,
-          `💸 ${child.displayName} needs money`,
-          `${child.displayName} requested £${fmtAmt(amountNum)}`,
-        ).catch(() => {});
-      });
-
+      // Notifications to circle members delivered server-side via Edge Function
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Could not send request.');
