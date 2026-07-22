@@ -118,10 +118,19 @@ export const AddFriendsScreen: React.FC = () => {
         ).catch(() => {});
       }
     } catch (e: any) {
-      // Revert on failure
       requestedIdsRef.current.delete(user.id);
       setRequestedIds(new Set(requestedIdsRef.current));
-      Alert.alert('Error', e.message ?? 'Could not send request.');
+      const msg: string = e?.message ?? '';
+      if (msg.includes('already_friends')) {
+        // Race: they became friends via another path — mark locally as in-circle
+        setCircleIds(prev => new Set([...prev, user.id]));
+      } else if (msg.includes('already_pending')) {
+        // Race: a pending request already exists — mark as requested
+        requestedIdsRef.current.add(user.id);
+        setRequestedIds(new Set(requestedIdsRef.current));
+      } else {
+        Alert.alert('Error', 'Could not send request. Please try again.');
+      }
     }
   };
 
