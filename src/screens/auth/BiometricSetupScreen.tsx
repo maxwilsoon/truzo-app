@@ -56,12 +56,11 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       const deviceId = await getDeviceId();
-      if (__DEV__) console.log('[BiometricSetup] deviceId=', deviceId);
-      await db.enableBiometric(childId, deviceId);
+      if (__DEV__) console.log('[BiometricSetup] deviceId obtained');
+      // Generate CSPRNG token, store raw in SecureStore, send hash to DB.
+      const { tokenHash } = await saveBiometricForChild(childId);
+      await db.enableBiometric(childId, deviceId, tokenHash);
       if (__DEV__) console.log('[BiometricSetup] DB biometric_enabled=true');
-      // Store a child-ID-scoped token and persist the childId so that
-      // WhoIsLoggingInScreen can offer Face ID even after logout or a cold restart.
-      await saveBiometricForChild(childId);
       await setLastChildForBiometric(childId);
       // Verify the token was actually stored before declaring success.
       const tokenOk = await hasBiometricForChild(childId);

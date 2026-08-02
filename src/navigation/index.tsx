@@ -44,8 +44,11 @@ import { BiometricLoginScreen } from '../screens/auth/BiometricLoginScreen';
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+import { getDeviceId } from '../lib/biometrics';
+import { saveChildSession } from '../lib/childSession';
+
 export const AppNavigator = () => {
-  const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests } = useApp();
+  const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests, setChildSessionToken } = useApp();
   const [navReady, setNavReady] = useState(false);
   const notifSubRef = useRef<Notifications.EventSubscription | null>(null);
 
@@ -57,9 +60,10 @@ export const AppNavigator = () => {
     const username = process.env.EXPO_PUBLIC_DEV_CHILD_USERNAME;
     const password = process.env.EXPO_PUBLIC_DEV_CHILD_PASSWORD;
     if (!username || !password) return;
-    db.loginChild(username, password).then(result => {
+    getDeviceId().then(deviceId =>
+      db.loginChild(username, password, deviceId).then(result => {
       if (!result) return;
-      const { child: row, parent: par } = result;
+      const { child: row, parent: par, session_token, session_expires_at } = result;
       setChild(c => ({
         ...c,
         displayName:   row.display_name,
@@ -96,13 +100,16 @@ export const AppNavigator = () => {
           allowanceNextPayment:   par.allowance_next_payment ?? '',
           allowanceActive:        par.allowance_active ?? false,
           passcode:               '',
-          passcodeHash:    par.passcode_hash    ?? prev.passcodeHash,
           passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
           marketingNotifications: par.marketing_notifications ?? false,
           profileImageUrl:        par.profile_image_url ?? undefined,
         }));
       }
       setChildId(row.id);
+      if (session_token) {
+        saveChildSession(row.id, session_token, session_expires_at ?? '').catch(() => {});
+        setChildSessionToken(session_token);
+      }
       db.getCircle(row.id).then(members => {
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
@@ -120,7 +127,7 @@ export const AppNavigator = () => {
       }).catch(() => {});
       setIsChildLoggedIn(true);
       navigationRef.navigate('ChildTabs' as never);
-    }).catch(() => {});
+    }).catch(() => {})).catch(() => {});
   }, [navReady]);
 
   // Deep link: navigate to the correct screen when the user taps a push notification

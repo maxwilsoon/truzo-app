@@ -2,8 +2,10 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { cache } from '../lib/cache';
 import { db } from '../lib/database';
 import { fmtAmt } from '../lib/utils';
-import { setLastParentForPasscode, getLastParentForPasscode } from '../lib/biometrics';
+import { setLastParentForPasscode, getLastParentForPasscode, getDeviceId } from '../lib/biometrics';
+import { saveChildSession, getChildSession, clearChildSession } from '../lib/childSession';
 import { deregisterCurrentPushToken } from '../lib/notifications';
+import { navigationRef } from '../navigation';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -169,6 +171,10 @@ interface AppContextType {
   setBiometricEnabled: (v: boolean) => void;
   repayHighlightId: string | null;
   setRepayHighlightId: (id: string | null) => void;
+  childSessionToken: string | null;
+  setChildSessionToken: (token: string | null) => void;
+  childDeviceId: string | null;
+  handleSessionError: (code: string) => void;
   resetSession: () => void;
 }
 
@@ -227,6 +233,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [repayHighlightId, setRepayHighlightId] = useState<string | null>(null);
+  const [childSessionToken, setChildSessionToken] = useState<string | null>(null);
+  const [childDeviceId, setChildDeviceId] = useState<string | null>(null);
 
   // Holds the parent's Supabase Auth password only for the duration of onboarding.
   // Never stored in state, never written to AsyncStorage, cleared after signUp completes.
@@ -267,13 +275,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cache.loadUserId(),
       ]);
       if (cachedParent) setParent(p => ({ ...p, ...cachedParent }));
+      let hydratedChildId: string | null = null;
       if (cachedChild) {
         // Strip any plain-text password that may exist in caches written before
         // migration 006. The password field was removed from ChildProfile in that
         // migration — having it in cache state would expose a stale plain-text value.
         const { password: _stripped, ...safeChildCache } = cachedChild as any;
         setChild(c => ({ ...c, ...safeChildCache }));
-        if (cachedChild.childId) setChildId(cachedChild.childId);
+        if (cachedChild.childId) {
+          setChildId(cachedChild.childId);
+          hydratedChildId = cachedChild.childId;
+        }
       }
       if (cachedUserId) {
         setUserId(cachedUserId);
@@ -285,6 +297,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const secureParentId = await getLastParentForPasscode();
         if (secureParentId) setUserId(secureParentId);
       }
+      // Load session token from SecureStore (never from AsyncStorage).
+      // The server is always authoritative — a stale token will be rejected at first use.
+      if (hydratedChildId) {
+        const stored = await getChildSession(hydratedChildId);
+        if (stored?.token) setChildSessionToken(stored.token);
+      }
+      // Load device ID (stable per-install, SecureStore-backed).
+      const devId = await getDeviceId();
+      setChildDeviceId(devId);
       hydrated.current = true;
     };
     hydrate();
@@ -737,10 +758,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(id);
   }, [childId]);
 
+  const clearSessionState = (storedChildId: string | null, sessionToken: string | null) => {
+    if (sessionToken) db.revokeChildSession(sessionToken).catch(() => {});
+    if (storedChildId) clearChildSession(storedChildId).catch(() => {});
+    setChildSessionToken(null);
+  };
+
   const resetSession = () => {
-    // Deactivate the device push token before clearing session state so the
-    // device stops receiving notifications while logged out.
     deregisterCurrentPushToken().catch(() => {});
+    clearSessionState(childIdRef.current, childSessionToken);
 
     setChild({
       displayName: '', username: '', avatarEmoji: '😊', trustScore: 50,
@@ -767,6 +793,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPaymentMethods([]);
     setBiometricEnabled(false);
     cache.clear();
+  };
+
+  const handleSessionError = (code: string) => {
+    clearSessionState(childIdRef.current, childSessionToken);
+    setIsChildLoggedIn(false);
+    if (navigationRef.isReady()) {
+      navigationRef.reset({
+        index: 1,
+        routes: [
+          { name: 'WhoIsLoggingIn' as never },
+          { name: 'ChildLogin' as never, params: { sessionExpired: true } as never },
+        ],
+      });
+    }
   };
 
   return (
@@ -800,6 +840,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBiometricEnabled,
       repayHighlightId,
       setRepayHighlightId,
+      childSessionToken,
+      setChildSessionToken,
+      childDeviceId,
+      handleSessionError,
       resetSession,
     }}>
       {children}

@@ -16,15 +16,19 @@ import {
   saveBiometricForChild, isBiometricDeclined, clearBiometricDeclined,
   setLastChildForBiometric, setLastParentForPasscode,
 } from '../../lib/biometrics';
+import { saveChildSession } from '../../lib/childSession';
 
 const GREEN = '#C8E8CB';
 const GREEN_DARK = '#3D7A45';
 const BG = '#E8F5E9';
 
-type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'> };
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'ChildLogin'>;
+  route: { params?: { sessionExpired?: boolean } };
+};
 
-export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { child, setChild, childId, setChildId, setParent, setUserId, setIsChildLoggedIn, setCircle, setPendingRequests, setBiometricEnabled, setFrozenAccount, setParentDebt } = useApp();
+export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { child, setChild, childId, setChildId, setParent, setUserId, setIsChildLoggedIn, setCircle, setPendingRequests, setBiometricEnabled, setFrozenAccount, setParentDebt, setChildSessionToken } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass]  = useState(false);
@@ -33,6 +37,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
   const [userFocused, setUserFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+  const sessionExpired = route.params?.sessionExpired === true;
   // True when this device has a record that the cached child previously
   // declined Face ID setup — used to show the opt-in link.
   const [showBioSetupLink, setShowBioSetupLink] = useState(false);
@@ -59,13 +64,14 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
     // grant access to a different family's child account.
     setLoading(true);
     try {
-      const result = await db.loginChild(u, p);
+      const deviceId = await getDeviceId();
+      const result = await db.loginChild(u, p, deviceId);
       if (!result) {
         setUsernameError('Username or password incorrect.');
         setPasswordError(' ');
         return;
       }
-      const { child: row, parent: par } = result;
+      const { child: row, parent: par, session_token, session_expires_at } = result;
       setChild(c => ({
         ...c,
         displayName:   row.display_name,
@@ -95,22 +101,32 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           firstName:       par.first_name ?? '',
           lastName:        par.last_name ?? '',
           displayName:     par.display_name || par.first_name || '',
-          mobile:          par.mobile ?? '',
-          address:         par.address ?? '',
+          // mobile and address are not returned from child login (migration 015).
+          // Preserve any value already in context/cache rather than overwriting with ''.
+          mobile:          par.mobile  ?? prev.mobile,
+          address:         par.address ?? prev.address,
           safetyPoolLimit:     par.safety_pool_limit ?? 0,
           safetyPoolUsed:      par.safety_pool_used ?? 0,
           weeklyAllowance:     par.weekly_allowance ?? 0,
           allowanceFrequency:  par.allowance_frequency ?? 'weekly',
           allowanceNextPayment: par.allowance_next_payment ?? '',
           allowanceActive:     par.allowance_active ?? false,
-          passcode:               '',
-          passcodeHash:    par.passcode_hash    ?? prev.passcodeHash,
+          passcode:            '',
+          // passcodeHash intentionally not set here (migration 015 removed it from
+          // the child login response). Verification is now server-side via
+          // verify_parent_passcode RPC.
           passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
           marketingNotifications: par.marketing_notifications ?? false,
           profileImageUrl:        par.profile_image_url ?? undefined,
         }));
       }
       setChildId(row.id);
+      // Save session token to SecureStore and context.
+      // Never stored in AsyncStorage, logs, or analytics.
+      if (session_token) {
+        await saveChildSession(row.id, session_token, session_expires_at ?? '');
+        setChildSessionToken(session_token);
+      }
       await cache.saveChild({ username: row.username, childId: row.id });
       // Persist childId in SecureStore so WhoIsLoggingInScreen can offer Face ID
       // on the next visit even after logout clears the AsyncStorage cache.
@@ -156,12 +172,12 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
         try {
           const biometricsAvailable = await isBiometricAvailable();
           if (biometricsAvailable) {
-            const deviceId = await getDeviceId();
             if (row.biometric_enabled && row.last_device_id === deviceId) {
               // Biometric was previously set up for this child on this device.
-              // Refresh the child-scoped local token so WhoIsLoggingIn can
-              // offer Face ID next time (even after an app reinstall).
-              await saveBiometricForChild(row.id);
+              // Re-generate CSPRNG token, update the DB hash, and refresh SecureStore.
+              // This handles reinstall scenarios where the old SecureStore value is gone.
+              const { tokenHash } = await saveBiometricForChild(row.id);
+              await db.enableBiometric(row.id, deviceId, tokenHash);
               setBiometricEnabled(true);
             } else {
               // Not yet set up (new account or new device).
@@ -199,6 +215,11 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {sessionExpired && (
+            <View style={styles.sessionBanner}>
+              <Text style={styles.sessionBannerText}>Your session expired. Please sign in again.</Text>
+            </View>
+          )}
           <Text style={styles.title}>Hi 👋 let's log in</Text>
           <Text style={styles.sub}>
             Ask your parent or guardian for your login details.{' '}
@@ -304,6 +325,8 @@ const styles = StyleSheet.create({
   back:   { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
 
+  sessionBanner: { backgroundColor: '#FFF3CD', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#FBBF24' },
+  sessionBannerText: { color: '#92400E', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   title: { fontSize: 28, fontWeight: '800', color: '#1A1A3E', marginBottom: 10 },
   sub:   { fontSize: 16, color: '#3C3C43', lineHeight: 24, marginBottom: 32 },
   link:  { color: GREEN_DARK, fontWeight: '600' },

@@ -39,8 +39,8 @@ export const ChildSettingsScreen: React.FC = () => {
         const ok = await promptBiometric('Verify your identity to enable Face ID');
         if (!ok) { setBioLoading(false); return; }
         const deviceId = await getDeviceId();
-        await db.enableBiometric(childId, deviceId);
-        await saveBiometricForChild(childId);
+        const { tokenHash } = await saveBiometricForChild(childId);
+        await db.enableBiometric(childId, deviceId, tokenHash);
         setBiometricEnabled(true);
       } else {
         // Disable — confirm then clear

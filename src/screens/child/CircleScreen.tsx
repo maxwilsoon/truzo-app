@@ -28,6 +28,7 @@ export const CircleScreen: React.FC = () => {
     child, childId, setChild, addTransaction, addActivity, removeActivity,
     pendingRequests, setPendingRequests, recordWeeklyStreak, frozenAccount,
     repayHighlightId, setRepayHighlightId,
+    childSessionToken, childDeviceId, handleSessionError,
   } = useApp();
 
   const [fundingRequest,  setFundingRequest]  = useState<ActiveRequest | null>(null);
@@ -217,10 +218,11 @@ export const CircleScreen: React.FC = () => {
 
   const confirmFund = async () => {
     if (!fundingRequest || !childId) return;
+    if (!childSessionToken || !childDeviceId) { handleSessionError('invalid_child_session'); return; }
     const req = fundingRequest;
     setFundingRequest(null);
     try {
-      const { borrowerPushToken } = await db.fundMoneyRequest(req.id, childId, req.amount);
+      const { borrowerPushToken } = await db.fundMoneyRequest(req.id, childId, req.amount, childSessionToken, childDeviceId);
       recordWeeklyStreak().catch(() => {});
       setActiveRequests(prev => prev.map(r =>
         r.id === req.id ? { ...r, isFunded: true, fundedById: childId, fundedByName: child.displayName, fundedByEmoji: child.avatarEmoji } : r
@@ -238,7 +240,12 @@ export const CircleScreen: React.FC = () => {
       addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`, time: 'Just now', type: 'funded' });
       addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
       // Notification to borrower delivered server-side via Edge Function
-    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not fund request.'); }
+    } catch (e: any) {
+      const msg: string = e.message ?? '';
+      if (msg.includes('invalid_child_session') || msg.includes('child_session_expired') || msg.includes('child_session_revoked')) {
+        handleSessionError(msg);
+      } else { Alert.alert('Error', msg || 'Could not fund request.'); }
+    }
   };
 
   const handleRepay = (req: ActiveRequest) => {
@@ -251,10 +258,11 @@ export const CircleScreen: React.FC = () => {
 
   const confirmRepay = async () => {
     if (!repayingRequest || !childId) return;
+    if (!childSessionToken || !childDeviceId) { handleSessionError('invalid_child_session'); return; }
     const req = repayingRequest;
     setRepayingRequest(null);
     try {
-      const { amount: paidAmount } = await db.repayMoneyRequest(req.id, childId);
+      const { amount: paidAmount } = await db.repayMoneyRequest(req.id, childId, childSessionToken, childDeviceId);
       const amt = paidAmount ?? req.amount;
       setActiveRequests(prev => prev.filter(r => r.id !== req.id));
       setChild(c => ({ ...c, balance: c.balance - amt, borrowed: Math.max(0, c.borrowed - amt), trustScore: Math.min(100, c.trustScore + 5), points: c.points + 5, repaid: c.repaid + 1 }));
@@ -262,7 +270,12 @@ export const CircleScreen: React.FC = () => {
       addActivity({ id: `repay_${req.id}`, emoji: '✅', text: `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`, time: 'Just now', type: 'repaid' });
       addTransaction({ id: `t_repay_${Date.now()}`, type: 'repay', amount: -amt, description: `Repaid £${fmtAmt(amt)} to @${funderUser}`, date: 'Just now', counterparty: req.fundedByName, status: 'completed' });
       // Notification to funder delivered server-side via Edge Function
-    } catch (e: any) { Alert.alert('Error', e.message ?? 'Could not repay.'); }
+    } catch (e: any) {
+      const msg: string = e.message ?? '';
+      if (msg.includes('invalid_child_session') || msg.includes('child_session_expired') || msg.includes('child_session_revoked')) {
+        handleSessionError(msg);
+      } else { Alert.alert('Error', msg || 'Could not repay.'); }
+    }
   };
 
   // ── Derived data ───────────────────────────────────────────────────────────
@@ -557,7 +570,9 @@ export const CircleScreen: React.FC = () => {
                                 setActiveRequests(prev => prev.filter(r => r.id !== req.id));
                                 removeActivity(`a_req_${req.id}`);
                                 removeActivity(`moneyreq_${req.id}`);
-                                if (childId) db.cancelMoneyRequest(req.id, childId).catch(() => {});
+                                if (childId && childSessionToken && childDeviceId) {
+                                  db.cancelMoneyRequest(req.id, childId, childSessionToken, childDeviceId).catch(() => {});
+                                }
                                 db.removeRequestActivities(req.id).catch(() => {});
                               }}
                               activeOpacity={0.8}

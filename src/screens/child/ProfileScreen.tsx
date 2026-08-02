@@ -8,6 +8,8 @@ import { navigationRef } from '../../navigation';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
+import { clearChildSession } from '../../lib/childSession';
 
 interface MenuItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -30,7 +32,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon, label, onPress, destructive, 
 );
 
 export const ProfileScreen: React.FC = () => {
-  const { child } = useApp();
+  const { child, childId, childSessionToken, setChildSessionToken } = useApp();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
@@ -82,7 +84,14 @@ export const ProfileScreen: React.FC = () => {
             label="Log Out"
             last
             onPress={() => {
-              const doLogout = () => navigationRef.reset({ index: 0, routes: [{ name: 'WhoIsLoggingIn' }] });
+              const doLogout = async () => {
+                if (childSessionToken) {
+                  db.revokeChildSession(childSessionToken).catch(() => {});
+                  setChildSessionToken(null);
+                }
+                if (childId) clearChildSession(childId).catch(() => {});
+                navigationRef.reset({ index: 0, routes: [{ name: 'WhoIsLoggingIn' }] });
+              };
               if (Platform.OS === 'web') {
                 if (window.confirm('Are you sure you want to log out?')) {
                   setTimeout(doLogout, 0);

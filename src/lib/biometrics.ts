@@ -1,5 +1,6 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 
 // expo-secure-store key validation: /^[\w.-]+$/ — only alphanumeric, ".", "-", "_".
@@ -45,15 +46,17 @@ const declinedKey     = (childId: string) => `truzo_bio_declined_${childId}`;
 
 // ─── Device ID (stable, per-install) ─────────────────────────────────────────
 
+const bytesToHex = (bytes: Uint8Array): string =>
+  Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
 export async function getDeviceId(): Promise<string> {
   if (Platform.OS === 'web') return 'web';
   let id = await secureGet(DEVICE_KEY);
   if (!id) {
-    const rand = () => Math.random().toString(36).slice(2);
-    id = `${rand()}${rand()}${Date.now().toString(36)}`;
+    const bytes = await Crypto.getRandomBytesAsync(24);
+    id = bytesToHex(bytes);
     await secureSet(DEVICE_KEY, id);
   }
-  if (__DEV__) console.log('[biometrics] getDeviceId:', id);
   return id;
 }
 
@@ -105,12 +108,21 @@ export async function hasBiometricForChild(childId: string): Promise<boolean> {
   return has;
 }
 
-export async function saveBiometricForChild(childId: string): Promise<void> {
-  const rand  = () => Math.random().toString(36).slice(2);
-  const token = `${rand()}${rand()}${rand()}${Date.now().toString(36)}`;
-  const key   = tokenKey(childId);
-  await secureSet(key, token);
-  if (__DEV__) console.log('[biometrics] saveBiometricForChild: wrote token to', key);
+export async function saveBiometricForChild(childId: string): Promise<{ rawToken: string; tokenHash: string }> {
+  const bytes    = await Crypto.getRandomBytesAsync(32);
+  const rawToken = bytesToHex(bytes);
+  const tokenHash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    rawToken,
+    { encoding: Crypto.CryptoEncoding.HEX },
+  );
+  await secureSet(tokenKey(childId), rawToken);
+  if (__DEV__) console.log('[biometrics] saveBiometricForChild: wrote token to', tokenKey(childId));
+  return { rawToken, tokenHash };
+}
+
+export async function getBiometricTokenForChild(childId: string): Promise<string | null> {
+  return secureGet(tokenKey(childId));
 }
 
 export async function clearBiometricForChild(childId: string): Promise<void> {

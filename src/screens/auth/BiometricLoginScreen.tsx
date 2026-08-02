@@ -14,11 +14,13 @@ import { registerPushToken } from '../../lib/notifications';
 import {
   getDeviceId,
   hasBiometricForChild,
+  getBiometricTokenForChild,
   promptBiometric,
   clearBiometricForChild,
   setLastChildForBiometric,
   setLastParentForPasscode,
 } from '../../lib/biometrics';
+import { saveChildSession } from '../../lib/childSession';
 import { cache } from '../../lib/cache';
 
 const GREEN = '#C8E8CB';
@@ -33,6 +35,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
   const {
     setChild, setChildId, childId, setParent, setIsChildLoggedIn,
     setCircle, setPendingRequests, setUserId, setBiometricEnabled,
+    setChildSessionToken,
   } = useApp();
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -69,8 +72,9 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
         firstName:       par.first_name ?? '',
         lastName:        par.last_name ?? '',
         displayName:     par.first_name ?? '',
-        mobile:          par.mobile ?? '',
-        address:         par.address ?? '',
+        // mobile and address are not returned from child login (migration 015).
+        mobile:          par.mobile  ?? prev.mobile,
+        address:         par.address ?? prev.address,
         safetyPoolLimit:        par.safety_pool_limit ?? 50,
         weeklyAllowance:        par.weekly_allowance ?? 10,
         passcodeCreated:        par.passcode_created ?? false,
@@ -128,16 +132,29 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
       const deviceId = await getDeviceId();
-      if (__DEV__) console.log('[BiometricLogin] deviceId=', deviceId, 'calling biometric_login_child RPC');
-      const result = await db.biometricLoginChild(childId, deviceId);
+      if (__DEV__) console.log('[BiometricLogin] calling biometric_login_child RPC');
+      const biometricToken = await getBiometricTokenForChild(childId);
+      if (!biometricToken) {
+        // No credential in SecureStore — biometric was never enrolled or was cleared.
+        await clearBiometricForChild(childId);
+        setStatus('failed');
+        setErrorMsg('Face ID is no longer set up. Please sign in with your password.');
+        return;
+      }
+      const result = await db.biometricLoginChild(childId, deviceId, biometricToken);
       if (__DEV__) console.log('[BiometricLogin] biometric_login_child result:', result ? 'ok' : 'null (rejected)');
       if (!result) {
-        // DB rejected — biometric was disabled server-side or device changed.
-        // Clear the stale local token so WhoIsLoggingIn won't offer Face ID again.
+        // DB rejected — biometric_token_hash mismatch, disabled, or device changed.
+        // Could be a legacy enrollment with no hash — requires re-enrolment.
         await clearBiometricForChild(childId);
         setStatus('failed');
         setErrorMsg('Face ID login is no longer active. Please sign in with your password.');
         return;
+      }
+      const { session_token, session_expires_at } = result as any;
+      if (session_token) {
+        await saveChildSession(childId, session_token, session_expires_at ?? '');
+        setChildSessionToken(session_token);
       }
       setStatus('success');
       await applyLoginResult(result);

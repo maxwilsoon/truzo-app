@@ -261,9 +261,10 @@ export const db = {
   },
 
   /** Deactivate a push token on logout so the device stops receiving notifications. */
-  async deregisterDeviceToken(expoPushToken: string): Promise<void> {
+  async deregisterDeviceToken(expoPushToken: string, userId: string): Promise<void> {
     const { error } = await supabase.rpc('deregister_device_token', {
       p_expo_push_token: expoPushToken,
+      p_user_id:         userId,
     });
     if (error) {
       if (__DEV__) console.warn('[Truzo] deregister_device_token error:', error.message);
@@ -276,23 +277,26 @@ export const db = {
     return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; trust_score: number; avatar_url: string | null }>;
   },
 
-  async loginChild(username: string, password: string) {
+  async loginChild(username: string, password: string, deviceId: string) {
     const { data, error } = await supabase.rpc('login_child', {
       p_username: username.toLowerCase(),
       p_password: password,
+      p_device_id: deviceId,
     });
     if (error) throw new Error('RPC error: ' + error.message + ' [' + error.code + ']');
     if (!data) return null;
-    // RPC returns { child: {...}, parent: {...} }
-    return data as { child: Record<string, any>; parent: Record<string, any> };
+    return data as { child: Record<string, any>; parent: Record<string, any>; session_token: string; session_expires_at: string };
   },
 
   async createMoneyRequest(
     fromId: string, amount: number, deadlineDays: number,
+    sessionToken: string, deviceId: string,
     viewerIds?: string[],
   ): Promise<{ requestId: string; pushTokens: string[] }> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { data, error } = await supabase.rpc('create_money_request', {
       p_from_id: fromId, p_amount: amount, p_deadline_days: deadlineDays,
+      p_session_token: sessionToken, p_device_id: deviceId,
       p_reason: '', p_reason_emoji: '💸',
       p_viewer_ids: viewerIds ?? null,
     });
@@ -313,26 +317,32 @@ export const db = {
     }>;
   },
 
-  async fundMoneyRequest(requestId: string, funderId: string, amount: number): Promise<{ borrowerPushToken: string | null }> {
+  async fundMoneyRequest(requestId: string, funderId: string, amount: number, sessionToken: string, deviceId: string): Promise<{ borrowerPushToken: string | null }> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { data, error } = await supabase.rpc('fund_money_request', {
       p_request_id: requestId, p_funder_id: funderId, p_amount: amount,
+      p_session_token: sessionToken, p_device_id: deviceId,
     });
     if (error) throw new Error('fund_money_request error: ' + error.message);
     return { borrowerPushToken: (data as any)?.borrower_push_token ?? null };
   },
 
-  async repayMoneyRequest(requestId: string, borrowerId: string): Promise<{ funderPushToken: string | null; funderId: string; amount: number }> {
+  async repayMoneyRequest(requestId: string, borrowerId: string, sessionToken: string, deviceId: string): Promise<{ funderPushToken: string | null; funderId: string; amount: number }> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { data, error } = await supabase.rpc('repay_money_request', {
       p_request_id: requestId, p_borrower_id: borrowerId,
+      p_session_token: sessionToken, p_device_id: deviceId,
     });
     if (error) throw new Error('repay_money_request error: ' + error.message);
     const d = data as any;
     return { funderPushToken: d?.funder_push_token ?? null, funderId: d?.funder_id, amount: d?.amount };
   },
 
-  async cancelMoneyRequest(requestId: string, childId: string): Promise<void> {
+  async cancelMoneyRequest(requestId: string, childId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { error } = await supabase.rpc('cancel_money_request', {
       p_request_id: requestId, p_child_id: childId,
+      p_session_token: sessionToken, p_device_id: deviceId,
     });
     if (error) throw new Error('cancel_money_request error: ' + error.message);
   },
@@ -341,8 +351,10 @@ export const db = {
     await supabase.rpc('remove_request_activities', { p_request_id: requestId });
   },
 
-  async enableBiometric(childId: string, deviceId: string): Promise<void> {
-    const { error } = await supabase.rpc('enable_biometric', { p_child_id: childId, p_device_id: deviceId });
+  async enableBiometric(childId: string, deviceId: string, biometricTokenHash: string): Promise<void> {
+    const { error } = await supabase.rpc('enable_biometric', {
+      p_child_id: childId, p_device_id: deviceId, p_biometric_token_hash: biometricTokenHash,
+    });
     if (error) throw new Error('enable_biometric error: ' + error.message);
   },
 
@@ -351,10 +363,16 @@ export const db = {
     if (error) throw new Error('disable_biometric error: ' + error.message);
   },
 
-  async biometricLoginChild(childId: string, deviceId: string): Promise<{ child: any; parent: any } | null> {
-    const { data, error } = await supabase.rpc('biometric_login_child', { p_child_id: childId, p_device_id: deviceId });
+  async biometricLoginChild(childId: string, deviceId: string, biometricToken: string): Promise<{ child: any; parent: any; session_token: string; session_expires_at: string } | null> {
+    const { data, error } = await supabase.rpc('biometric_login_child', {
+      p_child_id: childId, p_device_id: deviceId, p_biometric_token: biometricToken,
+    });
     if (error) throw new Error('biometric_login_child error: ' + error.message);
     return data ?? null;
+  },
+
+  async revokeChildSession(sessionToken: string): Promise<void> {
+    await supabase.rpc('revoke_child_session', { p_session_token: sessionToken });
   },
 
   async cancelCircleRequest(fromId: string, toId: string): Promise<void> {
@@ -496,15 +514,19 @@ export const db = {
     if (error) throw error;
   },
 
-  /** Fetch just the parent's passcode fields (used to recover from stale context). */
-  async getParentPasscodeHash(userId: string): Promise<{ hash: string | null; created: boolean } | null> {
-    const { data } = await supabase
-      .from('parents')
-      .select('passcode_hash, passcode_created')
-      .eq('id', userId)
-      .single();
-    if (!data) return null;
-    return { hash: data.passcode_hash ?? null, created: data.passcode_created ?? false };
+  /** Check whether a passcode has been set for a parent (never returns the hash). */
+  async getParentPasscodeStatus(userId: string): Promise<boolean> {
+    const { data } = await supabase.rpc('get_parent_passcode_status', { p_parent_id: userId });
+    return !!data;
+  },
+
+  /** Verify a parent PIN server-side — the hash never leaves the DB. */
+  async verifyParentPasscode(userId: string, pin: string): Promise<boolean> {
+    const { data } = await supabase.rpc('verify_parent_passcode', {
+      p_parent_id: userId,
+      p_pin:       pin,
+    });
+    return !!data;
   },
 
   /** Fetch live Safety Pool balance from DB — used by the access guard.
@@ -545,7 +567,7 @@ export const db = {
     const userId = authData.user.id;
     const { data: parentData } = await supabase
       .from('parents')
-      .select('*')
+      .select('id, first_name, last_name, display_name, mobile, address, safety_pool_limit, safety_pool_used, weekly_allowance, allowance_frequency, allowance_next_payment, allowance_active, passcode_created, marketing_notifications, profile_image_url')
       .eq('id', userId)
       .single();
     const { data: childData } = await supabase

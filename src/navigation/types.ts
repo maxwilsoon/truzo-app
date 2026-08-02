@@ -15,7 +15,7 @@ export type RootStackParamList = {
   WhoIsLoggingIn: { newAccount?: boolean } | undefined;
   GetApp: undefined;
   ParentEmailLogin: undefined;
-  ChildLogin: undefined;
+  ChildLogin: { sessionExpired?: boolean } | undefined;
   ParentPasscode: { mode: 'create' | 'confirm' | 'enter'; pinToConfirm?: string; onSuccess?: 'SafetyPool' | 'ParentTabs' };
   ChildTabs: undefined;
   ParentTabs: undefined;

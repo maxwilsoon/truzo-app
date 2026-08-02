@@ -41,6 +41,7 @@ export const RequestMoneyScreen: React.FC = () => {
   const {
     child, childId, parent, circle,
     activeRequests, setActiveRequests, addActivity, recordWeeklyStreak, frozenAccount,
+    childSessionToken, childDeviceId, handleSessionError,
   } = useApp();
 
   // Form state
@@ -128,10 +129,15 @@ export const RequestMoneyScreen: React.FC = () => {
 
   const sendRequest = async () => {
     if (!childId) return;
+    if (!childSessionToken || !childDeviceId) {
+      handleSessionError('invalid_child_session');
+      return;
+    }
     setSending(true);
     try {
       const { requestId, pushTokens } = await db.createMoneyRequest(
         childId, amountNum, deadlineDays,
+        childSessionToken, childDeviceId,
         viewerIds.length > 0 ? viewerIds : undefined,
       );
       recordWeeklyStreak().catch(() => {});
@@ -163,7 +169,12 @@ export const RequestMoneyScreen: React.FC = () => {
       // Notifications to circle members delivered server-side via Edge Function
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not send request.');
+      const msg: string = e.message ?? '';
+      if (msg.includes('invalid_child_session') || msg.includes('child_session_expired') || msg.includes('child_session_revoked')) {
+        handleSessionError(msg);
+      } else {
+        Alert.alert('Error', msg || 'Could not send request.');
+      }
     } finally {
       setSending(false);
     }
