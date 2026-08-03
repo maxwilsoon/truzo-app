@@ -37,6 +37,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
   const [userFocused, setUserFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const sessionExpired = route.params?.sessionExpired === true;
   // True when this device has a record that the cached child previously
   // declined Face ID setup — used to show the opt-in link.
@@ -63,15 +64,20 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
     // Never use cached credentials — stale state from a previous session could
     // grant access to a different family's child account.
     setLoading(true);
+    setLoginError('');
+    if (__DEV__) console.log('[ChildLogin] platform:', Platform.OS, '— Continue pressed');
     try {
       const deviceId = await getDeviceId();
+      if (__DEV__) console.log('[ChildLogin] deviceId present:', !!deviceId, 'length:', deviceId.length);
       const result = await db.loginChild(u, p, deviceId);
+      if (__DEV__) console.log('[ChildLogin] RPC result:', result ? 'ok' : 'null/invalid credentials');
       if (!result) {
         setUsernameError('Username or password incorrect.');
         setPasswordError(' ');
         return;
       }
       const { child: row, parent: par, session_token, session_expires_at } = result;
+      if (__DEV__) console.log('[ChildLogin] session_token present:', !!session_token);
       setChild(c => ({
         ...c,
         displayName:   row.display_name,
@@ -121,11 +127,13 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
         }));
       }
       setChildId(row.id);
-      // Save session token to SecureStore and context.
-      // Never stored in AsyncStorage, logs, or analytics.
+      // Save session token to secure storage and context.
+      // Native: iOS Keychain / Android Keychain via SecureStore.
+      // Web: sessionStorage (cleared when tab closes). Never logged.
       if (session_token) {
         await saveChildSession(row.id, session_token, session_expires_at ?? '');
         setChildSessionToken(session_token);
+        if (__DEV__) console.log('[ChildLogin] session storage succeeded');
       }
       await cache.saveChild({ username: row.username, childId: row.id });
       // Persist childId in SecureStore so WhoIsLoggingInScreen can offer Face ID
@@ -164,6 +172,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
 
 
       setIsChildLoggedIn(true);
+      if (__DEV__) console.log('[ChildLogin] AppContext updated, isChildLoggedIn=true');
 
       // Decide whether to offer Face ID setup or go straight to the dashboard.
       // All biometric checks are best-effort — any failure falls back to ChildTabs.
@@ -191,9 +200,22 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
 
+      if (__DEV__) console.log('[ChildLogin] navigating to:', destination);
       navigation.navigate(destination);
     } catch (err: any) {
-      Alert.alert('Login error', String(err?.message ?? err));
+      const msg = String(err?.message ?? err);
+      if (__DEV__) console.error('[ChildLogin] error:', msg);
+      // Alert.alert is a no-op on React Native Web — show an inline error instead.
+      if (msg.includes('invalid_credentials') || msg.includes('incorrect')) {
+        setUsernameError('Username or password incorrect.');
+        setPasswordError(' ');
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        setLoginError('Network error — check your connection and try again.');
+      } else if (msg.includes('RPC') || msg.includes('not found')) {
+        setLoginError('Service unavailable — please try again.');
+      } else {
+        setLoginError('Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -237,7 +259,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
               placeholder="Username"
               placeholderTextColor="#AEAEB2"
               value={username}
-              onChangeText={t => { setUsername(t); setUsernameError(''); setPasswordError(''); }}
+              onChangeText={t => { setUsername(t); setUsernameError(''); setPasswordError(''); setLoginError(''); }}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
@@ -260,7 +282,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
               placeholder="Password"
               placeholderTextColor="#AEAEB2"
               value={password}
-              onChangeText={t => { setPassword(t); setPasswordError(''); setUsernameError(''); }}
+              onChangeText={t => { setPassword(t); setPasswordError(''); setUsernameError(''); setLoginError(''); }}
               secureTextEntry={!showPass}
               autoCapitalize="none"
               autoCorrect={false}
@@ -282,6 +304,11 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
         </ScrollView>
 
         <View style={styles.footer}>
+          {!!loginError && (
+            <View style={styles.loginErrorBanner}>
+              <Text style={styles.loginErrorText}>{loginError}</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={[styles.btn, (!canContinue || loading) && styles.btnDisabled]}
             onPress={login}
@@ -364,4 +391,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center', paddingVertical: 12, marginTop: 4,
   },
   bioSetupLinkText: { color: GREEN_DARK, fontSize: 14, fontWeight: '600' },
+
+  loginErrorBanner: {
+    backgroundColor: '#FFF0F0',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    padding: 12,
+    marginBottom: 12,
+  },
+  loginErrorText: { color: '#C0392B', fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });

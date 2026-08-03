@@ -50,7 +50,25 @@ const bytesToHex = (bytes: Uint8Array): string =>
   Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
 export async function getDeviceId(): Promise<string> {
-  if (Platform.OS === 'web') return 'web';
+  if (Platform.OS === 'web') {
+    // Web: persist a stable device ID in localStorage so it survives page
+    // refreshes and is consistent across logins in the same browser profile.
+    // Falls back to an ephemeral ID if localStorage is unavailable (private mode).
+    const WEB_DEVICE_KEY = 'truzo_web_device_id';
+    try {
+      const stored = localStorage.getItem(WEB_DEVICE_KEY);
+      if (stored) return stored;
+      const buf = new Uint8Array(24);
+      crypto.getRandomValues(buf);
+      const id = Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(WEB_DEVICE_KEY, id);
+      return id;
+    } catch {
+      const buf = new Uint8Array(24);
+      crypto.getRandomValues(buf);
+      return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  }
   let id = await secureGet(DEVICE_KEY);
   if (!id) {
     const bytes = await Crypto.getRandomBytesAsync(24);
