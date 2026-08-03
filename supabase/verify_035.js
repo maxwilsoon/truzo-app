@@ -1,13 +1,19 @@
 // verify_035.js — M7: Server-side financial amount validation
 //
 // Prerequisites:
-//   DATABASE_URL — postgres superuser connection string
+//   DATABASE_URL   — postgres superuser connection string (never printed)
 //   TEST_PARENT_ID — UUID of an existing parents row with no active loans
 //
 // Usage:
 //   node supabase/verify_035.js
 //
-// Tests T01–T08: require_valid_gbp_amount helper (called directly as superuser)
+// Behaviour:
+//   Stops immediately on the first test failure (fail-fast).
+//   All tests are read-only or wrapped in transactions that always ROLLBACK.
+//   No data is written to the database — no cleanup step is needed.
+//   The connection string is never printed; only static status messages appear.
+//
+// Tests T01–T08: require_valid_gbp_amount helper
 // Tests T09–T11: top_up_safety_pool — auth guard + amount validation
 // Tests T12–T14: update_safety_pool — auth guard + inline validation
 // Tests T15–T16: parent_send_to_child — auth guard + amount validation
@@ -17,14 +23,14 @@
 'use strict';
 const { Client } = require('pg');
 
-const DATABASE_URL  = process.env.DATABASE_URL;
+const DATABASE_URL   = process.env.DATABASE_URL;
 const TEST_PARENT_ID = process.env.TEST_PARENT_ID;
 
 if (!DATABASE_URL)   throw new Error('DATABASE_URL not set');
 if (!TEST_PARENT_ID) throw new Error('TEST_PARENT_ID not set');
 
+let c; // module-level so test() can close the connection on failure
 let passed = 0;
-let failed = 0;
 
 async function test(name, fn) {
   try {
@@ -33,7 +39,9 @@ async function test(name, fn) {
     passed++;
   } catch (e) {
     console.error(`  ✗  ${name}: ${e.message}`);
-    failed++;
+    console.error('\nVerification stopped at first failure.');
+    if (c) await c.end().catch(() => {});
+    process.exit(1);
   }
 }
 
@@ -48,32 +56,28 @@ async function assertThrows(fn, expectedSubstr) {
     }
     return;
   }
-  throw new Error(`Expected an error containing '${expectedSubstr}' but succeeded (result: ${JSON.stringify(result)})`);
+  throw new Error(`Expected error containing '${expectedSubstr}' but succeeded (result: ${JSON.stringify(result)})`);
 }
 
-// Expects fn() to resolve without throwing.
 async function assertOk(fn) {
   await fn();
 }
 
-// Run fn(conn) inside a transaction with request.jwt.claims set to the given parentId.
-// auth.uid() will return parentId for the duration.
-async function asParent(c, parentId, fn) {
-  await c.query('BEGIN');
+// Run fn(conn) as an authenticated parent (sets auth.uid()). Always ROLLBACKs —
+// prevents state changes even when the called function succeeds.
+async function asParentRollback(conn, parentId, fn) {
+  await conn.query('BEGIN');
   try {
     const claims = JSON.stringify({ sub: parentId, role: 'authenticated' }).replace(/'/g, "''");
-    await c.query(`SET LOCAL "request.jwt.claims" = '${claims}'`);
-    const result = await fn(c);
-    await c.query('COMMIT');
-    return result;
-  } catch (e) {
-    await c.query('ROLLBACK');
-    throw e;
+    await conn.query(`SET LOCAL "request.jwt.claims" = '${claims}'`);
+    return await fn(conn);
+  } finally {
+    await conn.query('ROLLBACK');
   }
 }
 
 async function main() {
-  const c = new Client({ connectionString: DATABASE_URL });
+  c = new Client({ connectionString: DATABASE_URL });
   await c.connect();
 
   // ── T01–T08: require_valid_gbp_amount ───────────────────────────────────────
@@ -138,7 +142,7 @@ async function main() {
 
   await test('T10: null amount (as parent) → invalid_amount', () =>
     assertThrows(
-      () => asParent(c, TEST_PARENT_ID, conn =>
+      () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query('SELECT public.top_up_safety_pool($1, NULL::numeric)', [TEST_PARENT_ID])
       ),
       'invalid_amount'
@@ -147,7 +151,7 @@ async function main() {
 
   await test('T11: 0.49 (as parent) → amount_below_minimum', () =>
     assertThrows(
-      () => asParent(c, TEST_PARENT_ID, conn =>
+      () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query('SELECT public.top_up_safety_pool($1, 0.49)', [TEST_PARENT_ID])
       ),
       'amount_below_minimum'
@@ -166,7 +170,7 @@ async function main() {
 
   await test('T13: null limit (as parent) → invalid_amount', () =>
     assertThrows(
-      () => asParent(c, TEST_PARENT_ID, conn =>
+      () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query('SELECT public.update_safety_pool($1, NULL::numeric)', [TEST_PARENT_ID])
       ),
       'invalid_amount'
@@ -175,7 +179,7 @@ async function main() {
 
   await test('T14: 50.999 (as parent) → amount_precision_invalid', () =>
     assertThrows(
-      () => asParent(c, TEST_PARENT_ID, conn =>
+      () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query('SELECT public.update_safety_pool($1, 50.999)', [TEST_PARENT_ID])
       ),
       'amount_precision_invalid'
@@ -197,7 +201,7 @@ async function main() {
 
   await test('T16: 0.001 (as parent) → amount_precision_invalid', () =>
     assertThrows(
-      () => asParent(c, TEST_PARENT_ID, conn =>
+      () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query(
           'SELECT public.parent_send_to_child($1, $2, 0.001, $3)',
           [TEST_PARENT_ID, '00000000-0000-0000-0000-000000000001', 'Test Parent']
@@ -208,8 +212,8 @@ async function main() {
   );
 
   // ── T17–T18: create_money_request amount-first ordering ─────────────────────
-  // Amount validation fires before session check — proven by getting an amount
-  // error (not a session error) when both p_amount and session are invalid.
+  // Proves amount validation fires before session check:
+  // with both p_amount and session invalid, we get an amount error (not session error).
   console.log('\n  create_money_request (amount validation before session check)\n');
 
   await test('T17: null amount + fake session → invalid_amount (not session error)', () =>
@@ -267,10 +271,9 @@ async function main() {
 
   // ── Summary ──────────────────────────────────────────────────────────────────
   console.log(`\n${'─'.repeat(52)}`);
-  console.log(`  ${passed} passed, ${failed} failed\n`);
+  console.log(`  ${passed}/20 passed\n`);
 
   await c.end();
-  if (failed > 0) process.exit(1);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

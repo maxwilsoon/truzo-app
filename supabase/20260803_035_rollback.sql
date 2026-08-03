@@ -1,37 +1,58 @@
--- Rollback 035: Undo server-side financial amount validation (M7)
+-- Rollback 035: Server-side financial amount validation (M7) — FAIL-CLOSED
 --
--- Reverses:
---   - Drops require_valid_gbp_amount helper
---   - Restores top_up_safety_pool, update_safety_pool, parent_send_to_child
---     to pre-035 bodies (no auth guards, no amount validation)
---   - Restores grant exposure to PUBLIC on those three RPCs
---   - Restores create_money_request to migration 023 body (no amount validation)
---   - Restores fund_money_request to migration 028 body (old <= 0 guard only)
---   - Drops non-negative CHECK constraints on children
+-- SECURITY POLICY: This rollback prioritises security over restoring old behaviour.
+-- It does NOT reopen the vulnerabilities that existed before migration 035.
+--
+-- What is preserved from migration 035:
+--   ✓ authenticated-only EXECUTE grants on top_up_safety_pool, update_safety_pool,
+--     parent_send_to_child  (PUBLIC and anon remain revoked)
+--   ✓ auth.uid() = p_parent_id / p_user_id ownership checks in all three RPCs
+--   ✓ non-negative CHECK constraints on children: wallet_balance, borrowed,
+--     loaned_out, parent_debt  (do NOT drop unless proven to cause the regression)
+--
+-- What is rolled back:
+--   ✗ require_valid_gbp_amount helper — dropped; each RPC that called it gets
+--     a minimal inline replacement (not null, > 0) rather than the full helper
+--   ✗ create_money_request — session check moves back to first (035 moved it after
+--     amount validation); inline amount pre-check removed
+--   ✗ fund_money_request — session check moves back to first; helper replaced
+--     with the original manual <= 0 guard from migration 028
+--   ✗ update_safety_pool — helper call removed; null and < 0 checks remain inline;
+--     decimal-precision check not present after this rollback
+--   ✗ top_up_safety_pool — helper call removed; inline null + <= 0 replaces it
+--   ✗ parent_send_to_child — helper call removed; inline null + <= 0 replaces it
+--
+-- When to drop the CHECK constraints (NOT done here):
+--   If a specific constraint (e.g. chk_children_wallet_nonneg) is the confirmed
+--   cause of a production regression, drop it manually AFTER investigation:
+--     ALTER TABLE children DROP CONSTRAINT chk_children_wallet_nonneg;
+--   Do not drop all four constraints blindly.
+--
+-- Rollback verification: supabase/verify_035_rollback.js
 
 BEGIN;
 
--- ── Drop helper ───────────────────────────────────────────────────────────────
+-- ── Drop require_valid_gbp_amount ─────────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS public.require_valid_gbp_amount(numeric, text);
 
--- ── Restore grants to PUBLIC ──────────────────────────────────────────────────
+-- ── top_up_safety_pool — auth guard + grant preserved; inline minimal validation
 
-GRANT EXECUTE ON FUNCTION public.top_up_safety_pool(uuid, numeric)           TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.update_safety_pool(uuid, numeric)           TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.parent_send_to_child(uuid, uuid, numeric, text) TO PUBLIC;
-
--- ── Restore top_up_safety_pool (migration 016 body — no auth guard) ───────────
-
-CREATE OR REPLACE FUNCTION public.top_up_safety_pool(p_parent_id UUID, p_amount NUMERIC)
-RETURNS NUMERIC
+CREATE OR REPLACE FUNCTION public.top_up_safety_pool(p_parent_id uuid, p_amount numeric)
+RETURNS numeric
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_new_limit NUMERIC;
+  v_new_limit numeric;
 BEGIN
+  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RAISE EXCEPTION 'invalid_amount: top-up amount must be positive';
+  END IF;
   UPDATE parents
     SET safety_pool_limit = COALESCE(safety_pool_limit, 0) + p_amount
   WHERE id = p_parent_id
@@ -39,8 +60,9 @@ BEGIN
   RETURN v_new_limit;
 END;
 $$;
+-- Grant unchanged: authenticated only (no PUBLIC/anon restoration)
 
--- ── Restore update_safety_pool (migration 028 body — no auth guard) ───────────
+-- ── update_safety_pool — auth guard + grant preserved; simplified inline checks
 
 CREATE OR REPLACE FUNCTION public.update_safety_pool(
   p_parent_id uuid,
@@ -48,19 +70,24 @@ CREATE OR REPLACE FUNCTION public.update_safety_pool(
 ) RETURNS void
   LANGUAGE plpgsql
   SECURITY DEFINER
-  SET search_path TO 'public'
+  SET search_path = public
 AS $$
 DECLARE
   v_used     numeric;
   v_reserved numeric;
   v_combined numeric;
 BEGIN
+  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+  IF p_new_limit IS NULL THEN
+    RAISE EXCEPTION 'invalid_amount: limit must not be null';
+  END IF;
   IF p_new_limit < 0 THEN
-    RAISE EXCEPTION 'Safety pool limit cannot be negative';
+    RAISE EXCEPTION 'invalid_amount: limit cannot be negative';
   END IF;
 
-  SELECT COALESCE(safety_pool_used, 0),
-         COALESCE(safety_pool_reserved, 0)
+  SELECT COALESCE(safety_pool_used, 0), COALESCE(safety_pool_reserved, 0)
     INTO v_used, v_reserved
     FROM parents WHERE id = p_parent_id
     FOR UPDATE;
@@ -69,7 +96,7 @@ BEGIN
 
   IF p_new_limit < v_combined THEN
     RAISE EXCEPTION
-      'Cannot reduce Safety Pool limit to % — current used (%) + reserved (%) = % exceeds the new limit',
+      'Cannot reduce Safety Pool limit to % — used (%) + reserved (%) = % exceeds new limit',
       p_new_limit, v_used, v_reserved, v_combined;
   END IF;
 
@@ -79,19 +106,31 @@ BEGIN
     WHERE id = p_parent_id;
 END;
 $$;
+-- Grant unchanged: authenticated only (no PUBLIC/anon restoration)
 
--- ── Restore parent_send_to_child (parent-transfer-migration body — no auth guard)
+-- ── parent_send_to_child — auth guard + grant preserved; inline minimal validation
 
 CREATE OR REPLACE FUNCTION public.parent_send_to_child(
-  p_user_id    uuid,
-  p_child_id   uuid,
-  p_amount     numeric,
+  p_user_id     uuid,
+  p_child_id    uuid,
+  p_amount      numeric,
   p_parent_name text
-) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+) RETURNS void
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path = public
+AS $$
 DECLARE
   v_tx_id      text := 'ps_' || floor(extract(epoch from now()))::bigint;
   v_amount_str text;
 BEGIN
+  IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RAISE EXCEPTION 'invalid_amount: transfer amount must be positive';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM children WHERE id = p_child_id AND parent_id = p_user_id
   ) THEN
@@ -103,30 +142,23 @@ BEGIN
     ELSE round(p_amount, 2)::text
   END;
 
-  UPDATE children
-    SET wallet_balance = wallet_balance + p_amount
-  WHERE id = p_child_id;
+  UPDATE children SET wallet_balance = wallet_balance + p_amount WHERE id = p_child_id;
 
   INSERT INTO transactions (child_id, type, amount, description, counterparty)
-    VALUES (
-      p_child_id,
-      'parent_transfer',
-      p_amount,
-      p_parent_name || ' sent you £' || v_amount_str,
-      p_parent_name
-    );
+    VALUES (p_child_id, 'parent_transfer', p_amount,
+            p_parent_name || ' sent you £' || v_amount_str, p_parent_name);
 
   INSERT INTO activity_feed (child_id, id, emoji, text, type)
-    VALUES (
-      p_child_id,
-      'act_' || v_tx_id,
-      '💚',
-      p_parent_name || ' sent you £' || v_amount_str,
-      'topup'
-    );
-END; $$;
+    VALUES (p_child_id, 'act_' || v_tx_id, '💚',
+            p_parent_name || ' sent you £' || v_amount_str, 'topup');
+END;
+$$;
+-- Grant unchanged: authenticated only (no PUBLIC/anon restoration)
 
--- ── Restore create_money_request (migration 023 body — no amount validation) ──
+-- ── create_money_request — session check restored to first position
+-- (035 moved amount validation before the session check; this restores the
+-- 023 ordering. The PERFORM require_valid_gbp_amount line is removed.
+-- All other logic is unchanged from migration 023.)
 
 CREATE OR REPLACE FUNCTION public.create_money_request(
   p_from_id       uuid,
@@ -204,8 +236,10 @@ BEGIN
   RETURN json_build_object('request_id', v_req_id);
 END;
 $$;
+-- Grant unchanged from migration 023: anon
 
--- ── Restore fund_money_request (migration 028 body — manual <= 0 guard only) ──
+-- ── fund_money_request — session check restored to first; helper replaced with
+-- original manual <= 0 guard from migration 028. All other logic unchanged.
 
 CREATE OR REPLACE FUNCTION public.fund_money_request(
   p_request_id    uuid,
@@ -330,14 +364,16 @@ BEGIN
   RETURN json_build_object('borrower_id', v_borrower_id);
 END;
 $$;
+-- Grant unchanged from migration 028: anon
 
--- ── Drop CHECK constraints on children ───────────────────────────────────────
-
-ALTER TABLE children
-  DROP CONSTRAINT IF EXISTS chk_children_wallet_nonneg,
-  DROP CONSTRAINT IF EXISTS chk_children_borrowed_nonneg,
-  DROP CONSTRAINT IF EXISTS chk_children_loaned_nonneg,
-  DROP CONSTRAINT IF EXISTS chk_children_debt_nonneg;
+-- ── CHECK constraints — intentionally preserved ───────────────────────────────
+-- The non-negative constraints added by migration 035 are NOT dropped here.
+-- If a specific constraint is the confirmed cause of a regression, remove it
+-- manually after investigation:
+--   ALTER TABLE children DROP CONSTRAINT chk_children_wallet_nonneg;
+--   ALTER TABLE children DROP CONSTRAINT chk_children_borrowed_nonneg;
+--   ALTER TABLE children DROP CONSTRAINT chk_children_loaned_nonneg;
+--   ALTER TABLE children DROP CONSTRAINT chk_children_debt_nonneg;
 
 NOTIFY pgrst, 'reload schema';
 
