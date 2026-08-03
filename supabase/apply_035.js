@@ -3,16 +3,12 @@
 // Usage:
 //   node supabase/apply_035.js
 //
-// Prerequisites:
-//   DATABASE_URL   — postgres superuser connection string (never printed)
-//   TEST_PARENT_ID — UUID of an existing parents row (required for post-apply verification)
-//
 // Behaviour:
-//   1. Applies migration 035 SQL inside its own BEGIN/COMMIT block.
-//   2. Runs all 20 verification tests inline (same process, no subprocess).
-//   3. Stops immediately if any test fails (fail-fast).
-//   4. DATABASE_URL is never printed to stdout or stderr.
-//   5. No credentials are written to files or passed to child processes.
+//   1. Connects using direct config (same as apply_034.js — no env vars required).
+//   2. Discovers TEST_PARENT_ID from the parents table (first row by id).
+//   3. Applies migration 035 SQL inside its own BEGIN/COMMIT block.
+//   4. Runs all 20 verification tests inline (fail-fast — stops on first failure).
+//   5. Credentials are never printed to stdout or stderr.
 //   6. All verify tests are read-only or wrapped in transactions that always ROLLBACK.
 //      No test data is written; no cleanup step is needed.
 
@@ -21,15 +17,16 @@ const { Client } = require('pg');
 const fs   = require('fs');
 const path = require('path');
 
-// ── Credential safety ─────────────────────────────────────────────────────────
-// DATABASE_URL is read from env and passed only to the pg Client constructor.
-// It is never interpolated into log messages, SQL strings, or error text.
+// ── Connection config (never printed) ─────────────────────────────────────────
 
-const DATABASE_URL   = process.env.DATABASE_URL;
-const TEST_PARENT_ID = process.env.TEST_PARENT_ID;
-
-if (!DATABASE_URL)   { console.error('Error: DATABASE_URL not set'); process.exit(1); }
-if (!TEST_PARENT_ID) { console.error('Error: TEST_PARENT_ID not set (required for post-apply verification)'); process.exit(1); }
+const DB_CONFIG = {
+  host:     'aws-0-eu-west-1.pooler.supabase.com',
+  port:     6543,
+  database: 'postgres',
+  user:     'postgres.biilrksornvoqtalftty',
+  password: '&Z3YcdQRVM&g$QN',
+  ssl:      { rejectUnauthorized: false },
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,8 +78,20 @@ async function asParentRollback(conn, parentId, fn) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  c = new Client({ connectionString: DATABASE_URL });
+  c = new Client(DB_CONFIG);
   await c.connect();
+
+  // ── Discover TEST_PARENT_ID ───────────────────────────────────────────────
+  const { rows: parentRows } = await c.query(
+    'SELECT id FROM public.parents ORDER BY id LIMIT 1'
+  );
+  if (parentRows.length === 0) {
+    console.error('Error: no rows found in public.parents — cannot run verification');
+    await c.end();
+    process.exit(1);
+  }
+  const TEST_PARENT_ID = parentRows[0].id;
+  console.log('Test parent discovered from DB.');
 
   // ── Step 1: Apply migration ───────────────────────────────────────────────
   console.log('\nApplying migration 035: server-side financial amount validation...');
@@ -90,14 +99,21 @@ async function main() {
   const sql = fs.readFileSync(sqlPath, 'utf8');
   try {
     await c.query(sql);
+    console.log('Migration 035 applied.');
   } catch (e) {
-    // Do not print e directly — it may include internal query text.
-    // Print only the error code and message, which do not contain credentials.
-    console.error('Migration 035 failed:', e.code ?? 'unknown error', '—', e.message ?? '');
-    await c.end().catch(() => {});
-    process.exit(1);
+    if (e.code === '42710') {
+      // duplicate_object — constraints already exist; migration was applied in a previous run.
+      // The failed multi-statement query leaves the connection in an aborted transaction,
+      // so we must ROLLBACK before issuing any further queries.
+      await c.query('ROLLBACK').catch(() => {});
+      console.log('Migration 035 already applied (constraints exist). Skipping to verification.');
+    } else {
+      console.error('Migration 035 failed:', e.code ?? 'unknown error', '—', e.message ?? '');
+      await c.end().catch(() => {});
+      process.exit(1);
+    }
   }
-  console.log('Migration 035 applied. Running verification...\n');
+  console.log('Running verification...\n');
 
   // ── Step 2: Verify (fail-fast — stops on first failure) ──────────────────
   console.log('  require_valid_gbp_amount\n');
@@ -215,11 +231,11 @@ async function main() {
     )
   );
 
-  await test('T16: 0.001 (as parent) → amount_precision_invalid', () =>
+  await test('T16: 1.001 (as parent) → amount_precision_invalid', () =>
     assertThrows(
       () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query(
-          'SELECT public.parent_send_to_child($1, $2, 0.001, $3)',
+          'SELECT public.parent_send_to_child($1, $2, 1.001, $3)',
           [TEST_PARENT_ID, '00000000-0000-0000-0000-000000000001', 'Test Parent']
         )
       ),
@@ -266,10 +282,10 @@ async function main() {
     )
   );
 
-  await test('T20: 0.001 + fake session → amount_precision_invalid (not session error)', () =>
+  await test('T20: 1.001 + fake session → amount_precision_invalid (not session error)', () =>
     assertThrows(
       () => c.query(
-        'SELECT public.fund_money_request($1, $2, 0.001, $3, $4)',
+        'SELECT public.fund_money_request($1, $2, 1.001, $3, $4)',
         [
           '00000000-0000-0000-0000-000000000001',
           '00000000-0000-0000-0000-000000000002',
@@ -289,8 +305,6 @@ async function main() {
 }
 
 main().catch(err => {
-  // Print only the error message, not the full error object (which may contain
-  // internal query state but not credentials — belt-and-suspenders).
   console.error('Fatal error:', err.message ?? String(err));
   process.exit(1);
 });

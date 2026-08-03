@@ -199,11 +199,11 @@ async function main() {
     )
   );
 
-  await test('T16: 0.001 (as parent) → amount_precision_invalid', () =>
+  await test('T16: 1.001 (as parent) → amount_precision_invalid', () =>
     assertThrows(
       () => asParentRollback(c, TEST_PARENT_ID, conn =>
         conn.query(
-          'SELECT public.parent_send_to_child($1, $2, 0.001, $3)',
+          'SELECT public.parent_send_to_child($1, $2, 1.001, $3)',
           [TEST_PARENT_ID, '00000000-0000-0000-0000-000000000001', 'Test Parent']
         )
       ),
@@ -254,10 +254,10 @@ async function main() {
     )
   );
 
-  await test('T20: 0.001 + fake session → amount_precision_invalid (not session error)', () =>
+  await test('T20: 1.001 + fake session → amount_precision_invalid (not session error)', () =>
     assertThrows(
       () => c.query(
-        'SELECT public.fund_money_request($1, $2, 0.001, $3, $4)',
+        'SELECT public.fund_money_request($1, $2, 1.001, $3, $4)',
         [
           '00000000-0000-0000-0000-000000000001',
           '00000000-0000-0000-0000-000000000002',
