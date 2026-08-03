@@ -28,13 +28,12 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
 
-  // If we arrive in 'enter' mode with no hash in context (e.g. after child logout),
-  // fetch the hash from DB so the parent can verify their PIN without re-entering email.
-  // When userId is missing from context (AsyncStorage cleared), fall back to the
-  // SecureStore key written at child login / parent login time before going to email.
+  // In 'enter' mode, ensure userId is available (needed for server-side PIN verification).
+  // When userId is missing from context (e.g. after child logout + app restart),
+  // fall back to the SecureStore key written at child/parent login time.
   useEffect(() => {
     if (mode !== 'enter') return;
-    if (parent.passcodeHash || parent.passcode) return;
+    if (parent.passcodeCreated) return;
     (async () => {
       let effectiveUserId = userId;
       if (!effectiveUserId) {
@@ -46,9 +45,9 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         return;
       }
       try {
-        const result = await db.getParentPasscodeHash(effectiveUserId);
-        if (result?.hash) {
-          setParent(p => ({ ...p, passcodeHash: result.hash!, passcodeCreated: true }));
+        const created = await db.getParentPasscodeStatus(effectiveUserId);
+        if (created) {
+          setParent(p => ({ ...p, passcodeCreated: true }));
         } else {
           navigation.replace('ParentEmailLogin');
         }
@@ -93,8 +92,9 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
     } else if (mode === 'confirm') {
       if (next === pinToConfirm) {
         const hash = await hashPasscode(userId ?? '', next);
-        setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
-        try { await savePasscodeToDb(hash); } catch { /* context + cache already updated */ }
+        // Save to DB first; then update context WITHOUT the hash so it is never written to AsyncStorage.
+        try { await savePasscodeToDb(hash); } catch { /* DB save best-effort */ }
+        setParent(p => ({ ...p, passcodeHash: '', passcodeCreated: true, passcode: '' }));
         setTimeout(async () => {
           if (onSuccess === 'ParentTabs') {
             // Login-time PIN creation: run Safety Pool guard before granting dashboard access.
@@ -109,28 +109,11 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       }
 
     } else {
-      // Enter mode — try hash comparison first, fall back to plain text for migrating old accounts.
-      // Always run the Safety Pool guard before granting dashboard access.
-      if (parent.passcodeHash) {
-        const hash = await hashPasscode(userId ?? '', next);
-        if (hash === parent.passcodeHash) {
-          if (userId) registerPushToken(userId, 'parent').catch(() => {});
-          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
-        } else {
-          shake();
-        }
-      } else if (parent.passcode) {
-        // Migration path: old plain-text passcode in cache
-        if (next === parent.passcode) {
-          // Auto-upgrade: hash and save, clear plain text
-          const hash = await hashPasscode(userId ?? '', next);
-          setParent(p => ({ ...p, passcodeHash: hash, passcodeCreated: true, passcode: '' }));
-          savePasscodeToDb(hash).catch(() => {});
-          if (userId) registerPushToken(userId, 'parent').catch(() => {});
-          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
-        } else {
-          shake();
-        }
+      // Enter mode — verify PIN server-side; the hash never leaves the DB.
+      const ok = await db.verifyParentPasscode(userId ?? '', next);
+      if (ok) {
+        if (userId) registerPushToken(userId, 'parent').catch(() => {});
+        setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
       } else {
         shake();
       }

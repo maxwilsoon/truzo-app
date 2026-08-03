@@ -14,9 +14,10 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Holds the last successfully registered Expo push token for the current session.
-// Used by deregisterCurrentPushToken() on logout.
+// Hold the last registered push token and its owner for the current session.
+// Both are required by deregisterCurrentPushToken() to satisfy the ownership check added in migration 017.
 let _currentPushToken: string | null = null;
+let _currentUserId:    string | null = null;
 
 /**
  * Requests push permission, obtains an Expo push token, and registers it in the
@@ -58,6 +59,7 @@ export async function registerPushToken(
   try {
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     _currentPushToken = token;
+    _currentUserId    = userId;
 
     // Register in device_tokens table (and keep legacy children.push_token in sync)
     await db.registerDeviceToken(
@@ -80,13 +82,14 @@ export async function registerPushToken(
  * Call this on logout so the device stops receiving notifications while logged out.
  */
 export async function deregisterCurrentPushToken(): Promise<void> {
-  if (!_currentPushToken) return;
+  if (!_currentPushToken || !_currentUserId) return;
   try {
-    await db.deregisterDeviceToken(_currentPushToken);
+    await db.deregisterDeviceToken(_currentPushToken, _currentUserId);
   } catch (e) {
     if (__DEV__) console.warn('[Truzo] Push token deregistration failed:', e);
   } finally {
     _currentPushToken = null;
+    _currentUserId    = null;
   }
 }
 

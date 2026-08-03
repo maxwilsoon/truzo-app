@@ -116,6 +116,22 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
         data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
       };
 
+    case 'loan_defaulted_lender':
+      return {
+        to: token, sound: 'default',
+        title: '🛡️ Safety Pool paid out',
+        body: `${sender} missed their repayment. You've been paid ${amount} from the Safety Pool.`,
+        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
+      };
+
+    case 'loan_defaulted_borrower':
+      return {
+        to: token, sound: 'default',
+        title: '🔒 Account frozen',
+        body: `You missed your ${amount} repayment to ${sender}. Your parent has been notified.`,
+        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
+      };
+
     default:
       return null;
   }
@@ -136,7 +152,7 @@ serve(async (req: Request) => {
   // function is deployed with --no-verify-jwt
   const secret = Deno.env.get('NOTIFICATION_SECRET') ?? '';
   const provided = req.headers.get('x-notification-secret') ?? '';
-  if (secret !== '' && provided !== secret) {
+  if (!secret || provided !== secret) {
     return new Response('Unauthorized', { status: 401 });
   }
 

@@ -657,18 +657,6 @@ export const db = {
     return (data as any)?.streak ?? -1;
   },
 
-  /** Returns IDs of funded loans that are past their repay_by_date. */
-  async getOverdueFundedLoans(childId: string): Promise<Array<{ request_id: string }>> {
-    const { data, error } = await supabase.rpc('get_overdue_funded_loans', { p_child_id: childId });
-    if (error) return [];
-    return (data ?? []) as Array<{ request_id: string }>;
-  },
-
-  /** Atomically handles a defaulted loan: charges safety pool, pays lender, freezes borrower. */
-  async processLoanDefault(requestId: string): Promise<void> {
-    await supabase.rpc('process_loan_default', { p_request_id: requestId });
-  },
-
   /** Parent confirms child repaid: clears parent_debt, restores safety pool, unfreezes account. */
   async confirmParentRepayment(childId: string, parentId: string): Promise<void> {
     const { error } = await supabase.rpc('confirm_parent_repayment', {

@@ -598,13 +598,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setParentDebt(stats.parent_debt ?? 0);
       }).catch(() => {});
 
-      // 0c. Overdue funded loans — process defaults atomically on the server
-      db.getOverdueFundedLoans(childId).then(overdue => {
-        overdue.forEach(({ request_id }) => {
-          db.processLoanDefault(request_id).catch(() => {});
-        });
-      }).catch(() => {});
-
       // 1. Circle members (most critical — must always succeed)
       db.getCircle(childId).then(members => {
         setCircle(members.map(m => ({

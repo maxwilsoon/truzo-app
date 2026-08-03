@@ -61,7 +61,6 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
         allowanceNextPayment: par.allowance_next_payment ?? '',
         allowanceActive:     par.allowance_active ?? false,
         passcode:               '',
-        passcodeHash:           par.passcode_hash ?? '',
         passcodeCreated:        par.passcode_created ?? false,
         marketingNotifications: par.marketing_notifications ?? false,
         profileImageUrl:        par.profile_image_url ?? undefined,
@@ -97,7 +96,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
       // Email + password is full authentication.
       // First-time parents (no passcode yet) must create their PIN.
       // All paths then run through the central Safety Pool guard before entering the dashboard.
-      if (!par.passcode_created && !par.passcode_hash) {
+      if (!par.passcode_created) {
         navigation.navigate('ParentPasscode', { mode: 'create', onSuccess: 'ParentTabs' });
       } else {
         await navigateToParentDash(navigation, userId);
