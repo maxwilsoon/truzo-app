@@ -162,7 +162,11 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     } catch (e) {
       if (__DEV__) console.warn('[BiometricLogin] authenticate error:', String(e));
       setStatus('failed');
-      setErrorMsg('Something went wrong. Please try again.');
+      if (String((e as any)?.message ?? '').includes('rate_limit_exceeded')) {
+        setErrorMsg('Too many login attempts. Please wait before trying again.');
+      } else {
+        setErrorMsg('Something went wrong. Please try again.');
+      }
     }
   }, [childId, applyLoginResult, navigation]);
 

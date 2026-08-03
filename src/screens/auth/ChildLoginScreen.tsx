@@ -206,7 +206,9 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
       const msg = String(err?.message ?? err);
       if (__DEV__) console.error('[ChildLogin] error:', msg);
       // Alert.alert is a no-op on React Native Web — show an inline error instead.
-      if (msg.includes('invalid_credentials') || msg.includes('incorrect')) {
+      if (msg.includes('rate_limit_exceeded')) {
+        setLoginError('Too many failed attempts. Please wait a few minutes before trying again.');
+      } else if (msg.includes('invalid_credentials') || msg.includes('incorrect')) {
         setUsernameError('Username or password incorrect.');
         setPasswordError(' ');
       } else if (msg.includes('network') || msg.includes('fetch')) {

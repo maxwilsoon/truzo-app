@@ -516,12 +516,17 @@ export const db = {
     return !!data;
   },
 
-  /** Verify a parent PIN server-side — the hash never leaves the DB. */
+  /** Verify a parent PIN server-side — the hash never leaves the DB.
+   *  Throws 'rate_limit_exceeded' when too many failed attempts have been made.
+   */
   async verifyParentPasscode(userId: string, pin: string): Promise<boolean> {
-    const { data } = await supabase.rpc('verify_parent_passcode', {
+    const { data, error } = await supabase.rpc('verify_parent_passcode', {
       p_parent_id: userId,
       p_pin:       pin,
     });
+    if (error?.message?.includes('rate_limit_exceeded')) {
+      throw new Error('rate_limit_exceeded');
+    }
     return !!data;
   },
 

@@ -27,6 +27,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
   const { parent, setParent, savePasscodeToDb, userId, setUserId } = useApp();
   const [code, setCode] = useState('');
   const [error, setError] = useState(false);
+  const [throttleMsg, setThrottleMsg] = useState('');
 
   // In 'enter' mode, ensure userId is available (needed for server-side PIN verification).
   // When userId is missing from context (e.g. after child logout + app restart),
@@ -73,6 +74,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
   };
 
   const press = async (key: string) => {
+    setThrottleMsg('');
     if (key === '⌫') {
       setCode(c => c.slice(0, -1));
       setError(false);
@@ -110,12 +112,21 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
 
     } else {
       // Enter mode — verify PIN server-side; the hash never leaves the DB.
-      const ok = await db.verifyParentPasscode(userId ?? '', next);
-      if (ok) {
-        if (userId) registerPushToken(userId, 'parent').catch(() => {});
-        setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
-      } else {
-        shake();
+      try {
+        const ok = await db.verifyParentPasscode(userId ?? '', next);
+        if (ok) {
+          if (userId) registerPushToken(userId, 'parent').catch(() => {});
+          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
+        } else {
+          shake();
+        }
+      } catch (e: any) {
+        if (String(e?.message).includes('rate_limit_exceeded')) {
+          setCode('');
+          setThrottleMsg('Too many failed attempts. Please wait 5 minutes before trying again.');
+        } else {
+          shake();
+        }
       }
     }
   };
@@ -148,6 +159,10 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
             />
           ))}
         </View>
+
+        {!!throttleMsg && (
+          <Text style={styles.throttleMsg}>{throttleMsg}</Text>
+        )}
 
         {/* Number pad */}
         <View style={styles.pad}>
@@ -205,6 +220,15 @@ const styles = StyleSheet.create({
   },
   dotFilled: { backgroundColor: '#fff' },
   dotError:  { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' },
+
+  throttleMsg: {
+    color: '#FF6B6B',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: -32,
+    marginBottom: 20,
+    paddingHorizontal: 24,
+  },
 
   pad:    { flexDirection: 'row', flexWrap: 'wrap', width: '100%', maxWidth: 340 },
   keyBtn: { width: '33.33%', height: 88, alignItems: 'center', justifyContent: 'center' },
