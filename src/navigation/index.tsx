@@ -99,7 +99,6 @@ export const AppNavigator = () => {
           allowanceFrequency:     par.allowance_frequency ?? 'weekly',
           allowanceNextPayment:   par.allowance_next_payment ?? '',
           allowanceActive:        par.allowance_active ?? false,
-          passcode:               '',
           passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
           marketingNotifications: par.marketing_notifications ?? false,
           profileImageUrl:        par.profile_image_url ?? undefined,

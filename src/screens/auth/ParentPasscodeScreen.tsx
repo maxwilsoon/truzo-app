@@ -8,7 +8,6 @@ import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
-import { hashPasscode } from '../../lib/passcode';
 import { db } from '../../lib/database';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
 import { getLastParentForPasscode } from '../../lib/biometrics';
@@ -45,25 +44,18 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         navigation.replace('ParentEmailLogin');
         return;
       }
-      try {
-        const created = await db.getParentPasscodeStatus(effectiveUserId);
-        if (created) {
-          setParent(p => ({ ...p, passcodeCreated: true }));
-        } else {
-          navigation.replace('ParentEmailLogin');
-        }
-      } catch {
-        navigation.replace('ParentEmailLogin');
-      }
+      // Device-bound UUID found — proceed with PIN entry.
+    // verify_parent_passcode returns false for null hash (passcode not yet configured)
+    // identically to a wrong PIN; the "Sign in with email" footer link is the fallback.
     })();
   }, []);
 
   const firstName = (parent.displayName || 'there').split(' ')[0];
 
   const headings = {
-    create:  { title: 'Create your PIN',  sub: 'Choose a 4-digit parent PIN' },
+    create:  { title: 'Create your PIN',  sub: 'Choose a 6-digit parent PIN' },
     confirm: { title: 'Confirm your PIN', sub: 'Re-enter your PIN to confirm' },
-    enter:   { title: `Hi ${firstName}`,  sub: 'Enter your 4-digit parent PIN' },
+    enter:   { title: `Hi ${firstName}`,  sub: 'Enter your 6-digit parent PIN' },
   };
   const { title, sub } = headings[mode];
 
@@ -80,11 +72,11 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       setError(false);
       return;
     }
-    if (key === '' || code.length >= 4) return;
+    if (key === '' || code.length >= 6) return;
 
     const next = code + key;
     setCode(next);
-    if (next.length < 4) return;
+    if (next.length < 6) return;
 
     if (mode === 'create') {
       setTimeout(() => {
@@ -93,10 +85,9 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
 
     } else if (mode === 'confirm') {
       if (next === pinToConfirm) {
-        const hash = await hashPasscode(userId ?? '', next);
-        // Save to DB first; then update context WITHOUT the hash so it is never written to AsyncStorage.
-        try { await savePasscodeToDb(hash); } catch { /* DB save best-effort */ }
-        setParent(p => ({ ...p, passcodeHash: '', passcodeCreated: true, passcode: '' }));
+        // Send raw PIN to set_parent_passcode RPC; bcrypt is computed server-side.
+        try { await savePasscodeToDb(next); } catch { /* DB save best-effort */ }
+        setParent(p => ({ ...p, passcodeCreated: true }));
         setTimeout(async () => {
           if (onSuccess === 'ParentTabs') {
             // Login-time PIN creation: run Safety Pool guard before granting dashboard access.
@@ -146,9 +137,9 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.sub}>{sub}</Text>
 
-        {/* 4 indicator dots */}
+        {/* 6 indicator dots */}
         <View style={styles.dots}>
-          {[0,1,2,3].map(i => (
+          {[0,1,2,3,4,5].map(i => (
             <View
               key={i}
               style={[

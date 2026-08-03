@@ -170,9 +170,9 @@ export async function getLastChildForBiometric(): Promise<string | null> {
 }
 
 // ─── Last-parent persistence (survives logout and app restart) ────────────────
-// Stores the parent UUID so ParentPasscodeScreen can compute the correct
-// hashPasscode(parentId, pin) even when the AsyncStorage userId cache is stale
-// or the parent has not done a fresh email login in this session.
+// Stores the parent UUID so ParentPasscodeScreen can identify the parent for
+// PIN verification when the AsyncStorage userId cache is stale or the parent
+// has not done a fresh email login in this session.
 // Contains only the UUID — no passcode or hash is stored here.
 
 export async function setLastParentForPasscode(parentId: string): Promise<void> {

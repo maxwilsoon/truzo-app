@@ -186,15 +186,11 @@ export const db = {
     if (error) throw error;
   },
 
-  async updatePasscodeHash(userId: string, passcodeHash: string): Promise<void> {
-    const { error } = await supabase
-      .from('parents')
-      .update({
-        passcode_hash:       passcodeHash,
-        passcode_created:    true,
-        passcode_created_at: new Date().toISOString(),
-      })
-      .eq('id', userId);
+  async setParentPasscode(userId: string, pin: string): Promise<void> {
+    const { error } = await supabase.rpc('set_parent_passcode', {
+      p_parent_id: userId,
+      p_pin:       pin,
+    });
     if (error) throw error;
   },
 
@@ -508,12 +504,6 @@ export const db = {
       })
       .eq('id', userId);
     if (error) throw error;
-  },
-
-  /** Check whether a passcode has been set for a parent (never returns the hash). */
-  async getParentPasscodeStatus(userId: string): Promise<boolean> {
-    const { data } = await supabase.rpc('get_parent_passcode_status', { p_parent_id: userId });
-    return !!data;
   },
 
   /** Verify a parent PIN server-side — the hash never leaves the DB.

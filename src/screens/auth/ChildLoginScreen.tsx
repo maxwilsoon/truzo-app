@@ -117,10 +117,6 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
           allowanceFrequency:  par.allowance_frequency ?? 'weekly',
           allowanceNextPayment: par.allowance_next_payment ?? '',
           allowanceActive:     par.allowance_active ?? false,
-          passcode:            '',
-          // passcodeHash intentionally not set here (migration 015 removed it from
-          // the child login response). Verification is now server-side via
-          // verify_parent_passcode RPC.
           passcodeCreated: par.passcode_created ?? prev.passcodeCreated,
           marketingNotifications: par.marketing_notifications ?? false,
           profileImageUrl:        par.profile_image_url ?? undefined,
@@ -140,8 +136,8 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
       // on the next visit even after logout clears the AsyncStorage cache.
       setLastChildForBiometric(row.id).catch(() => {});
       // Set the parent's userId from the login response so PasscodeScreen can
-      // verify the PIN with hashPasscode(userId, pin) even without a prior parent
-      // email login in this session. Also persist to cache and SecureStore so the
+      // identify the parent for PIN verification even without a prior parent email
+      // login in this session. Also persist to cache and SecureStore so the
       // value survives a fresh app restart.
       if (par?.id) {
         setUserId(par.id);

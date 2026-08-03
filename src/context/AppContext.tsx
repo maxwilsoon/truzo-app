@@ -115,8 +115,6 @@ interface ParentProfile {
   allowanceFrequency: string;    // 'weekly' | 'fortnightly' | 'monthly'
   allowanceNextPayment: string;  // ISO date string or ''
   allowanceActive: boolean;
-  passcode: string;              // kept for cache backward-compat migration only
-  passcodeHash: string;          // SHA-256(userId:pin) — used for all new logins
   passcodeCreated: boolean;      // true once a passcode has been set up
   marketingNotifications: boolean;
   profileImageUrl?: string;
@@ -254,8 +252,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     allowanceFrequency: 'weekly',
     allowanceNextPayment: '',
     allowanceActive: false,
-    passcode: '',
-    passcodeHash: '',
     passcodeCreated: false,
     marketingNotifications: false,
   });
@@ -302,8 +298,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         // AsyncStorage cache miss (old cache format, reinstall, or first launch).
         // SecureStore is not cleared by cache.clear() or app reinstall on Android —
-        // use the persisted parent UUID as a fallback so PasscodeScreen can compute
-        // hashPasscode(parentId, pin) without requiring a fresh email login.
+        // use the persisted parent UUID as a fallback so PasscodeScreen can identify
+        // the parent for PIN verification without requiring a fresh email login.
         const secureParentId = await getLastParentForPasscode();
         if (secureParentId) setUserId(secureParentId);
       }
@@ -455,12 +451,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newChildId) setChildId(newChildId);
     // New account has no passcode yet. Clear any stale passcode data that
     // may have been left in cache from a previous session or account.
-    setParent(p => ({ ...p, passcode: '', passcodeHash: '', passcodeCreated: false }));
+    setParent(p => ({ ...p, passcodeCreated: false }));
   };
 
-  const savePasscodeToDb = async (passcodeHash: string) => {
+  const savePasscodeToDb = async (pin: string) => {
     if (!userId) return;
-    await db.updatePasscodeHash(userId, passcodeHash);
+    await db.setParentPasscode(userId, pin);
   };
 
   const setupSafetyPool = async (amount: number) => {
@@ -824,7 +820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firstName: '', lastName: '', displayName: '', email: '', mobile: '',
       address: '', safetyPoolLimit: 0, safetyPoolUsed: 0, weeklyAllowance: 10,
       allowanceFrequency: 'weekly', allowanceNextPayment: '', allowanceActive: false,
-      passcode: '', passcodeHash: '', passcodeCreated: false, marketingNotifications: false,
+      passcodeCreated: false, marketingNotifications: false,
     });
     setUserId(null);
     setActivityFeed([]);
