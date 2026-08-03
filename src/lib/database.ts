@@ -347,10 +347,6 @@ export const db = {
     if (error) throw new Error('cancel_money_request error: ' + error.message);
   },
 
-  async removeRequestActivities(requestId: string): Promise<void> {
-    await supabase.rpc('remove_request_activities', { p_request_id: requestId });
-  },
-
   async enableBiometric(childId: string, deviceId: string, biometricTokenHash: string): Promise<void> {
     const { error } = await supabase.rpc('enable_biometric', {
       p_child_id: childId, p_device_id: deviceId, p_biometric_token_hash: biometricTokenHash,

@@ -266,6 +266,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const hydrated = useRef(false);
   const childIdRef = useRef<string | null>(null);
 
+  // Activity feed merge helpers — reset when childId changes (new session).
+  // persistedActivityIds: IDs that have ever appeared in a DB response.
+  //   If an ID was in DB before but is now missing, it was deleted → remove from state.
+  // activeRequestIds: currently-active request IDs (pending or funded).
+  //   If a moneyreq_*/a_req_* item's request is gone from this set and has no
+  //   completion events in the feed, the request was cancelled → remove from state.
+  //   null = not yet loaded (skip the filter to avoid false removals on first load).
+  const persistedActivityIdsRef = useRef(new Set<string>());
+  const activeRequestIdsRef = useRef<Set<string> | null>(null);
+
   // Hydrate from local cache on mount (instant), then background-sync from DB.
   useEffect(() => {
     const hydrate = async () => {
@@ -543,6 +553,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       //    Sorted by created_at DESC so newest is always first regardless of RPC order.
       db.getActivityFeed(childId).then(items => {
         const dbIds = new Set(items.map(i => i.id));
+
+        // Track every ID that has ever appeared in a DB response.
+        // If an item was previously in this set but is now absent, it was
+        // deleted from DB (e.g. cancelled request) and must leave state too.
+        items.forEach(i => persistedActivityIdsRef.current.add(i.id));
+
         const dbMapped: ActivityItem[] = items.map(i => ({
           id: i.id,
           emoji: i.emoji,
@@ -551,9 +567,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: i.type as ActivityItem['type'],
           createdAt: i.created_at,
         }));
+
         setActivityFeed(prev => {
-          // Preserve any optimistic items not yet persisted to DB
-          const optimistic = prev.filter(a => !dbIds.has(a.id));
+          const optimistic = prev.filter(a => {
+            if (dbIds.has(a.id)) return false; // already in dbMapped
+
+            // Item was previously confirmed in DB but is now gone → deleted, remove it.
+            if (persistedActivityIdsRef.current.has(a.id)) return false;
+
+            // For in-memory-only request activities (moneyreq_* or a_req_*): remove
+            // if the associated request is no longer active AND the feed has no
+            // completion events (funded/repaid) for it — meaning it was cancelled.
+            if (a.type === 'request' && activeRequestIdsRef.current !== null) {
+              const reqId = a.id.startsWith('moneyreq_') ? a.id.slice(9)
+                          : a.id.startsWith('a_req_')    ? a.id.slice(6)
+                          : null;
+              if (reqId && !activeRequestIdsRef.current.has(reqId)) {
+                // Request is gone from active list.  Check for completion events in
+                // this child's feed so we don't remove history for funded/repaid loans.
+                const hasCompletion =
+                  [...prev, ...dbMapped].some(x =>
+                    x.id === 'funded_' + reqId || x.id === 'fund_'   + reqId ||
+                    x.id === 'repay_'  + reqId || x.id === 'recv_'   + reqId
+                  );
+                if (!hasCompletion) return false; // cancelled or expired, remove it
+              }
+            }
+
+            return true; // genuine not-yet-persisted optimistic item, keep it
+          });
           return [...optimistic, ...dbMapped].sort((a, b) => {
             const ta = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
             const tb = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
@@ -713,6 +755,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         moneyReqFirstDone = true;
         expiredFirstDone = true;
 
+        // Keep activeRequestIdsRef current so the activity-feed merge can
+        // detect request activities that belong to cancelled/expired requests.
+        activeRequestIdsRef.current = new Set(moneyReqs.map(r => r.id));
+
         // Exclude expired pending requests — they drop off everyone's circle page
         // via this same poll; funded requests are kept until repaid.
         setActiveRequests(() =>
@@ -748,7 +794,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     poll(); // immediate first fetch
     const id = setInterval(poll, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      // Reset per-session refs so the next child login starts with a clean slate.
+      persistedActivityIdsRef.current = new Set();
+      activeRequestIdsRef.current = null;
+    };
   }, [childId]);
 
   const clearSessionState = (storedChildId: string | null, sessionToken: string | null) => {

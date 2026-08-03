@@ -566,14 +566,15 @@ export const CircleScreen: React.FC = () => {
                             </View>
                             <TouchableOpacity
                               style={s.cancelPill}
-                              onPress={async () => {
+                              onPress={() => {
+                                // Optimistic: remove from local state immediately.
+                                // cancelMoneyRequest atomically updates status + deletes
+                                // activity rows (a_req_* and moneyreq_*) in one transaction.
                                 setActiveRequests(prev => prev.filter(r => r.id !== req.id));
                                 removeActivity(`a_req_${req.id}`);
-                                removeActivity(`moneyreq_${req.id}`);
                                 if (childId && childSessionToken && childDeviceId) {
                                   db.cancelMoneyRequest(req.id, childId, childSessionToken, childDeviceId).catch(() => {});
                                 }
-                                db.removeRequestActivities(req.id).catch(() => {});
                               }}
                               activeOpacity={0.8}
                             >
