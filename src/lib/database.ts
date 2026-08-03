@@ -526,8 +526,8 @@ export const db = {
   },
 
   /** Fetch live Safety Pool balance from DB — used by the access guard.
-   *  Uses a SECURITY DEFINER RPC so this works without an active parent
-   *  Supabase Auth session (e.g. after child logout → parent passcode entry).
+   *  Requires an active parent Supabase Auth session; returns null if the
+   *  caller is unauthenticated or not the parent identified by userId.
    */
   async getSafetyPoolStatus(userId: string): Promise<{ limit: number; used: number } | null> {
     const { data } = await supabase
