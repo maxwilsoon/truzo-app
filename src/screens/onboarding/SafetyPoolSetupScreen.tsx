@@ -20,6 +20,13 @@ type Props = {
   route: RouteProp<RootStackParamList, 'SafetyPool'>;
 };
 
+function describeAmountError(msg: string): string {
+  if (msg.includes('amount_below_minimum')) return 'Amount must be at least £0.50.';
+  if (msg.includes('amount_precision_invalid')) return 'Please enter a whole number or up to 2 decimal places (e.g. £5.50).';
+  if (msg.includes('invalid_amount')) return 'Please enter a valid amount.';
+  return msg;
+}
+
 export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation, route }) => {
   const { setupSafetyPool, topUpSafetyPool, parent } = useApp();
 
@@ -57,7 +64,7 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation, route }) =>
       }
       navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'ParentTabs' }] }));
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not save Safety Pool. Please try again.');
+      Alert.alert('Error', describeAmountError(e.message ?? 'Could not save Safety Pool. Please try again.'));
     } finally {
       setSaving(false);
     }

@@ -11,6 +11,13 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { fmtAmt } from '../../lib/utils';
 
+function describeAmountError(msg: string): string {
+  if (msg.includes('amount_below_minimum')) return 'Amount must be at least £0.50.';
+  if (msg.includes('amount_precision_invalid')) return 'Please enter a whole number or up to 2 decimal places (e.g. £5.50).';
+  if (msg.includes('invalid_amount')) return 'Please enter a valid amount.';
+  return msg;
+}
+
 export const ParentHomeScreen: React.FC = () => {
   const { child, parent, setParent, setChild, addActivity, addTransaction, frozenAccount, parentDebt, repayParent, userId, childId, activityFeed, topUpSafetyPool, saveAllowanceToDb } = useApp();
   const [topUpVisible, setTopUpVisible] = useState(false);
@@ -252,7 +259,9 @@ export const ParentHomeScreen: React.FC = () => {
         amount={topUpPaymentAmount}
         description="Top up Safety Pool"
         onSuccess={() => {
-          topUpSafetyPool(topUpPaymentAmount).catch(() => {});
+          topUpSafetyPool(topUpPaymentAmount).catch((e: any) => {
+            Alert.alert('Top-up failed', describeAmountError(e?.message ?? 'Could not update Safety Pool. Please try again.'));
+          });
           setTopUpPaymentVisible(false);
         }}
         onCancel={() => {
@@ -285,7 +294,7 @@ export const ParentHomeScreen: React.FC = () => {
               status: 'completed',
             });
           } catch (e: any) {
-            Alert.alert('Send failed', e.message ?? 'Could not send money. Please try again.');
+            Alert.alert('Send failed', describeAmountError(e?.message ?? 'Could not send money. Please try again.'));
           } finally {
             setSending(false);
             setSendPaymentVisible(false);

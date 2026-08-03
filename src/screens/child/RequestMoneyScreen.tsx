@@ -13,6 +13,13 @@ import { ActiveRequest } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { fmtAmt } from '../../lib/utils';
 
+function describeAmountError(msg: string): string {
+  if (msg.includes('amount_below_minimum')) return 'Amount must be at least £0.50.';
+  if (msg.includes('amount_precision_invalid')) return 'Please enter a whole number or up to 2 decimal places (e.g. £5.50).';
+  if (msg.includes('invalid_amount')) return 'Please enter a valid amount.';
+  return msg;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_FRIEND_AVATARS = 4;
@@ -173,7 +180,7 @@ export const RequestMoneyScreen: React.FC = () => {
       if (msg.includes('invalid_child_session') || msg.includes('child_session_expired') || msg.includes('child_session_revoked')) {
         handleSessionError(msg);
       } else {
-        Alert.alert('Error', msg || 'Could not send request.');
+        Alert.alert('Error', describeAmountError(msg) || 'Could not send request.');
       }
     } finally {
       setSending(false);
