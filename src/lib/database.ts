@@ -343,15 +343,18 @@ export const db = {
     if (error) throw new Error('cancel_money_request error: ' + error.message);
   },
 
-  async enableBiometric(childId: string, deviceId: string, biometricTokenHash: string): Promise<void> {
+  async enableBiometric(childId: string, deviceId: string, biometricTokenHash: string, sessionToken: string): Promise<void> {
     const { error } = await supabase.rpc('enable_biometric', {
       p_child_id: childId, p_device_id: deviceId, p_biometric_token_hash: biometricTokenHash,
+      p_session_token: sessionToken,
     });
     if (error) throw new Error('enable_biometric error: ' + error.message);
   },
 
-  async disableBiometric(childId: string): Promise<void> {
-    const { error } = await supabase.rpc('disable_biometric', { p_child_id: childId });
+  async disableBiometric(childId: string, sessionToken: string, deviceId: string): Promise<void> {
+    const { error } = await supabase.rpc('disable_biometric', {
+      p_child_id: childId, p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('disable_biometric error: ' + error.message);
   },
 

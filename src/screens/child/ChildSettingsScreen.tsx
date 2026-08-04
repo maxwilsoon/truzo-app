@@ -19,7 +19,7 @@ const Row: React.FC<{ label: string; value: string; isLast?: boolean }> = ({ lab
 
 export const ChildSettingsScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child, childId, biometricEnabled, setBiometricEnabled } = useApp();
+  const { child, childId, childSessionToken, biometricEnabled, setBiometricEnabled } = useApp();
   const initial = child.displayName.charAt(0).toUpperCase();
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
@@ -40,7 +40,8 @@ export const ChildSettingsScreen: React.FC = () => {
         if (!ok) { setBioLoading(false); return; }
         const deviceId = await getDeviceId();
         const { tokenHash } = await saveBiometricForChild(childId);
-        await db.enableBiometric(childId, deviceId, tokenHash);
+        if (!childSessionToken) throw new Error('No active session');
+        await db.enableBiometric(childId, deviceId, tokenHash, childSessionToken);
         setBiometricEnabled(true);
       } else {
         // Disable — confirm then clear
@@ -53,7 +54,9 @@ export const ChildSettingsScreen: React.FC = () => {
         const confirmed = await confirm();
         if (!confirmed) { setBioLoading(false); return; }
         await clearBiometricForChild(childId);
-        await db.disableBiometric(childId);
+        const deviceId = await getDeviceId();
+        if (!childSessionToken) throw new Error('No active session');
+        await db.disableBiometric(childId, childSessionToken, deviceId);
         setBiometricEnabled(false);
       }
     } catch {

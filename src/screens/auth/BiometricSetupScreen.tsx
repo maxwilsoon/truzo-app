@@ -26,7 +26,7 @@ const BG = '#E8F5E9';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'BiometricSetup'> };
 
 export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
-  const { childId, setBiometricEnabled } = useApp();
+  const { childId, childSessionToken, setBiometricEnabled } = useApp();
   const [loading, setLoading] = useState(false);
 
   const goToDashboard = () => {
@@ -59,7 +59,8 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
       if (__DEV__) console.log('[BiometricSetup] deviceId obtained');
       // Generate CSPRNG token, store raw in SecureStore, send hash to DB.
       const { tokenHash } = await saveBiometricForChild(childId);
-      await db.enableBiometric(childId, deviceId, tokenHash);
+      if (!childSessionToken) throw new Error('No active session');
+      await db.enableBiometric(childId, deviceId, tokenHash, childSessionToken);
       if (__DEV__) console.log('[BiometricSetup] DB biometric_enabled=true');
       await setLastChildForBiometric(childId);
       // Verify the token was actually stored before declaring success.

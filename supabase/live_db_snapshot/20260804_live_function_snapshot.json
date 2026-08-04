@@ -1,0 +1,1871 @@
+{
+  "extracted_at": "2026-08-04T06:19:36.306Z",
+  "db_host": "aws-0-eu-west-1.pooler.supabase.com",
+  "total_overloads": 47,
+  "functions": [
+    {
+      "name": "_trigger_notification",
+      "signature": "_trigger_notification(text,uuid,text,uuid,text,jsonb)",
+      "args": "p_type text, p_recipient_id uuid, p_recipient_type text, p_sender_id uuid, p_sender_name text, p_data jsonb",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions, net"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public._trigger_notification(p_type text, p_recipient_id uuid, p_recipient_type text, p_sender_id uuid, p_sender_name text, p_data jsonb DEFAULT '{}'::jsonb)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions', 'net'\nAS $function$\nDECLARE\n  v_secret TEXT;\nBEGIN\n  v_secret := current_setting('app.notification_secret', true);\n  IF v_secret IS NULL OR v_secret = '' THEN\n    RETURN; -- Not yet configured — skip silently\n  END IF;\n\n  PERFORM net.http_post(\n    url     := 'https://biilrksornvoqtalftty.supabase.co/functions/v1/send-notification',\n    headers := jsonb_build_object(\n      'Content-Type',          'application/json',\n      'x-notification-secret', v_secret\n    ),\n    body := jsonb_build_object(\n      'type',           p_type,\n      'recipient_id',   p_recipient_id,\n      'recipient_type', p_recipient_type,\n      'sender_id',      p_sender_id,\n      'sender_name',    p_sender_name,\n      'data',           p_data\n    )\n  );\nEXCEPTION WHEN OTHERS THEN\n  -- Never propagate notification errors to the calling transaction\n  NULL;\nEND; $function$\n"
+    },
+    {
+      "name": "_trigger_notification_multi",
+      "signature": "_trigger_notification_multi(text,uuid[],text,uuid,text,jsonb)",
+      "args": "p_type text, p_recipient_ids uuid[], p_recipient_type text, p_sender_id uuid, p_sender_name text, p_data jsonb",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions, net"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public._trigger_notification_multi(p_type text, p_recipient_ids uuid[], p_recipient_type text, p_sender_id uuid, p_sender_name text, p_data jsonb DEFAULT '{}'::jsonb)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions', 'net'\nAS $function$\nDECLARE\n  v_secret TEXT;\nBEGIN\n  IF p_recipient_ids IS NULL OR array_length(p_recipient_ids, 1) = 0 THEN\n    RETURN;\n  END IF;\n\n  v_secret := current_setting('app.notification_secret', true);\n  IF v_secret IS NULL OR v_secret = '' THEN RETURN; END IF;\n\n  PERFORM net.http_post(\n    url     := 'https://biilrksornvoqtalftty.supabase.co/functions/v1/send-notification',\n    headers := jsonb_build_object(\n      'Content-Type',          'application/json',\n      'x-notification-secret', v_secret\n    ),\n    body := jsonb_build_object(\n      'type',            p_type,\n      'recipient_ids',   to_jsonb(p_recipient_ids),\n      'recipient_type',  p_recipient_type,\n      'sender_id',       p_sender_id,\n      'sender_name',     p_sender_name,\n      'data',            p_data\n    )\n  );\nEXCEPTION WHEN OTHERS THEN\n  NULL;\nEND; $function$\n"
+    },
+    {
+      "name": "_update_weekly_streak",
+      "signature": "_update_weekly_streak(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "integer",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public._update_weekly_streak(p_child_id uuid)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  v_current_week date := date_trunc('week', now())::date;\n  v_last_week    date;\n  v_streak       int;\n  v_new_streak   int;\nBEGIN\n  SELECT last_active_week, streak INTO v_last_week, v_streak\n  FROM children WHERE id = p_child_id;\n\n  IF v_last_week = v_current_week THEN\n    -- Same ISO week: activity already counted this week, no change\n    RETURN COALESCE(v_streak, 0);\n  ELSIF v_last_week = (v_current_week - interval '7 days')::date THEN\n    -- Exactly one ISO week behind: consecutive week, increment\n    v_new_streak := COALESCE(v_streak, 0) + 1;\n    UPDATE children\n      SET streak = v_new_streak,\n          last_active_week = v_current_week\n      WHERE id = p_child_id;\n    RETURN v_new_streak;\n  ELSE\n    -- Gap detected (missed ≥1 week) or first ever activity: start fresh\n    UPDATE children\n      SET streak = 1,\n          last_active_week = v_current_week,\n          streak_started_at = now()\n      WHERE id = p_child_id;\n    RETURN 1;\n  END IF;\nEND;\n$function$\n"
+    },
+    {
+      "name": "accept_circle_request",
+      "signature": "accept_circle_request(uuid)",
+      "args": "p_request_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.accept_circle_request(p_request_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_from_id    uuid;\n  v_to_id      uuid;\n  v_from_token text;\n  v_to_name    text;\nBEGIN\n  UPDATE circle_requests\n  SET status = 'accepted'\n  WHERE id = p_request_id\n  RETURNING from_id, to_id INTO v_from_id, v_to_id;\n\n  IF v_from_id IS NULL THEN\n    RAISE EXCEPTION 'request_not_found';\n  END IF;\n\n  INSERT INTO circles(child_id, friend_id, status)\n  VALUES (v_from_id, v_to_id, 'active')\n  ON CONFLICT (child_id, friend_id) DO UPDATE\n    SET status = 'active', removed_at = NULL, removed_by = NULL;\n\n  INSERT INTO circles(child_id, friend_id, status)\n  VALUES (v_to_id, v_from_id, 'active')\n  ON CONFLICT (child_id, friend_id) DO UPDATE\n    SET status = 'active', removed_at = NULL, removed_by = NULL;\n\n  SELECT push_token   INTO v_from_token FROM children WHERE id = v_from_id;\n  SELECT display_name INTO v_to_name    FROM children WHERE id = v_to_id;\n\n  PERFORM _trigger_notification(\n    'friend_accepted', v_from_id, 'child', v_to_id, v_to_name, '{}'::jsonb\n  );\n\n  RETURN json_build_object(\n    'from_id',         v_from_id,\n    'to_id',           v_to_id,\n    'from_push_token', v_from_token\n  );\nEND; $function$\n"
+    },
+    {
+      "name": "add_activity_item",
+      "signature": "add_activity_item(uuid,text,text,text,text)",
+      "args": "p_child_id uuid, p_id text, p_emoji text, p_text text, p_type text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.add_activity_item(p_child_id uuid, p_id text, p_emoji text, p_text text, p_type text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  INSERT INTO activity_feed (child_id, id, emoji, text, type)\n  VALUES (p_child_id, p_id, p_emoji, p_text, p_type)\n  ON CONFLICT (id) DO NOTHING;\nEND;\n$function$\n"
+    },
+    {
+      "name": "biometric_login_child",
+      "signature": "biometric_login_child(uuid,text,text)",
+      "args": "p_child_id uuid, p_device_id text, p_biometric_token text",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.biometric_login_child(p_child_id uuid, p_device_id text, p_biometric_token text)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_child     children%ROWTYPE;\n  v_parent    parents%ROWTYPE;\n  v_raw_token text;\n  v_hash      text;\n  v_expires   timestamptz := now() + interval '1 hour';\n  v_abs_exp   timestamptz := now() + interval '30 days';\n  v_allowed   boolean;\nBEGIN\n  IF p_biometric_token IS NULL OR length(p_biometric_token) <> 64 THEN\n    RETURN NULL;\n  END IF;\n  IF p_device_id IS NULL OR p_device_id = '' THEN\n    RETURN NULL;\n  END IF;\n\n  -- ── Device throttle ────────────────────────────────────────────────────────\n  v_allowed := _rl_attempt(\n    'rl_bio_login', p_device_id,\n    20, interval '60 minutes', interval '30 minutes'\n  );\n  IF NOT v_allowed THEN\n    RAISE EXCEPTION 'rate_limit_exceeded';\n  END IF;\n\n  -- ── Credential check ───────────────────────────────────────────────────────\n  SELECT * INTO v_child\n    FROM children\n    WHERE id                   = p_child_id\n      AND biometric_enabled    = true\n      AND last_device_id       = p_device_id\n      AND biometric_token_hash = encode(digest(p_biometric_token, 'sha256'), 'hex');\n\n  IF NOT FOUND THEN\n    RETURN NULL;\n  END IF;\n\n  -- ── Success ────────────────────────────────────────────────────────────────\n  PERFORM _rl_clear('rl_bio_login', p_device_id);\n\n  UPDATE children SET last_biometric_login = now() WHERE id = p_child_id;\n  SELECT * INTO v_parent FROM parents WHERE id = v_child.parent_id;\n\n  v_raw_token := encode(gen_random_bytes(32), 'hex');\n  v_hash      := encode(digest(v_raw_token, 'sha256'), 'hex');\n  PERFORM revoke_all_child_sessions(v_child.id, 'superseded_by_new_login');\n  INSERT INTO child_sessions (child_id, token_hash, device_id, expires_at, absolute_expires_at)\n    VALUES (v_child.id, v_hash, p_device_id, v_expires, v_abs_exp);\n\n  RETURN json_build_object(\n    'child', json_build_object(\n      'id',                v_child.id,\n      'display_name',      v_child.display_name,\n      'username',          v_child.username,\n      'avatar_emoji',      v_child.avatar_emoji,\n      'profile_image_url', v_child.profile_image_url,\n      'trust_score',       v_child.trust_score,\n      'wallet_balance',    v_child.wallet_balance,\n      'loaned_out',        v_child.loaned_out,\n      'borrowed',          v_child.borrowed,\n      'streak',            v_child.streak,\n      'repaid',            v_child.repaid,\n      'missed',            v_child.missed,\n      'total_borrowed',    v_child.total_borrowed,\n      'total_lent',        v_child.total_lent,\n      'times_borrowed',    v_child.times_borrowed,\n      'times_lent',        v_child.times_lent,\n      'points',            v_child.points,\n      'age',               v_child.age,\n      'mobile',            v_child.mobile,\n      'biometric_enabled', v_child.biometric_enabled,\n      'last_device_id',    v_child.last_device_id,\n      'account_frozen',    v_child.account_frozen,\n      'parent_debt',       v_child.parent_debt\n    ),\n    'parent', json_build_object(\n      'id',                     v_parent.id,\n      'first_name',             v_parent.first_name,\n      'last_name',              v_parent.last_name,\n      'display_name',           v_parent.display_name,\n      'safety_pool_limit',      v_parent.safety_pool_limit,\n      'safety_pool_used',       v_parent.safety_pool_used,\n      'safety_pool_reserved',   v_parent.safety_pool_reserved,\n      'weekly_allowance',       v_parent.weekly_allowance,\n      'allowance_frequency',    v_parent.allowance_frequency,\n      'allowance_active',       v_parent.allowance_active,\n      'allowance_next_payment', v_parent.allowance_next_payment,\n      'passcode_created',       v_parent.passcode_created,\n      'marketing_notifications',v_parent.marketing_notifications,\n      'profile_image_url',      v_parent.profile_image_url\n    ),\n    'session_token',      v_raw_token,\n    'session_expires_at', v_expires\n  );\nEND;\n$function$\n"
+    },
+    {
+      "name": "cancel_circle_request",
+      "signature": "cancel_circle_request(uuid,uuid)",
+      "args": "p_from_id uuid, p_to_id uuid",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.cancel_circle_request(p_from_id uuid, p_to_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nBEGIN\n  DELETE FROM circle_requests\n  WHERE from_id = p_from_id AND to_id = p_to_id AND status = 'pending';\nEND;\n$function$\n"
+    },
+    {
+      "name": "cancel_money_request",
+      "signature": "cancel_money_request(uuid,uuid,text,text)",
+      "args": "p_request_id uuid, p_child_id uuid, p_session_token text, p_device_id text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.cancel_money_request(p_request_id uuid, p_child_id uuid, p_session_token text, p_device_id text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_rows int;\nBEGIN\n  -- Session validation is the first operation — before any read or write.\n  PERFORM require_valid_child_session(p_child_id, p_session_token, p_device_id);\n\n  UPDATE money_requests\n    SET    status = 'cancelled'\n    WHERE  id      = p_request_id\n      AND  from_id = p_child_id\n      AND  status  = 'pending';\n\n  GET DIAGNOSTICS v_rows = ROW_COUNT;\n\n  -- Only delete activity rows when we actually cancelled something.\n  -- A no-op UPDATE (already cancelled, funded, or wrong owner) is safe — no cleanup needed.\n  IF v_rows > 0 THEN\n    DELETE FROM activity_feed\n      WHERE id IN (\n        'a_req_'    || p_request_id::text,   -- borrower's \"You requested £X\"\n        'moneyreq_' || p_request_id::text    -- circle viewers' \"X requested £Y\"\n      );\n  END IF;\nEND;\n$function$\n"
+    },
+    {
+      "name": "confirm_parent_repayment",
+      "signature": "confirm_parent_repayment(uuid,uuid)",
+      "args": "p_child_id uuid, p_parent_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.confirm_parent_repayment(p_child_id uuid, p_parent_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  v_debt          numeric;\n  v_child_balance numeric;\nBEGIN\n  -- Lock child row and read both debt and current balance atomically.\n  SELECT COALESCE(parent_debt, 0), wallet_balance\n  INTO   v_debt, v_child_balance\n  FROM   children\n  WHERE  id = p_child_id AND parent_id = p_parent_id\n  FOR UPDATE;\n\n  IF NOT FOUND THEN\n    RETURN json_build_object('error', 'not_parent');\n  END IF;\n\n  -- Short-circuit: nothing to repay\n  IF v_debt = 0 THEN\n    RETURN json_build_object('repaid', 0);\n  END IF;\n\n  -- Balance check before any write\n  IF COALESCE(v_child_balance, 0) < v_debt THEN\n    RAISE EXCEPTION 'Insufficient balance: child has £% but owes £%',\n      to_char(COALESCE(v_child_balance, 0), 'FM999990.00'),\n      to_char(v_debt, 'FM999990.00');\n  END IF;\n\n  -- Exact deduction (balance check above guarantees this stays >= 0)\n  UPDATE children SET\n    wallet_balance = wallet_balance - v_debt,\n    parent_debt    = 0,\n    account_frozen = false\n  WHERE id = p_child_id;\n\n  UPDATE parents\n  SET safety_pool_used = GREATEST(0, COALESCE(safety_pool_used, 0) - v_debt)\n  WHERE id = p_parent_id;\n\n  RETURN json_build_object('repaid', v_debt);\nEND;\n$function$\n"
+    },
+    {
+      "name": "create_money_request",
+      "signature": "create_money_request(uuid,numeric,integer,text,text,text,text,uuid[])",
+      "args": "p_from_id uuid, p_amount numeric, p_deadline_days integer, p_session_token text, p_device_id text, p_reason text, p_reason_emoji text, p_viewer_ids uuid[]",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.create_money_request(p_from_id uuid, p_amount numeric, p_deadline_days integer, p_session_token text, p_device_id text, p_reason text DEFAULT ''::text, p_reason_emoji text DEFAULT '💸'::text, p_viewer_ids uuid[] DEFAULT NULL::uuid[])\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_req_id     uuid;\n  v_trust      int;\n  v_max_borrow numeric;\n  v_frozen     boolean;\n  v_from_name  text;\n  v_viewer_ids uuid[];\nBEGIN\n  -- Amount validation first — before session check or any DB read\n  PERFORM public.require_valid_gbp_amount(p_amount, 'request amount');\n\n  PERFORM require_valid_child_session(p_from_id, p_session_token, p_device_id);\n\n  SELECT trust_score, COALESCE(account_frozen, false)\n    INTO v_trust, v_frozen\n    FROM children WHERE id = p_from_id;\n\n  IF v_frozen THEN RAISE EXCEPTION 'account_frozen'; END IF;\n\n  IF EXISTS (\n    SELECT 1 FROM money_requests\n    WHERE from_id = p_from_id AND status IN ('pending', 'funded')\n  ) THEN\n    RAISE EXCEPTION 'already_borrowing';\n  END IF;\n\n  v_max_borrow := CASE\n    WHEN v_trust < 50 THEN 20\n    WHEN v_trust < 70 THEN 30\n    WHEN v_trust < 85 THEN 50\n    ELSE 100\n  END;\n\n  IF p_amount > v_max_borrow THEN\n    RAISE EXCEPTION 'amount_exceeds_limit:%', v_max_borrow;\n  END IF;\n\n  INSERT INTO money_requests\n    (from_id, amount, reason, reason_emoji, deadline_days, repay_by_date, expires_at, viewer_ids)\n  VALUES (\n    p_from_id, p_amount, p_reason, p_reason_emoji, p_deadline_days,\n    (now() + (p_deadline_days || ' days'::text)::interval)::date,\n    now() + interval '24 hours',\n    p_viewer_ids\n  ) RETURNING id INTO v_req_id;\n\n  PERFORM _update_weekly_streak(p_from_id);\n\n  SELECT array_agg(ci.friend_id) INTO v_viewer_ids\n    FROM circles ci\n    WHERE ci.child_id = p_from_id\n      AND ci.status   = 'active'\n      AND (p_viewer_ids IS NULL OR ci.friend_id = ANY(p_viewer_ids));\n\n  SELECT display_name INTO v_from_name FROM children WHERE id = p_from_id;\n\n  PERFORM _trigger_notification_multi(\n    'money_request', v_viewer_ids, 'child', p_from_id, v_from_name,\n    jsonb_build_object('amount', p_amount, 'request_id', v_req_id)\n  );\n\n  RETURN json_build_object('request_id', v_req_id);\nEND;\n$function$\n"
+    },
+    {
+      "name": "decline_circle_request",
+      "signature": "decline_circle_request(uuid)",
+      "args": "p_request_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.decline_circle_request(p_request_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_from_token text;\n  v_from_id    uuid;\n  v_to_id      uuid;\n  v_to_name    text;\nBEGIN\n  UPDATE circle_requests SET status = 'declined'\n  WHERE id = p_request_id\n  RETURNING from_id, to_id INTO v_from_id, v_to_id;\n\n  SELECT push_token   INTO v_from_token FROM children WHERE id = v_from_id;\n  SELECT display_name INTO v_to_name    FROM children WHERE id = v_to_id;\n\n  PERFORM _trigger_notification(\n    'friend_declined', v_from_id, 'child', v_to_id, v_to_name, '{}'::jsonb\n  );\n\n  RETURN json_build_object('from_push_token', v_from_token);\nEND; $function$\n"
+    },
+    {
+      "name": "deregister_device_token",
+      "signature": "deregister_device_token(text)",
+      "args": "p_expo_push_token text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.deregister_device_token(p_expo_push_token text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  UPDATE device_tokens\n  SET active = false, updated_at = now()\n  WHERE expo_push_token = p_expo_push_token;\n\n  -- Clear the legacy column too\n  UPDATE children SET push_token = NULL WHERE push_token = p_expo_push_token;\nEND; $function$\n"
+    },
+    {
+      "name": "disable_biometric",
+      "signature": "disable_biometric(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.disable_biometric(p_child_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  UPDATE children\n    SET biometric_enabled    = false,\n        last_device_id       = NULL,\n        biometric_token_hash = NULL\n    WHERE id = p_child_id;\n\n  -- Revoke all active sessions: the biometric credential has been cleared.\n  -- Any session issued via biometric_login_child is now invalid.\n  PERFORM revoke_all_child_sessions(p_child_id, 'biometric_disabled');\nEND;\n$function$\n"
+    },
+    {
+      "name": "enable_biometric",
+      "signature": "enable_biometric(uuid,text,text)",
+      "args": "p_child_id uuid, p_device_id text, p_biometric_token_hash text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.enable_biometric(p_child_id uuid, p_device_id text, p_biometric_token_hash text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  IF p_biometric_token_hash IS NULL OR length(p_biometric_token_hash) <> 64 THEN\n    RAISE EXCEPTION 'invalid_biometric_token_hash';\n  END IF;\n  IF p_device_id IS NULL OR p_device_id = '' THEN\n    RAISE EXCEPTION 'invalid_device_id';\n  END IF;\n\n  UPDATE children\n    SET biometric_enabled     = true,\n        last_device_id        = p_device_id,\n        biometric_token_hash  = p_biometric_token_hash\n    WHERE id = p_child_id;\nEND;\n$function$\n"
+    },
+    {
+      "name": "fund_money_request",
+      "signature": "fund_money_request(uuid,uuid,numeric,text,text)",
+      "args": "p_request_id uuid, p_funder_id uuid, p_amount numeric, p_session_token text, p_device_id text",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.fund_money_request(p_request_id uuid, p_funder_id uuid, p_amount numeric, p_session_token text, p_device_id text)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_borrower_id    uuid;\n  v_request_amount numeric;\n  v_parent_id      uuid;\n  v_funder_user    text;\n  v_funder_name    text;\n  v_borrower_name  text;\n  v_borrower_user  text;\n  v_amt_str        text;\n  v_frozen         boolean;\n  v_pool_avail     numeric;\n  v_funder_balance numeric;\nBEGIN\n  -- Amount validation first — before session check or any DB read\n  PERFORM public.require_valid_gbp_amount(p_amount, 'funding amount');\n\n  PERFORM require_valid_child_session(p_funder_id, p_session_token, p_device_id);\n\n  -- Read the pending request (no lock — just confirming it exists and is pending)\n  SELECT from_id, amount INTO v_borrower_id, v_request_amount\n    FROM money_requests\n    WHERE id = p_request_id AND status = 'pending';\n  IF v_borrower_id IS NULL THEN\n    RAISE EXCEPTION 'Request not found or already funded';\n  END IF;\n\n  -- Validate the client-supplied amount matches the stored request amount\n  IF p_amount <> v_request_amount THEN\n    RAISE EXCEPTION 'Amount mismatch: request is for %, client sent %',\n      v_request_amount, p_amount;\n  END IF;\n\n  SELECT COALESCE(account_frozen, false) INTO v_frozen\n    FROM children WHERE id = v_borrower_id;\n  IF v_frozen THEN RAISE EXCEPTION 'borrower_frozen'; END IF;\n\n  -- Lock the borrower's parent FOR UPDATE FIRST (consistent lock ordering).\n  -- This makes the availability check + reservation increment atomic.\n  SELECT p.id,\n         (COALESCE(p.safety_pool_limit,    0)\n          - COALESCE(p.safety_pool_used,   0)\n          - COALESCE(p.safety_pool_reserved, 0))\n    INTO v_parent_id, v_pool_avail\n    FROM parents p\n    JOIN children c ON c.parent_id = p.id\n    WHERE c.id = v_borrower_id\n    FOR UPDATE;\n\n  IF v_parent_id IS NULL THEN\n    RAISE EXCEPTION 'Parent not found for borrower';\n  END IF;\n\n  IF COALESCE(v_pool_avail, 0) < p_amount THEN\n    RAISE EXCEPTION 'safety_pool_insufficient';\n  END IF;\n\n  -- Lock funder child AFTER parent (consistent ordering: parent before child)\n  SELECT wallet_balance INTO v_funder_balance\n    FROM children WHERE id = p_funder_id FOR UPDATE;\n  IF COALESCE(v_funder_balance, 0) < p_amount THEN\n    RAISE EXCEPTION 'Insufficient balance to fund this request';\n  END IF;\n\n  -- Fund the request and record the reservation amount atomically\n  UPDATE money_requests\n    SET status                      = 'funded',\n        funded_by                   = p_funder_id,\n        funded_at                   = now(),\n        safety_pool_reserved_amount = p_amount\n    WHERE id = p_request_id AND status = 'pending'\n    RETURNING from_id INTO v_borrower_id;\n\n  IF v_borrower_id IS NULL THEN\n    RAISE EXCEPTION 'Request not found or already funded';\n  END IF;\n\n  -- Reserve coverage in the parent (parent row still locked from above)\n  UPDATE parents\n    SET safety_pool_reserved = COALESCE(safety_pool_reserved, 0) + p_amount\n    WHERE id = v_parent_id;\n\n  SELECT username,     display_name INTO v_funder_user,   v_funder_name   FROM children WHERE id = p_funder_id;\n  SELECT display_name, username     INTO v_borrower_name, v_borrower_user FROM children WHERE id = v_borrower_id;\n\n  v_amt_str := '£' || to_char(p_amount, 'FM999990.00');\n\n  UPDATE children SET\n    wallet_balance = wallet_balance - p_amount,\n    loaned_out     = loaned_out     + p_amount,\n    total_lent     = total_lent     + p_amount,\n    times_lent     = times_lent     + 1,\n    trust_score    = LEAST(100, trust_score + 2),\n    points         = points         + 2\n  WHERE id = p_funder_id;\n\n  PERFORM _update_weekly_streak(p_funder_id);\n\n  UPDATE children SET\n    wallet_balance = wallet_balance + p_amount,\n    borrowed       = borrowed       + p_amount,\n    total_borrowed = total_borrowed + p_amount,\n    times_borrowed = times_borrowed + 1\n  WHERE id = v_borrower_id;\n\n  INSERT INTO transactions (child_id, type, amount, description, counterparty) VALUES\n    (p_funder_id,   'lend',   -p_amount,\n     v_amt_str || ' lent to @'       || v_borrower_user, v_borrower_name),\n    (v_borrower_id, 'borrow',  p_amount,\n     v_amt_str || ' borrowed from @' || v_funder_user,   NULL);\n\n  PERFORM _trigger_notification(\n    'money_funded', v_borrower_id, 'child', p_funder_id, v_funder_name,\n    jsonb_build_object('amount', p_amount, 'request_id', p_request_id)\n  );\n\n  RETURN json_build_object('borrower_id', v_borrower_id);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_active_requests",
+      "signature": "get_active_requests(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_active_requests(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  UPDATE money_requests SET status = 'cancelled'\n  WHERE status = 'pending' AND expires_at <= now();\n\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT\n      mr.id, mr.from_id,\n      c.display_name  AS from_name,\n      c.avatar_emoji  AS from_emoji,\n      c.avatar_url    AS from_url,\n      c.trust_score   AS from_trust,\n      mr.amount, mr.reason, mr.reason_emoji, mr.deadline_days,\n      TO_CHAR(mr.repay_by_date, 'DD Mon') AS repay_by_date,\n      mr.expires_at, mr.status, mr.created_at,\n      (mr.from_id = p_child_id) AS is_own,\n      mr.funded_by,\n      fc.display_name  AS funded_by_name,\n      fc.avatar_emoji  AS funded_by_emoji,\n      fc.avatar_url    AS funded_by_url\n    FROM money_requests mr\n    JOIN  children c  ON c.id  = mr.from_id\n    LEFT JOIN children fc ON fc.id = mr.funded_by\n    WHERE\n      -- Status gate: only pending (not expired) or funded-but-unpaid\n      ((mr.status = 'pending' AND mr.expires_at > now()) OR mr.status = 'funded')\n      AND (\n        -- Always show own requests\n        mr.from_id = p_child_id\n        -- Always show requests the child is funding\n        OR mr.funded_by = p_child_id\n        -- Show pending circle-member requests only if viewer_ids allows it\n        OR (\n          mr.status = 'pending'\n          AND mr.from_id IN (SELECT friend_id FROM circles WHERE child_id = p_child_id)\n          AND (mr.viewer_ids IS NULL OR p_child_id = ANY(mr.viewer_ids))\n        )\n      )\n    ORDER BY mr.created_at DESC\n  ) r;\n\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_activity_feed",
+      "signature": "get_activity_feed(uuid,integer)",
+      "args": "p_child_id uuid, p_limit integer",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_activity_feed(p_child_id uuid, p_limit integer DEFAULT 20)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE\n  v_result json;\nBEGIN\n  SELECT json_agg(row_to_json(r))\n  INTO   v_result\n  FROM (\n    SELECT id, emoji, text, type, created_at\n    FROM   activity_feed\n    WHERE  child_id = p_child_id\n    ORDER  BY created_at DESC\n    LIMIT  p_limit\n  ) r;\n  RETURN COALESCE(v_result, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_child_stats",
+      "signature": "get_child_stats(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_child_stats(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_result json;\nBEGIN\n  SELECT json_build_object(\n    'wallet_balance',    wallet_balance,\n    'loaned_out',        loaned_out,\n    'borrowed',          borrowed,\n    'trust_score',       trust_score,\n    'points',            points,\n    'streak',            streak,\n    'repaid',            repaid,\n    'missed',            missed,\n    'total_borrowed',    total_borrowed,\n    'total_lent',        total_lent,\n    'times_borrowed',    times_borrowed,\n    'times_lent',        times_lent,\n    'profile_image_url', COALESCE(profile_image_url, avatar_url),\n    'account_frozen',    COALESCE(account_frozen, false),\n    'parent_debt',       COALESCE(parent_debt, 0)\n  ) INTO v_result FROM children WHERE id = p_child_id;\n  RETURN v_result;\nEND; $function$\n"
+    },
+    {
+      "name": "get_child_transactions",
+      "signature": "get_child_transactions(uuid,integer)",
+      "args": "p_child_id uuid, p_limit integer",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_child_transactions(p_child_id uuid, p_limit integer DEFAULT 20)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_result json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_result\n  FROM (\n    SELECT id, type, amount, description, counterparty, created_at\n    FROM transactions WHERE child_id = p_child_id\n    ORDER BY created_at DESC LIMIT p_limit\n  ) r;\n  RETURN COALESCE(v_result, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_circle",
+      "signature": "get_circle(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_circle(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT c.id, c.display_name, c.username, c.avatar_emoji, c.avatar_url, c.trust_score\n    FROM circles ci\n    JOIN children c ON c.id = ci.friend_id\n    WHERE ci.child_id = p_child_id\n      AND ci.status = 'active'\n    ORDER BY ci.created_at DESC\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_circle_history",
+      "signature": "get_circle_history(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_circle_history(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT mr.id, mr.amount, mr.reason, mr.reason_emoji, mr.created_at,\n      TO_CHAR(mr.repay_by_date, 'DD Mon YYYY') AS repay_by_date,\n      (mr.from_id = p_child_id) AS is_borrower,\n      b.display_name AS borrower_name, b.avatar_emoji AS borrower_emoji, b.avatar_url AS borrower_url,\n      f.display_name AS funder_name, f.avatar_emoji AS funder_emoji, f.avatar_url AS funder_url\n    FROM money_requests mr\n    JOIN children b ON b.id = mr.from_id\n    JOIN children f ON f.id = mr.funded_by\n    WHERE mr.status = 'repaid' AND (mr.from_id = p_child_id OR mr.funded_by = p_child_id)\n    ORDER BY mr.created_at DESC LIMIT 50\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_loan_history",
+      "signature": "get_loan_history(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_loan_history(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_result json;\nBEGIN\n  SELECT json_agg(row_to_json(r) ORDER BY r.repaid_at DESC NULLS LAST) INTO v_result\n  FROM (\n    SELECT\n      mr.id, mr.amount, mr.reason, mr.reason_emoji,\n      mr.created_at, mr.repaid_at, mr.repay_by_date,\n      mr.status,\n      (mr.from_id = p_child_id) AS is_borrower,\n      (mr.repaid_at IS NOT NULL AND mr.repaid_at::date <= mr.repay_by_date AND mr.status = 'repaid') AS repaid_on_time,\n      bc.display_name AS borrower_name, bc.username AS borrower_username,\n      bc.avatar_emoji AS borrower_emoji, COALESCE(bc.profile_image_url, bc.avatar_url) AS borrower_avatar_url,\n      fc.display_name AS funder_name,   fc.username AS funder_username,\n      fc.avatar_emoji AS funder_emoji,  COALESCE(fc.profile_image_url, fc.avatar_url) AS funder_avatar_url\n    FROM money_requests mr\n    JOIN children bc ON bc.id = mr.from_id\n    JOIN children fc ON fc.id = mr.funded_by\n    WHERE mr.status IN ('repaid', 'defaulted')\n      AND (mr.from_id = p_child_id OR mr.funded_by = p_child_id)\n    ORDER BY mr.repaid_at DESC NULLS LAST\n    LIMIT 50\n  ) r;\n  RETURN COALESCE(v_result, '[]'::json);\nEND; $function$\n"
+    },
+    {
+      "name": "get_outgoing_pending_requests",
+      "signature": "get_outgoing_pending_requests(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_outgoing_pending_requests(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT cr.to_id AS id\n    FROM circle_requests cr\n    WHERE cr.from_id = p_child_id AND cr.status = 'pending'\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_parent_safety_pool_status",
+      "signature": "get_parent_safety_pool_status(uuid)",
+      "args": "p_parent_id uuid",
+      "result_type": "TABLE(pool_limit numeric, pool_used numeric, pool_reserved numeric, pool_available numeric)",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_parent_safety_pool_status(p_parent_id uuid)\n RETURNS TABLE(pool_limit numeric, pool_used numeric, pool_reserved numeric, pool_available numeric)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  -- Reject anonymous callers and cross-family access.\n  -- Only the authenticated parent whose Supabase Auth UID = p_parent_id may call this.\n  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN\n    RAISE EXCEPTION 'unauthorized';\n  END IF;\n\n  RETURN QUERY\n    SELECT\n      COALESCE(p.safety_pool_limit,    0::numeric) AS pool_limit,\n      COALESCE(p.safety_pool_used,     0::numeric) AS pool_used,\n      COALESCE(p.safety_pool_reserved, 0::numeric) AS pool_reserved,\n      GREATEST(0::numeric,\n        COALESCE(p.safety_pool_limit,    0)\n        - COALESCE(p.safety_pool_used,   0)\n        - COALESCE(p.safety_pool_reserved, 0)\n      )                                             AS pool_available\n    FROM parents p\n    WHERE p.id = p_parent_id;\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_pending_requests",
+      "signature": "get_pending_requests(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_pending_requests(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT cr.id AS request_id, c.id, c.display_name, c.username, c.avatar_emoji, c.avatar_url, c.trust_score, cr.created_at\n    FROM circle_requests cr\n    JOIN children c ON c.id = cr.from_id\n    WHERE cr.to_id = p_child_id AND cr.status = 'pending'\n    ORDER BY cr.created_at DESC\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "get_resolved_sent_requests",
+      "signature": "get_resolved_sent_requests(uuid)",
+      "args": "p_child_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.get_resolved_sent_requests(p_child_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT cr.id AS request_id, c.id, c.display_name, c.username, c.avatar_emoji, cr.status, cr.created_at\n    FROM circle_requests cr\n    JOIN children c ON c.id = cr.to_id\n    WHERE cr.from_id = p_child_id AND cr.status IN ('accepted', 'declined')\n    ORDER BY cr.created_at DESC\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "insert_child",
+      "signature": "insert_child(text,text,text,text,integer,text)",
+      "args": "p_display_name text, p_username text, p_password text, p_mobile text, p_age integer, p_avatar_emoji text",
+      "result_type": "uuid",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.insert_child(p_display_name text, p_username text, p_password text, p_mobile text, p_age integer, p_avatar_emoji text DEFAULT '😊'::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_parent_id uuid := auth.uid();\n  v_child_id  uuid;\nBEGIN\n  IF v_parent_id IS NULL THEN\n    RAISE EXCEPTION 'not_authenticated';\n  END IF;\n\n  INSERT INTO children (\n    parent_id,    display_name,   username,\n    password_hash,\n    mobile,       age,            avatar_emoji,\n    trust_score,  wallet_balance, loaned_out,  borrowed,\n    streak,       repaid,         missed,\n    total_borrowed, total_lent,   points\n  ) VALUES (\n    v_parent_id,\n    p_display_name,\n    lower(p_username),\n    crypt(p_password, gen_salt('bf', 10)),\n    p_mobile,\n    p_age,\n    p_avatar_emoji,\n    50, 0, 0, 0,\n    0,  0, 0,\n    0,  0, 0\n  )\n  RETURNING id INTO v_child_id;\n\n  RETURN v_child_id;\nEXCEPTION\n  WHEN unique_violation THEN\n    RAISE EXCEPTION 'username_taken';\nEND;\n$function$\n"
+    },
+    {
+      "name": "login_child",
+      "signature": "login_child(text,text,text)",
+      "args": "p_username text, p_password text, p_device_id text",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.login_child(p_username text, p_password text, p_device_id text)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_child     children%ROWTYPE;\n  v_parent    parents%ROWTYPE;\n  v_raw_token text;\n  v_hash      text;\n  v_expires   timestamptz := now() + interval '1 hour';\n  v_abs_exp   timestamptz := now() + interval '30 days';\n  v_allowed   boolean;\n  c_dummy CONSTANT text :=\n    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';\nBEGIN\n  IF p_device_id IS NULL OR p_device_id = '' THEN\n    RAISE EXCEPTION 'device_id_required';\n  END IF;\n\n  -- ── Device throttle ────────────────────────────────────────────────────────\n  -- Recorded before we even look up the username so enumeration attempts\n  -- consume the device budget the same as wrong-password attempts.\n  v_allowed := _rl_attempt(\n    'rl_child_login_dev', p_device_id,\n    20, interval '30 minutes', interval '10 minutes'\n  );\n  IF NOT v_allowed THEN\n    RAISE EXCEPTION 'rate_limit_exceeded';\n  END IF;\n\n  -- ── Username lookup ────────────────────────────────────────────────────────\n  SELECT * INTO v_child\n    FROM children\n    WHERE username = lower(p_username) AND password_hash IS NOT NULL;\n\n  IF NOT FOUND THEN\n    -- Timing equalization: unknown username costs the same bcrypt time as wrong password.\n    -- Device throttle already incremented above; no per-username row created here.\n    PERFORM crypt(p_password, c_dummy);\n    RETURN NULL;\n  END IF;\n\n  -- ── Account throttle ───────────────────────────────────────────────────────\n  -- Only reached for known usernames, preventing junk rows for nonexistent accounts.\n  v_allowed := _rl_attempt(\n    'rl_child_login_acc', lower(p_username),\n    10, interval '15 minutes', interval '5 minutes'\n  );\n  IF NOT v_allowed THEN\n    RAISE EXCEPTION 'rate_limit_exceeded';\n  END IF;\n\n  -- ── Credential check ───────────────────────────────────────────────────────\n  IF crypt(p_password, v_child.password_hash) <> v_child.password_hash THEN\n    -- Both counters were incremented above; leave them incremented.\n    RETURN NULL;\n  END IF;\n\n  -- ── Success: clear rate-limit counters ────────────────────────────────────\n  PERFORM _rl_clear('rl_child_login_dev', p_device_id);\n  PERFORM _rl_clear('rl_child_login_acc', lower(p_username));\n\n  -- ── Issue session token ───────────────────────────────────────────────────\n  SELECT * INTO v_parent FROM parents WHERE id = v_child.parent_id;\n  v_raw_token := encode(gen_random_bytes(32), 'hex');\n  v_hash      := encode(digest(v_raw_token, 'sha256'), 'hex');\n  PERFORM revoke_all_child_sessions(v_child.id, 'superseded_by_new_login');\n  INSERT INTO child_sessions (child_id, token_hash, device_id, expires_at, absolute_expires_at)\n    VALUES (v_child.id, v_hash, p_device_id, v_expires, v_abs_exp);\n\n  RETURN json_build_object(\n    'child', json_build_object(\n      'id',                v_child.id,\n      'display_name',      v_child.display_name,\n      'username',          v_child.username,\n      'avatar_emoji',      v_child.avatar_emoji,\n      'profile_image_url', v_child.profile_image_url,\n      'trust_score',       v_child.trust_score,\n      'wallet_balance',    v_child.wallet_balance,\n      'loaned_out',        v_child.loaned_out,\n      'borrowed',          v_child.borrowed,\n      'streak',            v_child.streak,\n      'repaid',            v_child.repaid,\n      'missed',            v_child.missed,\n      'total_borrowed',    v_child.total_borrowed,\n      'total_lent',        v_child.total_lent,\n      'times_borrowed',    v_child.times_borrowed,\n      'times_lent',        v_child.times_lent,\n      'points',            v_child.points,\n      'age',               v_child.age,\n      'mobile',            v_child.mobile,\n      'biometric_enabled', v_child.biometric_enabled,\n      'last_device_id',    v_child.last_device_id,\n      'account_frozen',    v_child.account_frozen,\n      'parent_debt',       v_child.parent_debt\n    ),\n    'parent', json_build_object(\n      'id',                     v_parent.id,\n      'first_name',             v_parent.first_name,\n      'last_name',              v_parent.last_name,\n      'display_name',           v_parent.display_name,\n      'safety_pool_limit',      v_parent.safety_pool_limit,\n      'safety_pool_used',       v_parent.safety_pool_used,\n      'safety_pool_reserved',   v_parent.safety_pool_reserved,\n      'weekly_allowance',       v_parent.weekly_allowance,\n      'allowance_frequency',    v_parent.allowance_frequency,\n      'allowance_active',       v_parent.allowance_active,\n      'allowance_next_payment', v_parent.allowance_next_payment,\n      'passcode_created',       v_parent.passcode_created,\n      'marketing_notifications',v_parent.marketing_notifications,\n      'profile_image_url',      v_parent.profile_image_url\n    ),\n    'session_token',      v_raw_token,\n    'session_expires_at', v_expires\n  );\nEND;\n$function$\n"
+    },
+    {
+      "name": "parent_send_money",
+      "signature": "parent_send_money(uuid,numeric,text)",
+      "args": "p_parent_id uuid, p_amount numeric, p_note text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.parent_send_money(p_parent_id uuid, p_amount numeric, p_note text DEFAULT ''::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$ DECLARE v_child_id uuid; v_display_name text; v_amount_str text; v_desc text; BEGIN SELECT id INTO v_child_id FROM children WHERE parent_id = p_parent_id; IF v_child_id IS NULL THEN RAISE EXCEPTION 'child not found'; END IF; SELECT COALESCE(display_name, first_name) INTO v_display_name FROM parents WHERE id = p_parent_id; v_amount_str := CASE WHEN p_amount = FLOOR(p_amount) THEN chr(163) || FLOOR(p_amount)::bigint::text ELSE chr(163) || TO_CHAR(p_amount, 'FM9999990.99') END; v_desc := CASE WHEN p_note <> '' THEN v_display_name || ' sent you ' || v_amount_str || ' - ' || p_note ELSE v_display_name || ' sent you ' || v_amount_str END; UPDATE children SET wallet_balance = wallet_balance + p_amount WHERE id = v_child_id; INSERT INTO transactions (child_id, type, amount, description, counterparty) VALUES (v_child_id, 'parent_transfer', p_amount, v_desc, v_display_name); INSERT INTO activity_feed (child_id, id, emoji, text, type) VALUES (v_child_id, gen_random_uuid(), '💸', v_desc, 'topup'); END; $function$\n"
+    },
+    {
+      "name": "parent_send_to_child",
+      "signature": "parent_send_to_child(uuid,uuid,numeric,text)",
+      "args": "p_user_id uuid, p_child_id uuid, p_amount numeric, p_parent_name text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.parent_send_to_child(p_user_id uuid, p_child_id uuid, p_amount numeric, p_parent_name text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_tx_id      text := 'ps_' || floor(extract(epoch from now()))::bigint;\n  v_amount_str text;\nBEGIN\n  IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN\n    RAISE EXCEPTION 'unauthorized';\n  END IF;\n  PERFORM public.require_valid_gbp_amount(p_amount, 'transfer amount');\n\n  IF NOT EXISTS (\n    SELECT 1 FROM children WHERE id = p_child_id AND parent_id = p_user_id\n  ) THEN\n    RAISE EXCEPTION 'not_parent';\n  END IF;\n\n  v_amount_str := CASE\n    WHEN p_amount = floor(p_amount) THEN floor(p_amount)::integer::text\n    ELSE round(p_amount, 2)::text\n  END;\n\n  UPDATE children SET wallet_balance = wallet_balance + p_amount WHERE id = p_child_id;\n\n  INSERT INTO transactions (child_id, type, amount, description, counterparty)\n    VALUES (p_child_id, 'parent_transfer', p_amount,\n            p_parent_name || ' sent you £' || v_amount_str, p_parent_name);\n\n  INSERT INTO activity_feed (child_id, id, emoji, text, type)\n    VALUES (p_child_id, 'act_' || v_tx_id, '💚',\n            p_parent_name || ' sent you £' || v_amount_str, 'topup');\nEND;\n$function$\n"
+    },
+    {
+      "name": "persist_transaction",
+      "signature": "persist_transaction(uuid,text,numeric,text,text)",
+      "args": "p_child_id uuid, p_type text, p_amount numeric, p_description text, p_counterparty text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.persist_transaction(p_child_id uuid, p_type text, p_amount numeric, p_description text, p_counterparty text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  INSERT INTO transactions (child_id, type, amount, description, counterparty)\n  VALUES (p_child_id, p_type, p_amount, p_description, p_counterparty);\nEND;\n$function$\n"
+    },
+    {
+      "name": "process_due_allowances",
+      "signature": "process_due_allowances()",
+      "args": "",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.process_due_allowances()\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$ DECLARE r RECORD; v_desc text; BEGIN FOR r IN SELECT p.id AS parent_id, p.weekly_allowance, p.first_name, p.allowance_time, c.id AS child_id FROM parents p JOIN children c ON c.parent_id = p.id WHERE p.weekly_allowance > 0 AND p.allowance_day IS NOT NULL AND EXTRACT(DOW FROM now() AT TIME ZONE 'UTC') = p.allowance_day AND to_char(now() AT TIME ZONE 'UTC', 'HH24:MI') >= p.allowance_time AND to_char(now() AT TIME ZONE 'UTC', 'HH24:MI') < (to_timestamp(p.allowance_time, 'HH24:MI') + interval '5 minutes')::time::text AND (p.last_allowance_at IS NULL OR p.last_allowance_at < now() - interval '6 days') LOOP v_desc := r.first_name || ' sent you £' || to_char(r.weekly_allowance, 'FM999990.00') || ' pocket money'; UPDATE children SET wallet_balance = wallet_balance + r.weekly_allowance WHERE id = r.child_id; UPDATE parents SET last_allowance_at = now() WHERE id = r.parent_id; INSERT INTO transactions (child_id, type, amount, description, counterparty) VALUES (r.child_id, 'allowance', r.weekly_allowance, v_desc, r.first_name); INSERT INTO activity_feed (child_id, id, emoji, text, type) VALUES (r.child_id, gen_random_uuid(), '🎁', v_desc, 'allowance'); END LOOP; END; $function$\n"
+    },
+    {
+      "name": "process_due_loan_defaults",
+      "signature": "process_due_loan_defaults()",
+      "args": "",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=\"\""
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.process_due_loan_defaults()\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_req RECORD;\n\n  v_parent_id    uuid;\n  v_reserved     numeric;\n  v_updated      int;\n  v_processed    int := 0;\n  v_skipped      int := 0;\n  v_notif_sent   int := 0;\n\n  v_borrower_user  text;\n  v_borrower_name  text;\n  v_funder_user    text;\n  v_funder_name    text;\n  v_amt_str        text;\n\n  -- Notification sweep\n  v_notif RECORD;\n  v_token  text;\nBEGIN\n  -- ── Main processing loop ──────────────────────────────────────────────────\n  -- Non-locking scan: collect overdue funded loans whose reservations haven't\n  -- been released yet. Ordering by repay_by_date processes oldest debts first.\n  FOR v_req IN\n    SELECT mr.id,\n           mr.from_id            AS borrower_id,\n           mr.funded_by          AS funder_id,\n           mr.amount,\n           mr.safety_pool_reserved_amount,\n           mr.repay_by_date\n    FROM   public.money_requests mr\n    WHERE  mr.status = 'funded'\n      AND  mr.repay_by_date < CURRENT_DATE\n      AND  mr.safety_pool_reservation_released_at IS NULL\n    ORDER  BY mr.repay_by_date ASC\n  LOOP\n    BEGIN\n      -- Step 1: Lock borrower's parent FIRST (globally consistent lock order).\n      -- All concurrent fund/repay/default paths acquire the parent lock before\n      -- any child or money_requests lock — ensures deadlock-freedom.\n      SELECT p.id INTO v_parent_id\n        FROM public.parents p\n        JOIN public.children c ON c.parent_id = p.id\n        WHERE c.id = v_req.borrower_id\n        FOR UPDATE;\n\n      IF v_parent_id IS NULL THEN\n        v_skipped := v_skipped + 1;\n        RAISE WARNING 'process_due_loan_defaults: borrower % has no parent; skipping loan %',\n          v_req.borrower_id, v_req.id;\n        CONTINUE;\n      END IF;\n\n      -- Step 2: Atomically mark as defaulted and stamp reservation release time.\n      -- The WHERE clause re-validates the loan is still eligible (idempotency guard:\n      -- if repay_money_request or a concurrent processor already handled it, 0 rows\n      -- are updated and we skip gracefully).\n      UPDATE public.money_requests\n        SET status                            = 'defaulted',\n            repaid_at                         = now(),\n            safety_pool_reservation_released_at = now()\n        WHERE id      = v_req.id\n          AND status  = 'funded'\n          AND repay_by_date < CURRENT_DATE\n          AND safety_pool_reservation_released_at IS NULL;\n\n      GET DIAGNOSTICS v_updated = ROW_COUNT;\n      IF v_updated = 0 THEN\n        -- Already processed by a concurrent call or repaid between scan and lock\n        v_skipped := v_skipped + 1;\n        CONTINUE;\n      END IF;\n\n      -- Step 3: Release reservation and convert to used in parents.\n      -- reserved_amount is set by fund_money_request; COALESCE handles any\n      -- legacy loan that pre-dates the reservation system (uses full amount).\n      v_reserved := COALESCE(v_req.safety_pool_reserved_amount, v_req.amount);\n\n      UPDATE public.parents\n        SET safety_pool_reserved = GREATEST(0, COALESCE(safety_pool_reserved, 0) - v_reserved),\n            safety_pool_used     = COALESCE(safety_pool_used, 0) + v_req.amount\n        WHERE id = v_parent_id;\n\n      -- Step 4: Fetch display names for notifications / feed entries\n      v_amt_str := '£' || to_char(v_req.amount, 'FM999990.00');\n\n      SELECT username, display_name\n        INTO v_funder_user, v_funder_name\n        FROM public.children WHERE id = v_req.funder_id;\n\n      SELECT username, display_name\n        INTO v_borrower_user, v_borrower_name\n        FROM public.children WHERE id = v_req.borrower_id;\n\n      -- Step 5: Credit the funder (Safety Pool pays them back)\n      UPDATE public.children\n        SET wallet_balance = wallet_balance + v_req.amount,\n            loaned_out     = GREATEST(0, loaned_out - v_req.amount)\n        WHERE id = v_req.funder_id;\n\n      -- Step 6: Freeze borrower and record debt\n      UPDATE public.children\n        SET account_frozen = true,\n            parent_debt    = COALESCE(parent_debt, 0) + v_req.amount,\n            borrowed       = GREATEST(0, borrowed - v_req.amount),\n            trust_score    = GREATEST(0, trust_score - 15),\n            points         = GREATEST(0, points - 15),\n            streak         = 0,\n            missed         = missed + 1\n        WHERE id = v_req.borrower_id;\n\n      -- Step 7: Financial transaction record (funder side)\n      INSERT INTO public.transactions (child_id, type, amount, description, counterparty)\n        VALUES (v_req.funder_id, 'receive', v_req.amount,\n                v_amt_str || ' received from Parent Safety Pool (Loan Guarantee)',\n                'Safety Pool');\n\n      -- Step 8: Activity feed entries\n      INSERT INTO public.activity_feed (child_id, id, emoji, text, type)\n        VALUES (v_req.funder_id,\n                'default_recv_' || v_req.id::text, '🛡️',\n                v_amt_str || ' received from Safety Pool · @' || v_borrower_user || ' defaulted',\n                'funded')\n        ON CONFLICT (id) DO NOTHING;\n\n      INSERT INTO public.activity_feed (child_id, id, emoji, text, type)\n        VALUES (v_req.borrower_id,\n                'default_brw_' || v_req.id::text, '🔒',\n                'Missed repayment · Safety Pool paid ' || v_amt_str || ' to @' || v_funder_user ||\n                ' · -15 pts · Account frozen',\n                'missed')\n        ON CONFLICT (id) DO NOTHING;\n\n      -- Step 9: Queue push notifications (committed with the financial changes)\n      INSERT INTO public.notification_queue\n        (event_key, child_id, event_type, sender_id, sender_name, payload)\n        VALUES\n          ('default_lender_' || v_req.id::text,\n           v_req.funder_id, 'loan_defaulted_lender',\n           v_req.borrower_id, v_borrower_name,\n           jsonb_build_object('amount', v_req.amount, 'request_id', v_req.id)),\n          ('default_borrower_' || v_req.id::text,\n           v_req.borrower_id, 'loan_defaulted_borrower',\n           v_req.funder_id, v_funder_name,\n           jsonb_build_object('amount', v_req.amount, 'request_id', v_req.id))\n        ON CONFLICT (event_key) DO NOTHING;\n\n      v_processed := v_processed + 1;\n\n    EXCEPTION\n      WHEN deadlock_detected THEN\n        v_skipped := v_skipped + 1;\n        RAISE WARNING 'process_due_loan_defaults: deadlock on loan %; skipped for next run', v_req.id;\n      WHEN OTHERS THEN\n        v_skipped := v_skipped + 1;\n        RAISE WARNING 'process_due_loan_defaults: error on loan %: %', v_req.id, SQLERRM;\n    END;\n  END LOOP;\n\n  -- ── Notification sweep ────────────────────────────────────────────────────\n  -- Fire pending notification_queue rows via _trigger_notification.\n  -- status='sent' means the pg_net HTTP call was initiated, not that delivery\n  -- was confirmed. Failed rows remain 'pending' and are retried on the next run\n  -- (up to the UNIQUE event_key constraint preventing re-insertion).\n  FOR v_notif IN\n    SELECT id, child_id, event_type, sender_id, sender_name, payload\n      FROM public.notification_queue\n      WHERE status = 'pending'\n      ORDER BY id ASC\n      FOR UPDATE SKIP LOCKED\n  LOOP\n    BEGIN\n      PERFORM public._trigger_notification(\n        v_notif.event_type,\n        v_notif.child_id,\n        'child',\n        v_notif.sender_id,\n        v_notif.sender_name,\n        v_notif.payload\n      );\n\n      UPDATE public.notification_queue\n        SET status = 'sent', processed_at = now()\n        WHERE id = v_notif.id;\n\n      v_notif_sent := v_notif_sent + 1;\n    EXCEPTION WHEN OTHERS THEN\n      UPDATE public.notification_queue\n        SET status = 'failed', processed_at = now()\n        WHERE id = v_notif.id;\n    END;\n  END LOOP;\n\n  RETURN json_build_object(\n    'processed',          v_processed,\n    'skipped',            v_skipped,\n    'notifications_sent', v_notif_sent\n  );\nEND;\n$function$\n"
+    },
+    {
+      "name": "register_device_token",
+      "signature": "register_device_token(uuid,text,text,text,text,text)",
+      "args": "p_user_id uuid, p_user_type text, p_expo_push_token text, p_device_id text, p_platform text, p_app_version text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.register_device_token(p_user_id uuid, p_user_type text, p_expo_push_token text, p_device_id text DEFAULT NULL::text, p_platform text DEFAULT NULL::text, p_app_version text DEFAULT NULL::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  INSERT INTO device_tokens (\n    user_id, user_type, expo_push_token, device_id, platform, app_version,\n    active, last_seen, updated_at\n  )\n  VALUES (\n    p_user_id, p_user_type, p_expo_push_token, p_device_id, p_platform, p_app_version,\n    true, now(), now()\n  )\n  ON CONFLICT (expo_push_token) DO UPDATE SET\n    user_id     = EXCLUDED.user_id,\n    user_type   = EXCLUDED.user_type,\n    device_id   = COALESCE(EXCLUDED.device_id,   device_tokens.device_id),\n    platform    = COALESCE(EXCLUDED.platform,    device_tokens.platform),\n    app_version = COALESCE(EXCLUDED.app_version, device_tokens.app_version),\n    active      = true,\n    last_seen   = now(),\n    updated_at  = now();\n\n  -- Keep the legacy single-token column in sync for backward compatibility\n  IF p_user_type = 'child' THEN\n    UPDATE children SET push_token = p_expo_push_token WHERE id = p_user_id;\n  END IF;\nEND; $function$\n"
+    },
+    {
+      "name": "remove_from_circle",
+      "signature": "remove_from_circle(uuid,uuid)",
+      "args": "p_child_id uuid, p_friend_id uuid",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.remove_from_circle(p_child_id uuid, p_friend_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_active int;\nBEGIN\n  -- Verify caller is part of the friendship\n  IF NOT EXISTS (\n    SELECT 1 FROM circles\n    WHERE (child_id = p_child_id AND friend_id = p_friend_id)\n       OR (child_id = p_friend_id AND friend_id = p_child_id)\n  ) THEN\n    RAISE EXCEPTION 'not_in_circle';\n  END IF;\n\n  -- Block if any funded (active) loan exists in either direction\n  SELECT COUNT(*) INTO v_active\n  FROM money_requests\n  WHERE status = 'funded'\n    AND (\n      (from_id = p_child_id AND funded_by = p_friend_id) OR\n      (from_id = p_friend_id AND funded_by = p_child_id)\n    );\n\n  IF v_active > 0 THEN\n    RAISE EXCEPTION 'active_loan:outstanding_money';\n  END IF;\n\n  -- Soft-delete both directions of the friendship\n  UPDATE circles\n  SET status     = 'removed',\n      removed_at = now(),\n      removed_by = p_child_id\n  WHERE (child_id = p_child_id AND friend_id = p_friend_id)\n     OR (child_id = p_friend_id AND friend_id = p_child_id);\n\n  -- Remove friend from viewer_ids of child's pending (unfunded) requests\n  UPDATE money_requests\n  SET viewer_ids = array_remove(viewer_ids, p_friend_id)\n  WHERE status = 'pending'\n    AND from_id = p_child_id\n    AND viewer_ids IS NOT NULL\n    AND p_friend_id = ANY(viewer_ids);\n\n  -- Remove child from viewer_ids of friend's pending requests\n  UPDATE money_requests\n  SET viewer_ids = array_remove(viewer_ids, p_child_id)\n  WHERE status = 'pending'\n    AND from_id = p_friend_id\n    AND viewer_ids IS NOT NULL\n    AND p_child_id = ANY(viewer_ids);\nEND;\n$function$\n"
+    },
+    {
+      "name": "repay_money_request",
+      "signature": "repay_money_request(uuid,uuid,text,text)",
+      "args": "p_request_id uuid, p_borrower_id uuid, p_session_token text, p_device_id text",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.repay_money_request(p_request_id uuid, p_borrower_id uuid, p_session_token text, p_device_id text)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_parent_id        uuid;\n  v_funder_id        uuid;\n  v_amount           numeric;\n  v_reserved_amount  numeric;\n  v_borrower_user    text;\n  v_borrower_name    text;\n  v_funder_name      text;\n  v_funder_user      text;\n  v_amt_str          text;\n  v_act_id           text;\n  v_borrower_balance numeric;\nBEGIN\n  -- Session validation is the first operation — before any read or write\n  PERFORM require_valid_child_session(p_borrower_id, p_session_token, p_device_id);\n\n  -- Get parent_id without locking (needed to establish lock ordering)\n  SELECT parent_id INTO v_parent_id\n    FROM children WHERE id = p_borrower_id;\n  IF v_parent_id IS NULL THEN\n    RAISE EXCEPTION 'Borrower not found';\n  END IF;\n\n  -- Lock parent FIRST (consistent ordering: parent before child before money_requests).\n  -- This prevents deadlocks with fund_money_request and process_due_loan_defaults,\n  -- both of which also acquire the parent lock before other row locks.\n  PERFORM 1 FROM parents WHERE id = v_parent_id FOR UPDATE;\n\n  -- Lock borrower child AFTER parent\n  SELECT wallet_balance INTO v_borrower_balance\n    FROM children WHERE id = p_borrower_id FOR UPDATE;\n\n  -- Lock money_requests AFTER child\n  SELECT funded_by, amount, safety_pool_reserved_amount\n    INTO v_funder_id, v_amount, v_reserved_amount\n    FROM money_requests\n    WHERE id      = p_request_id\n      AND from_id = p_borrower_id\n      AND status  = 'funded'\n    FOR UPDATE;\n\n  IF v_funder_id IS NULL THEN\n    RAISE EXCEPTION 'Request not found or not in funded state';\n  END IF;\n\n  IF COALESCE(v_borrower_balance, 0) < v_amount THEN\n    RAISE EXCEPTION 'Insufficient balance to repay this loan';\n  END IF;\n\n  SELECT username,     display_name INTO v_borrower_user, v_borrower_name FROM children WHERE id = p_borrower_id;\n  SELECT display_name, username     INTO v_funder_name,   v_funder_user   FROM children WHERE id = v_funder_id;\n\n  v_amt_str := '£' || to_char(v_amount, 'FM999990.00');\n  v_act_id  := 'recv_' || p_request_id::text;\n\n  -- Mark as repaid and stamp reservation release time\n  UPDATE money_requests\n    SET status                            = 'repaid',\n        repaid_at                         = now(),\n        safety_pool_reservation_released_at = now()\n    WHERE id = p_request_id;\n\n  UPDATE children SET\n    wallet_balance = wallet_balance - v_amount,\n    borrowed       = GREATEST(0, borrowed - v_amount),\n    repaid         = repaid         + 1,\n    trust_score    = LEAST(100, trust_score + 5),\n    points         = points         + 5\n  WHERE id = p_borrower_id;\n\n  PERFORM _update_weekly_streak(p_borrower_id);\n\n  UPDATE children SET\n    wallet_balance = wallet_balance + v_amount,\n    loaned_out     = GREATEST(0, loaned_out - v_amount)\n  WHERE id = v_funder_id;\n\n  -- Release Safety Pool reservation (parent row still locked from above)\n  IF v_reserved_amount IS NOT NULL AND v_reserved_amount > 0 THEN\n    UPDATE parents\n      SET safety_pool_reserved = GREATEST(0, COALESCE(safety_pool_reserved, 0) - v_reserved_amount)\n      WHERE id = v_parent_id;\n  END IF;\n\n  INSERT INTO transactions (child_id, type, amount, description, counterparty) VALUES\n    (p_borrower_id, 'repay',   -v_amount,\n     'Repaid '   || v_amt_str || ' to @'   || v_funder_user,   v_funder_name),\n    (v_funder_id,   'receive',  v_amount,\n     'Received ' || v_amt_str || ' from @' || v_borrower_user, NULL);\n\n  INSERT INTO activity_feed (child_id, id, emoji, text, type)\n    VALUES (v_funder_id, v_act_id, '✅',\n            '@' || v_borrower_user || ' repaid you ' || v_amt_str, 'repaid')\n    ON CONFLICT (id) DO NOTHING;\n\n  PERFORM _trigger_notification(\n    'money_repaid', v_funder_id, 'child', p_borrower_id, v_borrower_name,\n    jsonb_build_object('amount', v_amount, 'request_id', p_request_id)\n  );\n\n  RETURN json_build_object('funder_id', v_funder_id, 'amount', v_amount);\nEND;\n$function$\n"
+    },
+    {
+      "name": "require_valid_child_session",
+      "signature": "require_valid_child_session(uuid,text,text)",
+      "args": "p_child_id uuid, p_session_token text, p_device_id text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.require_valid_child_session(p_child_id uuid, p_session_token text, p_device_id text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_session child_sessions%ROWTYPE;\n  v_hash    text;\n  v_now     timestamptz := now();\nBEGIN\n  IF p_session_token IS NULL OR length(p_session_token) <> 64 THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n  IF p_device_id IS NULL OR p_device_id = '' THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n  IF p_child_id IS NULL THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n\n  v_hash := encode(digest(p_session_token, 'sha256'), 'hex');\n\n  SELECT * INTO v_session\n    FROM child_sessions\n    WHERE token_hash = v_hash\n      AND child_id   = p_child_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n\n  IF v_session.device_id <> p_device_id THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n\n  IF v_session.revoked_at IS NOT NULL THEN\n    RAISE EXCEPTION 'child_session_revoked';\n  END IF;\n\n  IF v_session.expires_at < v_now THEN\n    RAISE EXCEPTION 'child_session_expired';\n  END IF;\n\n  IF v_session.absolute_expires_at < v_now THEN\n    RAISE EXCEPTION 'child_session_expired';\n  END IF;\n\n  IF EXISTS (SELECT 1 FROM children WHERE id = p_child_id AND account_frozen = true) THEN\n    RAISE EXCEPTION 'invalid_child_session';\n  END IF;\n\n  UPDATE child_sessions\n    SET last_seen_at = v_now,\n        expires_at   = LEAST(v_now + interval '1 hour', v_session.absolute_expires_at)\n    WHERE id = v_session.id;\nEND;\n$function$\n"
+    },
+    {
+      "name": "revoke_all_child_sessions",
+      "signature": "revoke_all_child_sessions(uuid,text)",
+      "args": "p_child_id uuid, p_reason text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.revoke_all_child_sessions(p_child_id uuid, p_reason text DEFAULT 'admin_action'::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nBEGIN\n  UPDATE child_sessions\n    SET revoked_at     = now(),\n        revoked_reason = p_reason\n    WHERE child_id   = p_child_id\n      AND revoked_at IS NULL;\nEND;\n$function$\n"
+    },
+    {
+      "name": "revoke_child_session",
+      "signature": "revoke_child_session(text)",
+      "args": "p_session_token text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.revoke_child_session(p_session_token text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE v_hash text;\nBEGIN\n  -- Silently ignore malformed or missing tokens — never log the raw token\n  IF p_session_token IS NULL OR length(p_session_token) <> 64 THEN\n    RETURN;\n  END IF;\n  v_hash := encode(digest(p_session_token, 'sha256'), 'hex');\n  UPDATE child_sessions\n    SET revoked_at     = now(),\n        revoked_reason = 'logout'\n    WHERE token_hash = v_hash\n      AND revoked_at IS NULL;\nEND;\n$function$\n"
+    },
+    {
+      "name": "search_children",
+      "signature": "search_children(text,uuid)",
+      "args": "p_query text, p_exclude_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.search_children(p_query text, p_exclude_id uuid DEFAULT NULL::uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\nDECLARE v_results json;\nBEGIN\n  SELECT json_agg(row_to_json(r)) INTO v_results\n  FROM (\n    SELECT id, display_name, username, avatar_emoji, avatar_url, trust_score\n    FROM children\n    WHERE (id != p_exclude_id OR p_exclude_id IS NULL)\n      AND (lower(username) LIKE '%' || lower(p_query) || '%' OR lower(display_name) LIKE '%' || lower(p_query) || '%')\n    LIMIT 20\n  ) r;\n  RETURN COALESCE(v_results, '[]'::json);\nEND;\n$function$\n"
+    },
+    {
+      "name": "send_circle_request",
+      "signature": "send_circle_request(uuid,uuid)",
+      "args": "p_from_id uuid, p_to_id uuid",
+      "result_type": "json",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.send_circle_request(p_from_id uuid, p_to_id uuid)\n RETURNS json\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_to_token  text;\n  v_from_name text;\nBEGIN\n  IF p_from_id = p_to_id THEN\n    RAISE EXCEPTION 'cannot_add_self';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1 FROM circles\n    WHERE status = 'active'\n      AND ((child_id = p_from_id AND friend_id = p_to_id)\n        OR (child_id = p_to_id   AND friend_id = p_from_id))\n  ) THEN\n    RAISE EXCEPTION 'already_friends';\n  END IF;\n\n  IF EXISTS (\n    SELECT 1 FROM circle_requests\n    WHERE status = 'pending'\n      AND ((from_id = p_from_id AND to_id = p_to_id)\n        OR (from_id = p_to_id   AND to_id = p_from_id))\n  ) THEN\n    RAISE EXCEPTION 'already_pending';\n  END IF;\n\n  DELETE FROM circle_requests WHERE from_id = p_from_id AND to_id = p_to_id;\n\n  INSERT INTO circle_requests(from_id, to_id, status, created_at)\n  VALUES (p_from_id, p_to_id, 'pending', now());\n\n  SELECT push_token    INTO v_to_token  FROM children WHERE id = p_to_id;\n  SELECT display_name  INTO v_from_name FROM children WHERE id = p_from_id;\n\n  PERFORM _trigger_notification(\n    'friend_request', p_to_id, 'child', p_from_id, v_from_name, '{}'::jsonb\n  );\n\n  RETURN json_build_object('push_token', v_to_token);\nEND; $function$\n"
+    },
+    {
+      "name": "set_allowance_schedule",
+      "signature": "set_allowance_schedule(uuid,numeric,integer,text,text,boolean)",
+      "args": "p_parent_id uuid, p_amount numeric, p_day integer, p_time text, p_frequency text, p_active boolean",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.set_allowance_schedule(p_parent_id uuid, p_amount numeric, p_day integer, p_time text, p_frequency text DEFAULT 'weekly'::text, p_active boolean DEFAULT true)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$ DECLARE v_days INTEGER; v_next TIMESTAMPTZ; BEGIN v_days := ((p_day - EXTRACT(DOW FROM NOW())::INTEGER) + 7) % 7; IF v_days = 0 THEN v_days := 7; END IF; v_next := DATE_TRUNC('day', NOW()) + (v_days || ' days')::INTERVAL + p_time::TIME WITHOUT TIME ZONE; UPDATE parents SET weekly_allowance = p_amount, allowance_day = p_day, allowance_time = p_time, allowance_frequency = p_frequency, allowance_next_payment = v_next, allowance_active = p_active WHERE id = p_parent_id; END; $function$\n"
+    },
+    {
+      "name": "set_parent_passcode",
+      "signature": "set_parent_passcode(uuid,text)",
+      "args": "p_parent_id uuid, p_pin text",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.set_parent_passcode(p_parent_id uuid, p_pin text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_allowed boolean;\nBEGIN\n  -- 1. Caller-identity guard — fails immediately for absent or mismatched JWT.\n  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN\n    RAISE EXCEPTION 'unauthorized';\n  END IF;\n\n  -- 2. Format validation — must be exactly 6 decimal digits.\n  IF p_pin !~ '^[0-9]{6}$' THEN\n    RAISE EXCEPTION 'invalid_pin_format';\n  END IF;\n\n  -- 3. Weak-PIN rejection.\n  IF p_pin = ANY(ARRAY[\n    '000000','111111','222222','333333','444444',\n    '555555','666666','777777','888888','999999',\n    '123456','654321','012345','543210'\n  ]) THEN\n    RAISE EXCEPTION 'weak_pin';\n  END IF;\n\n  -- 4. Rate guard before expensive bcrypt work.\n  --    Threat: authenticated abuse and resource exhaustion — bcrypt at cost=10 takes\n  --    ~100 ms; an unconstrained loop could consume significant DB CPU.\n  v_allowed := _rl_attempt(\n    'rl_set_passcode', p_parent_id::text,\n    10, interval '10 minutes', interval '30 minutes'\n  );\n  IF NOT v_allowed THEN\n    RAISE EXCEPTION 'rate_limit_exceeded';\n  END IF;\n\n  -- 5. Signal the column-protection trigger that this UPDATE is trusted.\n  --    The flag is transaction-local (third arg = true) so it cannot persist\n  --    beyond this request's transaction or be set by an external API caller.\n  PERFORM set_config('truzo.allow_passcode_write', 'true', true);\n\n  -- 6. bcrypt — expensive work only after all cheap guards pass.\n  UPDATE public.parents\n  SET\n    passcode_hash       = crypt(p_pin, gen_salt('bf', 10)),\n    passcode_created    = true,\n    passcode_created_at = now()\n  WHERE id = p_parent_id;\nEND;\n$function$\n"
+    },
+    {
+      "name": "top_up_safety_pool",
+      "signature": "top_up_safety_pool(uuid,numeric)",
+      "args": "p_parent_id uuid, p_amount numeric",
+      "result_type": "numeric",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.top_up_safety_pool(p_parent_id uuid, p_amount numeric)\n RETURNS numeric\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_new_limit numeric;\nBEGIN\n  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN\n    RAISE EXCEPTION 'unauthorized';\n  END IF;\n  PERFORM public.require_valid_gbp_amount(p_amount, 'top-up amount');\n  UPDATE parents\n    SET safety_pool_limit = COALESCE(safety_pool_limit, 0) + p_amount\n  WHERE id = p_parent_id\n  RETURNING safety_pool_limit INTO v_new_limit;\n  RETURN v_new_limit;\nEND;\n$function$\n"
+    },
+    {
+      "name": "update_marketing_preference",
+      "signature": "update_marketing_preference(uuid,boolean)",
+      "args": "p_parent_id uuid, p_enabled boolean",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": null,
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "PUBLIC",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.update_marketing_preference(p_parent_id uuid, p_enabled boolean)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$ BEGIN UPDATE parents SET marketing_notifications = p_enabled, marketing_preference_updated_at = NOW() WHERE id = p_parent_id; END; $function$\n"
+    },
+    {
+      "name": "update_safety_pool",
+      "signature": "update_safety_pool(uuid,numeric)",
+      "args": "p_parent_id uuid, p_new_limit numeric",
+      "result_type": "void",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.update_safety_pool(p_parent_id uuid, p_new_limit numeric)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_used     numeric;\n  v_reserved numeric;\n  v_combined numeric;\nBEGIN\n  IF auth.uid() IS NULL OR auth.uid() <> p_parent_id THEN\n    RAISE EXCEPTION 'unauthorized';\n  END IF;\n  IF p_new_limit IS NULL THEN\n    RAISE EXCEPTION 'invalid_amount: limit must not be null';\n  END IF;\n  IF p_new_limit < 0 THEN\n    RAISE EXCEPTION 'invalid_amount: limit cannot be negative';\n  END IF;\n  IF p_new_limit <> round(p_new_limit, 2) THEN\n    RAISE EXCEPTION 'amount_precision_invalid: limit must have at most 2 decimal places';\n  END IF;\n\n  SELECT COALESCE(safety_pool_used, 0), COALESCE(safety_pool_reserved, 0)\n    INTO v_used, v_reserved\n    FROM parents WHERE id = p_parent_id\n    FOR UPDATE;\n\n  v_combined := v_used + v_reserved;\n\n  IF p_new_limit < v_combined THEN\n    RAISE EXCEPTION\n      'Cannot reduce Safety Pool limit to % — used (%) + reserved (%) = % exceeds new limit',\n      p_new_limit, v_used, v_reserved, v_combined;\n  END IF;\n\n  UPDATE parents\n    SET safety_pool_limit        = p_new_limit,\n        safety_pool_last_updated = now()\n    WHERE id = p_parent_id;\nEND;\n$function$\n"
+    },
+    {
+      "name": "verify_parent_passcode",
+      "signature": "verify_parent_passcode(uuid,text)",
+      "args": "p_parent_id uuid, p_pin text",
+      "result_type": "boolean",
+      "language": "plpgsql",
+      "owner": "postgres",
+      "security": "SECURITY DEFINER",
+      "config": [
+        "search_path=public, extensions"
+      ],
+      "is_strict": false,
+      "grants": [
+        {
+          "grantee": "anon",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "authenticated",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        },
+        {
+          "grantee": "postgres",
+          "privilege": "EXECUTE",
+          "grantable": "YES"
+        },
+        {
+          "grantee": "service_role",
+          "privilege": "EXECUTE",
+          "grantable": "NO"
+        }
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.verify_parent_passcode(p_parent_id uuid, p_pin text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'extensions'\nAS $function$\nDECLARE\n  v_stored_hash text;\n  v_allowed     boolean;\nBEGIN\n  -- 1. Rate check BEFORE any hash work.  Counts this attempt regardless of outcome\n  --    so null-hash probes cost the same as wrong-PIN attempts.\n  v_allowed := _rl_attempt(\n    'rl_parent_passcode', p_parent_id::text,\n    5, interval '5 minutes', interval '5 minutes'\n  );\n  IF NOT v_allowed THEN\n    RAISE EXCEPTION 'rate_limit_exceeded';\n  END IF;\n\n  -- 2. Fetch stored hash (NULL for unknown UUID or passcode not yet configured).\n  SELECT passcode_hash INTO v_stored_hash FROM public.parents WHERE id = p_parent_id;\n\n  -- 3. Format guard: reject null, absent-parent, or non-bcrypt values without\n  --    calling crypt().  Accepts $2a$, $2b$, $2y$ prefixes; valid bcrypt output\n  --    is always exactly 60 characters.  This blocks SHA-256 hashes (64-char hex)\n  --    and any other malformed value safely and without a database exception.\n  --\n  --    All three caller-visible failure modes (unknown UUID, passcode not configured,\n  --    wrong PIN) return false — indistinguishable from the caller's perspective.\n  IF v_stored_hash IS NULL\n     OR v_stored_hash !~ '^\\$2[aby]\\$[0-9]{2}\\$'\n     OR length(v_stored_hash) <> 60 THEN\n    RETURN false;\n  END IF;\n\n  -- 4. bcrypt comparison — only reached when a valid stored hash exists.\n  IF crypt(p_pin, v_stored_hash) = v_stored_hash THEN\n    PERFORM _rl_clear('rl_parent_passcode', p_parent_id::text);\n    RETURN true;\n  END IF;\n\n  RETURN false;\nEND;\n$function$\n"
+    }
+  ],
+  "drop_candidate_deps": [
+    {
+      "fn_name": "cancel_circle_request",
+      "fn_args": "p_from_id uuid, p_to_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "cancel_circle_request",
+      "fn_args": "p_from_id uuid, p_to_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "disable_biometric",
+      "fn_args": "p_child_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "disable_biometric",
+      "fn_args": "p_child_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "enable_biometric",
+      "fn_args": "p_child_id uuid, p_device_id text, p_biometric_token_hash text",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "enable_biometric",
+      "fn_args": "p_child_id uuid, p_device_id text, p_biometric_token_hash text",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "parent_send_money",
+      "fn_args": "p_parent_id uuid, p_amount numeric, p_note text",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "parent_send_money",
+      "fn_args": "p_parent_id uuid, p_amount numeric, p_note text",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "remove_from_circle",
+      "fn_args": "p_child_id uuid, p_friend_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    },
+    {
+      "fn_name": "remove_from_circle",
+      "fn_args": "p_child_id uuid, p_friend_id uuid",
+      "deptype": "n",
+      "dep_table": null,
+      "dep_function": null,
+      "dep_trigger": null,
+      "dep_extension": null
+    }
+  ],
+  "reverse_deps": [],
+  "cron_references": [],
+  "trigger_references": []
+}

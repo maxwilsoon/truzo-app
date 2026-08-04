@@ -182,7 +182,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
               // Re-generate CSPRNG token, update the DB hash, and refresh SecureStore.
               // This handles reinstall scenarios where the old SecureStore value is gone.
               const { tokenHash } = await saveBiometricForChild(row.id);
-              await db.enableBiometric(row.id, deviceId, tokenHash);
+              await db.enableBiometric(row.id, deviceId, tokenHash, session_token);
               setBiometricEnabled(true);
             } else {
               // Not yet set up (new account or new device).
