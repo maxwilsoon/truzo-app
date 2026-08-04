@@ -80,10 +80,10 @@ export const CircleScreen: React.FC = () => {
   }, [highlightedId]);
 
   const loadHistory = useCallback(async () => {
-    if (!childId || historyLoading) return;
+    if (!childId || historyLoading || !childSessionToken || !childDeviceId) return;
     setHistoryLoading(true);
     try {
-      const rows = await db.getLoanHistory(childId);
+      const rows = await db.getLoanHistory(childId, childSessionToken, childDeviceId);
       setLoanHistory(rows.map(r => ({
         id: r.id, amount: r.amount, reason: r.reason, reasonEmoji: r.reason_emoji,
         createdAt: r.created_at, repaidAt: r.repaid_at, repayByDate: r.repay_by_date,
@@ -172,7 +172,7 @@ export const CircleScreen: React.FC = () => {
 
         // Refresh circle from DB to reflect server state on both users' devices
         if (childId) {
-          db.getCircle(childId).then(members => {
+          if (childSessionToken && childDeviceId) db.getCircle(childId, childSessionToken, childDeviceId).then(members => {
             setCircle(members.map(m => ({
               id: m.id, displayName: m.display_name, username: m.username,
               avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,

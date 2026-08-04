@@ -23,7 +23,7 @@ const colorFor = (id: string) => AVATAR_COLORS[id.charCodeAt(0) % AVATAR_COLORS.
 
 export const AddFriendsScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { childId, child, circle } = useApp();
+  const { childId, child, circle, childSessionToken, childDeviceId } = useApp();
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,8 +43,8 @@ export const AddFriendsScreen: React.FC = () => {
 
   // On mount, seed requestedIds from DB so existing pending requests show correctly
   useEffect(() => {
-    if (!childId) return;
-    db.getOutgoingPendingRequests(childId)
+    if (!childId || !childSessionToken || !childDeviceId) return;
+    db.getOutgoingPendingRequests(childId, childSessionToken, childDeviceId)
       .then(rows => {
         rows.forEach(r => requestedIdsRef.current.add(r.id));
         setRequestedIds(new Set(requestedIdsRef.current));
@@ -61,7 +61,12 @@ export const AddFriendsScreen: React.FC = () => {
       setLoading(true);
       setError('');
       try {
-        const rows = await db.searchChildren(q, childId ?? undefined);
+        if (!childId || !childSessionToken || !childDeviceId) {
+          setResults([]);
+          setLoading(false);
+          return;
+        }
+        const rows = await db.searchChildren(q, childId, childSessionToken, childDeviceId);
         setResults(rows);
         if (rows.length === 0) setError(`No users found for "${q}"`);
       } catch {

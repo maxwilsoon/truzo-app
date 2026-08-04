@@ -40,7 +40,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const applyLoginResult = useCallback(async (result: { child: Record<string, any>; parent: Record<string, any> }) => {
+  const applyLoginResult = useCallback(async (result: { child: Record<string, any>; parent: Record<string, any> }, sessionToken: string, deviceId: string) => {
     const { child: row, parent: par } = result;
     setChild(c => ({
       ...c,
@@ -86,13 +86,13 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     setBiometricEnabled(true);
     setLastChildForBiometric(row.id).catch(() => {});
     registerPushToken(row.id).catch(() => {});
-    db.getCircle(row.id).then(members => {
+    db.getCircle(row.id, sessionToken, deviceId).then(members => {
       setCircle(members.map(m => ({
         id: m.id, displayName: m.display_name,
         username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
       })));
     }).catch(() => {});
-    db.getPendingRequests(row.id).then(requests => {
+    db.getPendingRequests(row.id, sessionToken, deviceId).then(requests => {
       setPendingRequests(requests.map(r => ({
         requestId: r.request_id, id: r.id, displayName: r.display_name,
         username: r.username, avatarEmoji: r.avatar_emoji,
@@ -156,8 +156,14 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
         await saveChildSession(childId, session_token, session_expires_at ?? '');
         setChildSessionToken(session_token);
       }
+      if (!session_token) {
+        await clearBiometricForChild(childId);
+        setStatus('failed');
+        setErrorMsg('Login succeeded but no session was issued. Please sign in with your password.');
+        return;
+      }
       setStatus('success');
-      await applyLoginResult(result);
+      await applyLoginResult(result, session_token, deviceId);
       navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'ChildTabs' }] }));
     } catch (e) {
       if (__DEV__) console.warn('[BiometricLogin] authenticate error:', String(e));

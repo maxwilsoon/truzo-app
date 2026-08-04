@@ -194,13 +194,16 @@ export const db = {
     if (error) throw error;
   },
 
-  async searchChildren(query: string, excludeId?: string) {
+  async searchChildren(query: string, excludeId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { data, error } = await supabase.rpc('search_children', {
-      p_query:      query,
-      p_exclude_id: excludeId ?? null,
+      p_query:         query,
+      p_exclude_id:    excludeId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
     });
     if (error) throw new Error('search error: ' + error.message);
-    return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; trust_score: number }>;
+    return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; avatar_url: string | null; trust_score: number }>;
   },
 
   async sendCircleRequest(fromId: string, toId: string): Promise<string | null> {
@@ -222,8 +225,13 @@ export const db = {
     return { fromPushToken: (data as any)?.from_push_token ?? null };
   },
 
-  async getPendingRequests(childId: string) {
-    const { data, error } = await supabase.rpc('get_pending_requests', { p_child_id: childId });
+  async getPendingRequests(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_pending_requests', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_pending_requests error: ' + error.message);
     return (data ?? []) as Array<{
       request_id: string; id: string; display_name: string;
@@ -267,8 +275,13 @@ export const db = {
     }
   },
 
-  async getCircle(childId: string) {
-    const { data, error } = await supabase.rpc('get_circle', { p_child_id: childId });
+  async getCircle(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_circle', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_circle error: ' + error.message);
     return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; trust_score: number; avatar_url: string | null }>;
   },
@@ -301,8 +314,13 @@ export const db = {
     return { requestId: d.request_id, pushTokens: d.push_tokens ?? [] };
   },
 
-  async getActiveRequests(childId: string) {
-    const { data, error } = await supabase.rpc('get_active_requests', { p_child_id: childId });
+  async getActiveRequests(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_active_requests', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_active_requests error: ' + error.message);
     return (data ?? []) as Array<{
       id: string; from_id: string; from_name: string; from_emoji: string;
@@ -375,14 +393,24 @@ export const db = {
     if (error) throw new Error('cancel_circle_request error: ' + error.message);
   },
 
-  async getOutgoingPendingRequests(childId: string) {
-    const { data, error } = await supabase.rpc('get_outgoing_pending_requests', { p_child_id: childId });
+  async getOutgoingPendingRequests(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_outgoing_pending_requests', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_outgoing_pending_requests error: ' + error.message);
     return (data ?? []) as Array<{ id: string }>;
   },
 
-  async getResolvedSentRequests(childId: string) {
-    const { data, error } = await supabase.rpc('get_resolved_sent_requests', { p_child_id: childId });
+  async getResolvedSentRequests(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_resolved_sent_requests', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_resolved_sent_requests error: ' + error.message);
     return (data ?? []) as Array<{ request_id: string; id: string; display_name: string; username: string; avatar_emoji: string; status: string; created_at: string }>;
   },
@@ -393,14 +421,26 @@ export const db = {
     });
   },
 
-  async getActivityFeed(childId: string, limit = 100) {
-    const { data, error } = await supabase.rpc('get_activity_feed', { p_child_id: childId, p_limit: limit });
+  async getActivityFeed(childId: string, sessionToken: string, deviceId: string, limit = 100) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_activity_feed', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+      p_limit:         limit,
+    });
     if (error) throw new Error('get_activity_feed error: ' + error.message);
     return (data ?? []) as Array<{ id: string; emoji: string; text: string; type: string; created_at: string }>;
   },
 
-  async getChildTransactions(childId: string, limit = 20) {
-    const { data, error } = await supabase.rpc('get_child_transactions', { p_child_id: childId, p_limit: limit });
+  async getChildTransactions(childId: string, sessionToken: string, deviceId: string, limit = 20) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_child_transactions', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+      p_limit:         limit,
+    });
     if (error) throw new Error('get_child_transactions error: ' + error.message);
     return (data ?? []) as Array<{
       id: string; type: string; amount: number;
@@ -408,8 +448,13 @@ export const db = {
     }>;
   },
 
-  async getChildStats(childId: string) {
-    const { data, error } = await supabase.rpc('get_child_stats', { p_child_id: childId });
+  async getChildStats(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_child_stats', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_child_stats error: ' + error.message);
     return data as { wallet_balance: number; loaned_out: number; borrowed: number; trust_score: number; points: number; streak: number; repaid: number; missed: number; total_borrowed: number; total_lent: number; times_borrowed: number; times_lent: number; profile_image_url: string | null; account_frozen: boolean; parent_debt: number } | null;
   },
@@ -614,8 +659,13 @@ export const db = {
     if (error) throw new Error(error.message);
   },
 
-  async getLoanHistory(childId: string) {
-    const { data, error } = await supabase.rpc('get_loan_history', { p_child_id: childId });
+  async getLoanHistory(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_loan_history', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
     if (error) throw new Error('get_loan_history error: ' + error.message);
     return (data ?? []) as Array<{
       id: string;
@@ -635,6 +685,22 @@ export const db = {
       funder_username: string;
       funder_emoji: string;
       funder_avatar_url: string | null;
+    }>;
+  },
+
+  async getCircleHistory(childId: string, sessionToken: string, deviceId: string) {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { data, error } = await supabase.rpc('get_circle_history', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
+    if (error) throw new Error('get_circle_history error: ' + error.message);
+    return (data ?? []) as Array<{
+      id: string; amount: number; reason: string; reason_emoji: string;
+      created_at: string; repay_by_date: string; is_borrower: boolean;
+      borrower_name: string; borrower_emoji: string; borrower_url: string | null;
+      funder_name: string; funder_emoji: string; funder_url: string | null;
     }>;
   },
 

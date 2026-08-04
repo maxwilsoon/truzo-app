@@ -149,7 +149,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
       registerPushToken(row.id, 'child').catch(() => {});
 
       // Load circle + pending requests — each independently so one failure can't block another
-      db.getCircle(row.id).then(members => {
+      db.getCircle(row.id, session_token, deviceId).then(members => {
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
           username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
@@ -157,7 +157,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
         })));
       }).catch(() => {});
 
-      db.getPendingRequests(row.id).then(requests => {
+      db.getPendingRequests(row.id, session_token, deviceId).then(requests => {
         setPendingRequests(requests.map(r => ({
           requestId: r.request_id, id: r.id, displayName: r.display_name,
           username: r.username, avatarEmoji: r.avatar_emoji,

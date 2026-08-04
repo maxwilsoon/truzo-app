@@ -261,6 +261,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // overwrite real cached data on the first render.
   const hydrated = useRef(false);
   const childIdRef = useRef<string | null>(null);
+  const childSessionTokenRef = useRef<string | null>(null);
+  const childDeviceIdRef = useRef<string | null>(null);
+  // Always points to the current handleSessionError — used by poll() to avoid stale closure.
+  const handleSessionErrorRef = useRef<(code: string) => void>(() => {});
 
   // Activity feed merge helpers — reset when childId changes (new session).
   // persistedActivityIds: IDs that have ever appeared in a DB response.
@@ -326,6 +330,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [child, childId]);
   useEffect(() => { childIdRef.current = childId; }, [childId]);
+  useEffect(() => { childSessionTokenRef.current = childSessionToken; }, [childSessionToken]);
+  useEffect(() => { childDeviceIdRef.current = childDeviceId; }, [childDeviceId]);
 
   const adjustTrustScore = (delta: number) => {
     setChild(c => ({
@@ -540,14 +546,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const expiresInHours = (iso: string) =>
       Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 3600000));
 
+    const SESSION_ERROR_CODES = ['invalid_child_session', 'child_session_expired', 'child_session_revoked'];
+
     const poll = async () => {
+      const token = childSessionTokenRef.current;
+      const devId = childDeviceIdRef.current;
+      if (!token || !devId) return; // Session not yet loaded; skip this tick
+
+      // Route session errors (expired/revoked/invalid) to handleSessionError exactly once
+      // per poll cycle. Non-session errors are silently dropped.
+      let sessionErrorFired = false;
+      const onPollError = (e: unknown) => {
+        if (sessionErrorFired) return;
+        const msg = String((e as any)?.message ?? '');
+        if (SESSION_ERROR_CODES.some(code => msg.includes(code))) {
+          sessionErrorFired = true;
+          handleSessionErrorRef.current(msg);
+        }
+      };
+
       // Each call is independent — one failing cannot block the others
 
       // 0. Activity feed — merged on every cycle so:
       //    a) DB-written items from counterparty RPCs appear without re-login.
       //    b) Optimistic items added this tick (before this fetch resolved) are not lost.
       //    Sorted by created_at DESC so newest is always first regardless of RPC order.
-      db.getActivityFeed(childId).then(items => {
+      db.getActivityFeed(childId, token, devId).then(items => {
         const dbIds = new Set(items.map(i => i.id));
 
         // Track every ID that has ever appeared in a DB response.
@@ -598,10 +622,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return tb - ta;
           });
         });
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 0a. Transaction history from DB (live for both parties)
-      db.getChildTransactions(childId).then(txs => {
+      db.getChildTransactions(childId, token, devId).then(txs => {
         setTransactions(txs.map(t => ({
           id: t.id,
           type: t.type as Transaction['type'],
@@ -611,10 +635,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           counterparty: t.counterparty ?? undefined,
           status: 'completed' as const,
         })));
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 0b. Child's own financials — balance, borrowed, loaned_out, trust score, frozen state
-      db.getChildStats(childId).then(stats => {
+      db.getChildStats(childId, token, devId).then(stats => {
         if (!stats) return;
         setChild(c => ({
           ...c,
@@ -634,19 +658,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         setFrozenAccount(stats.account_frozen ?? false);
         setParentDebt(stats.parent_debt ?? 0);
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 1. Circle members (most critical — must always succeed)
-      db.getCircle(childId).then(members => {
+      db.getCircle(childId, token, devId).then(members => {
         setCircle(members.map(m => ({
           id: m.id, displayName: m.display_name,
           username: m.username, avatarEmoji: m.avatar_emoji, trustScore: m.trust_score,
           profileImageUrl: m.avatar_url ?? undefined,
         })));
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 2. Incoming friend requests
-      db.getPendingRequests(childId).then(requests => {
+      db.getPendingRequests(childId, token, devId).then(requests => {
         const mapped = requests.map(r => ({
           requestId: r.request_id, id: r.id, displayName: r.display_name,
           username: r.username, avatarEmoji: r.avatar_emoji,
@@ -669,10 +693,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         pendingFirstDone = true;
         setPendingRequests(mapped);
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 3. Resolved sent requests (accepted / declined by others)
-      db.getResolvedSentRequests(childId).then(resolved => {
+      db.getResolvedSentRequests(childId, token, devId).then(resolved => {
         resolved.forEach(req => {
           if (!seenResolvedIds.has(req.request_id)) {
             seenResolvedIds.add(req.request_id);
@@ -698,10 +722,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
         resolvedFirstDone = true;
-      }).catch(() => {});
+      }).catch(onPollError);
 
       // 4. Active money requests from self + circle
-      db.getActiveRequests(childId).then(moneyReqs => {
+      db.getActiveRequests(childId, token, devId).then(moneyReqs => {
         const now = Date.now();
         const isExpired = (r: typeof moneyReqs[0]) =>
           r.status === 'pending' && new Date(r.expires_at).getTime() <= now;
@@ -781,7 +805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               fundedByEmoji: r.funded_by_emoji ?? undefined,
             }))
         );
-      }).catch(() => {});
+      }).catch(onPollError);
     };
     // On login, expire streak to 0 if the child missed an entire ISO week
     db.checkStreakExpiry(childId).then(freshStreak => {
@@ -836,7 +860,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const handleSessionError = (code: string) => {
-    clearSessionState(childIdRef.current, childSessionToken);
+    clearSessionState(childIdRef.current, childSessionTokenRef.current);
+    setChildId(null); // stops the polling loop immediately
     setIsChildLoggedIn(false);
     if (navigationRef.isReady()) {
       navigationRef.reset({
@@ -848,6 +873,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
   };
+  // Keep ref current so poll() always calls the latest version without stale closure.
+  handleSessionErrorRef.current = handleSessionError;
 
   return (
     <AppContext.Provider value={{
