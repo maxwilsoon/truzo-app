@@ -14,21 +14,18 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Hold the last registered push token and its owner for the current session.
-// Both are required by deregisterCurrentPushToken() to satisfy the ownership check added in migration 017.
-let _currentPushToken: string | null = null;
-let _currentUserId:    string | null = null;
+// Per-session registration state — cleared on deregister.
+let _currentPushToken:    string | null = null;
+let _currentUserId:       string | null = null;
+let _currentUserType:     'child' | 'parent' | null = null;
+let _currentSessionToken: string | null = null;
+let _currentDeviceId:     string | null = null;
 
-/**
- * Requests push permission, obtains an Expo push token, and registers it in the
- * device_tokens table (plus the legacy children.push_token column).
- *
- * @param userId   - UUID of the logged-in user (child or parent)
- * @param userType - 'child' | 'parent'
- */
 export async function registerPushToken(
   userId: string,
   userType: 'child' | 'parent' = 'child',
+  sessionToken?: string,
+  deviceId?: string,
 ): Promise<string | null> {
   if (!Device.isDevice) return null;
 
@@ -58,18 +55,33 @@ export async function registerPushToken(
 
   try {
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    _currentPushToken = token;
-    _currentUserId    = userId;
 
-    // Register in device_tokens table (and keep legacy children.push_token in sync)
-    await db.registerDeviceToken(
-      userId,
-      userType,
-      token,
-      Platform.OS,
-      Constants.expoConfig?.version ?? undefined,
-    );
+    if (userType === 'parent') {
+      await db.registerParentDeviceToken(
+        token,
+        Platform.OS,
+        Constants.expoConfig?.version ?? undefined,
+      );
+    } else {
+      if (!sessionToken || !deviceId) {
+        if (__DEV__) console.warn('[Truzo] registerPushToken: child path requires sessionToken + deviceId');
+        return null;
+      }
+      await db.registerChildDeviceToken(
+        userId,
+        sessionToken,
+        deviceId,
+        token,
+        Platform.OS,
+        Constants.expoConfig?.version ?? undefined,
+      );
+    }
 
+    _currentPushToken    = token;
+    _currentUserId       = userId;
+    _currentUserType     = userType;
+    _currentSessionToken = sessionToken ?? null;
+    _currentDeviceId     = deviceId ?? null;
     return token;
   } catch (e) {
     if (__DEV__) console.warn('[Truzo] Push token registration failed:', e);
@@ -79,24 +91,33 @@ export async function registerPushToken(
 
 /**
  * Deactivates the push token registered during the current session.
- * Call this on logout so the device stops receiving notifications while logged out.
+ * Propagates errors to the caller (resetSession awaits this before revoking
+ * the child session, so the session must still be valid when this runs).
  */
 export async function deregisterCurrentPushToken(): Promise<void> {
-  if (!_currentPushToken || !_currentUserId) return;
-  try {
-    await db.deregisterDeviceToken(_currentPushToken, _currentUserId);
-  } catch (e) {
-    if (__DEV__) console.warn('[Truzo] Push token deregistration failed:', e);
-  } finally {
-    _currentPushToken = null;
-    _currentUserId    = null;
+  if (!_currentPushToken || !_currentUserType) return;
+  const token     = _currentPushToken;
+  const userId    = _currentUserId;
+  const userType  = _currentUserType;
+  const sessToken = _currentSessionToken;
+  const devId     = _currentDeviceId;
+
+  // Clear state before the async call so a second concurrent deregister is a no-op.
+  _currentPushToken    = null;
+  _currentUserId       = null;
+  _currentUserType     = null;
+  _currentSessionToken = null;
+  _currentDeviceId     = null;
+
+  if (userType === 'parent') {
+    await db.deregisterParentDeviceToken(token);
+  } else {
+    if (userId && sessToken && devId) {
+      await db.deregisterChildDeviceToken(token, userId, sessToken, devId);
+    }
   }
 }
 
-/**
- * Returns the Expo push token registered in the current session (if any).
- * Useful for passing to deregistration flows outside of this module.
- */
 export function getCurrentPushToken(): string | null {
   return _currentPushToken;
 }

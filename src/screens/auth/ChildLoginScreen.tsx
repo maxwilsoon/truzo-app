@@ -146,7 +146,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
       }
 
       // Register device for push notifications (best-effort, won't block login)
-      registerPushToken(row.id, 'child').catch(() => {});
+      registerPushToken(row.id, 'child', session_token, deviceId).catch(() => {});
 
       // Load circle + pending requests — each independently so one failure can't block another
       db.getCircle(row.id, session_token, deviceId).then(members => {

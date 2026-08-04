@@ -85,7 +85,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
     setChildId(row.id);
     setBiometricEnabled(true);
     setLastChildForBiometric(row.id).catch(() => {});
-    registerPushToken(row.id).catch(() => {});
+    registerPushToken(row.id, 'child', sessionToken, deviceId).catch(() => {});
     db.getCircle(row.id, sessionToken, deviceId).then(members => {
       setCircle(members.map(m => ({
         id: m.id, displayName: m.display_name,

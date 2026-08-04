@@ -23,7 +23,7 @@ const ITEM_WIDTH = SCREEN_WIDTH - 120;
 
 export const AvatarPickerScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { child, childId, setChild } = useApp();
+  const { child, childId, setChild, childSessionToken, childDeviceId } = useApp();
   const initialIndex = AVATARS.indexOf(child.avatarEmoji) >= 0 ? AVATARS.indexOf(child.avatarEmoji) : 0;
   const [selected, setSelected] = useState(AVATARS[initialIndex]);
   const [uploading, setUploading] = useState(false);
@@ -62,13 +62,17 @@ export const AvatarPickerScreen: React.FC = () => {
 
     if (result.canceled || !result.assets?.[0]) return;
     if (!childId) { Alert.alert('Error', 'Not logged in.'); return; }
+    if (!childSessionToken || !childDeviceId) {
+      Alert.alert('Session error', 'Please log out and back in to update your photo.');
+      return;
+    }
 
     const asset = result.assets[0];
     const mimeType = asset.mimeType ?? 'image/jpeg';
 
     setUploading(true);
     try {
-      const url = await db.uploadProfileImage(childId, asset.uri, mimeType);
+      const url = await db.uploadProfileImage(childId, asset.uri, mimeType, childSessionToken, childDeviceId);
       setChild(c => ({ ...c, profileImageUrl: url }));
       Alert.alert('Done!', 'Your profile photo has been updated.');
     } catch (e: any) {

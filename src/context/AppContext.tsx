@@ -173,7 +173,7 @@ interface AppContextType {
   setChildSessionToken: (token: string | null) => void;
   childDeviceId: string | null;
   handleSessionError: (code: string) => void;
-  resetSession: () => void;
+  resetSession: () => Promise<void>;
 }
 
 const defaultCircle: CircleMember[] = [];
@@ -406,9 +406,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addActivity = (item: ActivityItem) => {
     const stamped = { ...item, createdAt: item.createdAt ?? new Date().toISOString() };
     setActivityFeed(prev => [stamped, ...prev]);
-    if (childIdRef.current) {
-      db.addActivityItem(childIdRef.current, item.id, item.emoji, item.text, item.type).catch(() => {});
-    }
   };
 
   const removeActivity = (id: string) => {
@@ -807,11 +804,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }).catch(onPollError);
     };
-    // On login, expire streak to 0 if the child missed an entire ISO week
-    db.checkStreakExpiry(childId).then(freshStreak => {
-      if (freshStreak >= 0) setChild(c => ({ ...c, streak: freshStreak }));
-    }).catch(() => {});
-
     poll(); // immediate first fetch
     const id = setInterval(poll, 5000);
     return () => {
@@ -828,8 +820,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setChildSessionToken(null);
   };
 
-  const resetSession = () => {
-    deregisterCurrentPushToken().catch(() => {});
+  const resetSession = async () => {
+    await deregisterCurrentPushToken().catch(() => {});
     clearSessionState(childIdRef.current, childSessionToken);
 
     setChild({

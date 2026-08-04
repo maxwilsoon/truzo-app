@@ -247,40 +247,49 @@ export const db = {
     }>;
   },
 
-  async savePushToken(childId: string, token: string) {
-    const { error } = await supabase.rpc('save_push_token', { p_child_id: childId, p_token: token });
-    if (error) console.warn('save_push_token error:', error.message);
-  },
-
-  /** Register a device push token for server-side notification delivery. */
-  async registerDeviceToken(
-    userId: string,
-    userType: 'child' | 'parent',
-    expoPushToken: string,
-    platform?: string,
-    appVersion?: string,
-  ): Promise<void> {
-    const { error } = await supabase.rpc('register_device_token', {
-      p_user_id:         userId,
-      p_user_type:       userType,
+  async registerParentDeviceToken(expoPushToken: string, platform?: string, appVersion?: string): Promise<void> {
+    const { error } = await supabase.rpc('register_parent_device_token', {
       p_expo_push_token: expoPushToken,
       p_platform:        platform ?? null,
       p_app_version:     appVersion ?? null,
     });
     if (error) {
-      if (__DEV__) console.warn('[Truzo] register_device_token error:', error.message);
+      if (__DEV__) console.warn('[Truzo] register_parent_device_token error:', error.message);
     }
   },
 
-  /** Deactivate a push token on logout so the device stops receiving notifications. */
-  async deregisterDeviceToken(expoPushToken: string, userId: string): Promise<void> {
-    const { error } = await supabase.rpc('deregister_device_token', {
+  async registerChildDeviceToken(
+    childId: string, sessionToken: string, deviceId: string,
+    expoPushToken: string, platform?: string, appVersion?: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('register_child_device_token', {
+      p_child_id:        childId,
+      p_session_token:   sessionToken,
+      p_device_id:       deviceId,
       p_expo_push_token: expoPushToken,
-      p_user_id:         userId,
+      p_platform:        platform ?? null,
+      p_app_version:     appVersion ?? null,
     });
-    if (error) {
-      if (__DEV__) console.warn('[Truzo] deregister_device_token error:', error.message);
-    }
+    if (error) throw new Error('register_child_device_token error: ' + error.message);
+  },
+
+  async deregisterParentDeviceToken(expoPushToken: string): Promise<void> {
+    const { error } = await supabase.rpc('deregister_parent_device_token', {
+      p_expo_push_token: expoPushToken,
+    });
+    if (error) throw new Error('deregister_parent_device_token error: ' + error.message);
+  },
+
+  async deregisterChildDeviceToken(
+    expoPushToken: string, childId: string, sessionToken: string, deviceId: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('deregister_child_device_token', {
+      p_expo_push_token: expoPushToken,
+      p_child_id:        childId,
+      p_session_token:   sessionToken,
+      p_device_id:       deviceId,
+    });
+    if (error) throw new Error('deregister_child_device_token error: ' + error.message);
   },
 
   async getCircle(childId: string, sessionToken: string, deviceId: string) {
@@ -427,12 +436,6 @@ export const db = {
     return (data ?? []) as Array<{ request_id: string; id: string; display_name: string; username: string; avatar_emoji: string; status: string; created_at: string }>;
   },
 
-  async addActivityItem(childId: string, id: string, emoji: string, text: string, type: string): Promise<void> {
-    await supabase.rpc('add_activity_item', {
-      p_child_id: childId, p_id: id, p_emoji: emoji, p_text: text, p_type: type,
-    });
-  },
-
   async getActivityFeed(childId: string, sessionToken: string, deviceId: string, limit = 100) {
     if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
     const { data, error } = await supabase.rpc('get_activity_feed', {
@@ -471,12 +474,13 @@ export const db = {
     return data as { wallet_balance: number; loaned_out: number; borrowed: number; trust_score: number; points: number; streak: number; repaid: number; missed: number; total_borrowed: number; total_lent: number; times_borrowed: number; times_lent: number; profile_image_url: string | null; account_frozen: boolean; parent_debt: number } | null;
   },
 
-  async uploadProfileImage(childId: string, uri: string, mimeType: string): Promise<string> {
+  async uploadProfileImage(
+    childId: string, uri: string, mimeType: string,
+    sessionToken: string, deviceId: string,
+  ): Promise<string> {
     const ext = mimeType.includes('png') ? 'png' : 'jpg';
     const path = `child_${childId}.${ext}`;
 
-    // On web, the image picker returns a blob URL; fetch() can read it directly.
-    // On native, expo-file-system's base64 read + arraybuffer decode is the reliable path.
     let arrayBuffer: ArrayBuffer;
     if (Platform.OS === 'web') {
       const resp = await fetch(uri);
@@ -494,7 +498,10 @@ export const db = {
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
     const publicUrl = data.publicUrl + '?t=' + Date.now();
     const { error: updateErr } = await supabase.rpc('update_profile_image', {
-      p_child_id: childId, p_image_url: publicUrl,
+      p_child_id:      childId,
+      p_image_url:     publicUrl,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
     });
     if (updateErr) throw new Error('update error: ' + updateErr.message);
     return publicUrl;
@@ -506,20 +513,6 @@ export const db = {
       .update({ avatar_emoji: emoji })
       .eq('id', childId);
     if (error) throw error;
-  },
-
-  async persistTransaction(
-    childId: string, type: string, amount: number,
-    description: string, counterparty: string | null,
-  ): Promise<void> {
-    const { error } = await supabase.rpc('persist_transaction', {
-      p_child_id:     childId,
-      p_type:         type,
-      p_amount:       amount,
-      p_description:  description,
-      p_counterparty: counterparty,
-    });
-    if (error) throw new Error('persistTransaction error: ' + error.message);
   },
 
   async removeFromCircle(childId: string, friendId: string, sessionToken: string, deviceId: string): Promise<void> {
