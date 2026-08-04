@@ -102,8 +102,9 @@ export const CircleScreen: React.FC = () => {
   // ── Friend request actions ─────────────────────────────────────────────────
 
   const handleAcceptRequest = async (requestId: string) => {
+    if (!childId || !childSessionToken || !childDeviceId) return;
     try {
-      await db.acceptCircleRequest(requestId);
+      await db.acceptCircleRequest(requestId, childId, childSessionToken, childDeviceId);
       const accepted = pendingRequests.find(r => r.requestId === requestId);
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (accepted) {
@@ -123,9 +124,10 @@ export const CircleScreen: React.FC = () => {
   };
 
   const handleDeclineRequest = async (requestId: string) => {
+    if (!childId || !childSessionToken || !childDeviceId) return;
     try {
       const declined = pendingRequests.find(r => r.requestId === requestId);
-      await db.declineCircleRequest(requestId);
+      await db.declineCircleRequest(requestId, childId, childSessionToken, childDeviceId);
       setPendingRequests(prev => prev.filter(r => r.requestId !== requestId));
       if (declined) {
         addActivity({
@@ -154,9 +156,10 @@ export const CircleScreen: React.FC = () => {
     }
 
     const doRemove = async () => {
+      if (!childSessionToken || !childDeviceId) return;
       setSelectedFriend(null);
       try {
-        await db.removeFromCircle(childId, memberId);
+        await db.removeFromCircle(childId, memberId, childSessionToken, childDeviceId);
 
         // Remove from local circle immediately
         setCircle(prev => prev.filter(m => m.id !== memberId));

@@ -78,10 +78,10 @@ export const AddFriendsScreen: React.FC = () => {
   }, [search, childId]);
 
   const handleCancel = (user: SearchResult) => {
-    if (!childId) return;
+    if (!childId || !childSessionToken || !childDeviceId) return;
     const doCancel = async () => {
       try {
-        await db.cancelCircleRequest(childId, user.id);
+        await db.cancelCircleRequest(childId, user.id, childSessionToken, childDeviceId);
         requestedIdsRef.current.delete(user.id);
         setRequestedIds(new Set(requestedIdsRef.current));
       } catch (e: any) {
@@ -103,7 +103,7 @@ export const AddFriendsScreen: React.FC = () => {
   };
 
   const handleAdd = async (user: SearchResult) => {
-    if (!childId) {
+    if (!childId || !childSessionToken || !childDeviceId) {
       Alert.alert('Not logged in', 'Please log in again.');
       return;
     }
@@ -112,7 +112,7 @@ export const AddFriendsScreen: React.FC = () => {
     setRequestedIds(new Set(requestedIdsRef.current));
 
     try {
-      await db.sendCircleRequest(childId, user.id);
+      await db.sendCircleRequest(childId, user.id, childSessionToken, childDeviceId);
       // Notification delivered server-side via Edge Function
     } catch (e: any) {
       requestedIdsRef.current.delete(user.id);

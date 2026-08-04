@@ -206,23 +206,31 @@ export const db = {
     return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; avatar_url: string | null; trust_score: number }>;
   },
 
-  async sendCircleRequest(fromId: string, toId: string): Promise<string | null> {
-    const { data, error } = await supabase.rpc('send_circle_request', { p_from_id: fromId, p_to_id: toId });
+  async sendCircleRequest(fromId: string, toId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { error } = await supabase.rpc('send_circle_request', {
+      p_from_id: fromId, p_to_id: toId,
+      p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('send_circle_request error: ' + error.message);
-    return (data as any)?.push_token ?? null;
   },
 
-  async acceptCircleRequest(requestId: string): Promise<{ fromId: string; toId: string; fromPushToken: string | null }> {
-    const { data, error } = await supabase.rpc('accept_circle_request', { p_request_id: requestId });
+  async acceptCircleRequest(requestId: string, actingChildId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { error } = await supabase.rpc('accept_circle_request', {
+      p_request_id: requestId, p_acting_child_id: actingChildId,
+      p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('accept_circle_request error: ' + error.message);
-    const d = data as any;
-    return { fromId: d.from_id, toId: d.to_id, fromPushToken: d.from_push_token ?? null };
   },
 
-  async declineCircleRequest(requestId: string): Promise<{ fromPushToken: string | null }> {
-    const { data, error } = await supabase.rpc('decline_circle_request', { p_request_id: requestId });
+  async declineCircleRequest(requestId: string, actingChildId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { error } = await supabase.rpc('decline_circle_request', {
+      p_request_id: requestId, p_acting_child_id: actingChildId,
+      p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('decline_circle_request error: ' + error.message);
-    return { fromPushToken: (data as any)?.from_push_token ?? null };
   },
 
   async getPendingRequests(childId: string, sessionToken: string, deviceId: string) {
@@ -388,8 +396,12 @@ export const db = {
     await supabase.rpc('revoke_child_session', { p_session_token: sessionToken });
   },
 
-  async cancelCircleRequest(fromId: string, toId: string): Promise<void> {
-    const { error } = await supabase.rpc('cancel_circle_request', { p_from_id: fromId, p_to_id: toId });
+  async cancelCircleRequest(fromId: string, toId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { error } = await supabase.rpc('cancel_circle_request', {
+      p_from_id: fromId, p_to_id: toId,
+      p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('cancel_circle_request error: ' + error.message);
   },
 
@@ -510,8 +522,12 @@ export const db = {
     if (error) throw new Error('persistTransaction error: ' + error.message);
   },
 
-  async removeFromCircle(childId: string, friendId: string): Promise<void> {
-    const { error } = await supabase.rpc('remove_from_circle', { p_child_id: childId, p_friend_id: friendId });
+  async removeFromCircle(childId: string, friendId: string, sessionToken: string, deviceId: string): Promise<void> {
+    if (!sessionToken || !deviceId) throw new Error('invalid_child_session');
+    const { error } = await supabase.rpc('remove_from_circle', {
+      p_child_id: childId, p_friend_id: friendId,
+      p_session_token: sessionToken, p_device_id: deviceId,
+    });
     if (error) throw new Error('remove_from_circle error: ' + error.message);
   },
 
