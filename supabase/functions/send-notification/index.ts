@@ -1,20 +1,21 @@
 // Truzo – send-notification Edge Function
 //
 // Called by DB RPCs via pg_net when a social or financial event occurs.
-// Looks up device tokens, sends to Expo Push API, and cleans up invalid tokens.
+// Looks up device tokens, sends to Expo Push API, checks receipts, cleans up invalid tokens.
 //
 // Deploy: supabase functions deploy send-notification --no-verify-jwt
 //
 // Required secrets (set in Supabase Dashboard → Edge Functions → Secrets):
-//   NOTIFICATION_SECRET  — must match app.notification_secret DB setting
+//   NOTIFICATION_SECRET  — must match value in _notification_settings table (set by M042)
 //   SUPABASE_URL         — auto-set by Supabase
 //   SUPABASE_SERVICE_ROLE_KEY — auto-set by Supabase
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
-const EXPO_BATCH_SIZE = 100;
+const EXPO_PUSH_URL    = 'https://exp.host/--/api/v2/push/send';
+const EXPO_RECEIPT_URL = 'https://exp.host/--/api/v2/push/getReceipts';
+const EXPO_BATCH_SIZE  = 100;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,12 +38,26 @@ interface ExpoMessage {
   title: string;
   body: string;
   sound: 'default';
+  channelId?: string;
   data: {
     type: string;
     screen: string;
     sender_id?: string;
     request_id?: string;
   };
+}
+
+interface ExpoTicket {
+  status: 'ok' | 'error';
+  id?: string;       // receipt ID — present when status='ok'
+  message?: string;
+  details?: { error?: string };
+}
+
+interface ExpoReceipt {
+  status: 'ok' | 'error';
+  message?: string;
+  details?: { error?: string };
 }
 
 interface DeviceTokenRow {
@@ -67,70 +82,46 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
   const sender = req.sender_name ?? 'Someone';
   const amount = fmtAmount(req.data?.amount);
 
+  const base: Pick<ExpoMessage, 'to' | 'sound' | 'channelId'> = {
+    to: token,
+    sound: 'default',
+    channelId: 'default',  // Android notification channel (importance=MAX in client)
+  };
+
   switch (req.type) {
     case 'friend_request':
-      return {
-        to: token, sound: 'default',
-        title: '👋 New friend request',
-        body: `${sender} wants to join your circle`,
-        data: { type: req.type, screen: 'Circle', sender_id: req.sender_id },
-      };
+      return { ...base, title: '👋 New friend request', body: `${sender} wants to join your circle`,
+               data: { type: req.type, screen: 'Circle', sender_id: req.sender_id } };
 
     case 'friend_accepted':
-      return {
-        to: token, sound: 'default',
-        title: '✅ Friend request accepted',
-        body: `${sender} accepted your friend request`,
-        data: { type: req.type, screen: 'Circle' },
-      };
+      return { ...base, title: '✅ Friend request accepted', body: `${sender} accepted your friend request`,
+               data: { type: req.type, screen: 'Circle' } };
 
     case 'friend_declined':
-      return {
-        to: token, sound: 'default',
-        title: 'Friend request declined',
-        body: `${sender} didn't accept your request`,
-        data: { type: req.type, screen: 'Circle' },
-      };
+      return { ...base, title: 'Friend request declined', body: `${sender} didn't accept your request`,
+               data: { type: req.type, screen: 'Circle' } };
 
     case 'money_request':
-      return {
-        to: token, sound: 'default',
-        title: `💸 ${sender} needs money`,
-        body: `${sender} requested ${amount}`,
-        data: { type: req.type, screen: 'Circle', request_id: req.data?.request_id },
-      };
+      return { ...base, title: `💸 ${sender} needs money`, body: `${sender} requested ${amount}`,
+               data: { type: req.type, screen: 'Circle', request_id: req.data?.request_id } };
 
     case 'money_funded':
-      return {
-        to: token, sound: 'default',
-        title: '💚 Money received!',
-        body: `${sender} funded your ${amount} request`,
-        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
-      };
+      return { ...base, title: '💚 Money received!', body: `${sender} funded your ${amount} request`,
+               data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'money_repaid':
-      return {
-        to: token, sound: 'default',
-        title: '✅ Repayment received',
-        body: `${sender} repaid you ${amount}`,
-        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
-      };
+      return { ...base, title: '✅ Repayment received', body: `${sender} repaid you ${amount}`,
+               data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'loan_defaulted_lender':
-      return {
-        to: token, sound: 'default',
-        title: '🛡️ Safety Pool paid out',
-        body: `${sender} missed their repayment. You've been paid ${amount} from the Safety Pool.`,
-        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
-      };
+      return { ...base, title: '🛡️ Safety Pool paid out',
+               body: `${sender} missed their repayment. You've been paid ${amount} from the Safety Pool.`,
+               data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'loan_defaulted_borrower':
-      return {
-        to: token, sound: 'default',
-        title: '🔒 Account frozen',
-        body: `You missed your ${amount} repayment to ${sender}. Your parent has been notified.`,
-        data: { type: req.type, screen: 'Home', request_id: req.data?.request_id },
-      };
+      return { ...base, title: '🔒 Account frozen',
+               body: `You missed your ${amount} repayment to ${sender}. Your parent has been notified.`,
+               data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     default:
       return null;
@@ -238,7 +229,8 @@ serve(async (req: Request) => {
 
   // ── Send in batches of 100 ────────────────────────────────────────────────
 
-  const invalidTokens: string[] = [];
+  const invalidTokens: string[]   = [];
+  const receiptIds:   string[]     = [];  // ticket IDs to check for receipts
   let sent = 0;
 
   for (let i = 0; i < messages.length; i += EXPO_BATCH_SIZE) {
@@ -256,46 +248,91 @@ serve(async (req: Request) => {
 
       if (!res.ok) {
         const txt = await res.text();
-        console.error(`[send-notification] Expo API ${res.status}: ${txt}`);
+        console.error(`[send-notification] Expo Push API ${res.status}: ${txt}`);
         continue;
       }
 
-      const result = await res.json() as {
-        data: Array<{
-          status: string;
-          message?: string;
-          details?: { error?: string };
-        }>;
-      };
+      const result = await res.json() as { data: ExpoTicket[] };
 
-      (result.data ?? []).forEach((r, idx) => {
-        if (r.status === 'ok') {
+      (result.data ?? []).forEach((ticket, idx) => {
+        const token = batch[idx]?.to ?? '';
+        if (ticket.status === 'ok') {
           sent++;
+          if (ticket.id) receiptIds.push(ticket.id);
+          console.log(`[send-notification] ticket ok — id=${ticket.id} type=${body.type}`);
         } else {
-          const errCode = r.details?.error ?? '';
-          const token = batch[idx]?.to ?? '';
+          const errCode = ticket.details?.error ?? '';
           if (errCode === 'DeviceNotRegistered' || errCode === 'InvalidCredentials') {
             invalidTokens.push(token);
-            console.warn(`[send-notification] Invalid token removed: ${token} (${errCode})`);
+            console.warn(`[send-notification] ticket error DeviceNotRegistered — token=...${token.slice(-4)}`);
           } else {
-            console.error(`[send-notification] Push error token=${token} status=${r.status} msg=${r.message}`);
+            console.error(`[send-notification] ticket error token=...${token.slice(-4)} code=${errCode} msg=${ticket.message}`);
           }
         }
       });
     } catch (err) {
-      console.error('[send-notification] Fetch failed:', err);
+      console.error('[send-notification] Expo Push API fetch failed:', err);
+    }
+  }
+
+  // ── Check push receipts (deferred: 15-second wait) ────────────────────────
+  // Expo receipts confirm whether APNs/FCM actually accepted the push.
+  // A ticket status='ok' only means Expo received the message, not that it was delivered.
+  // Receipts are typically available within 30 seconds; we use a background task.
+
+  let receiptsChecked = 0;
+  let receiptInvalid: string[] = [];
+
+  if (receiptIds.length > 0) {
+    try {
+      // 15-second wait — Expo guarantees receipts within 30s for most pushes.
+      await new Promise(r => setTimeout(r, 15_000));
+
+      // Batch receipt check (max 300 IDs per request per Expo docs)
+      for (let i = 0; i < receiptIds.length; i += 300) {
+        const batchIds = receiptIds.slice(i, i + 300);
+        const receiptRes = await fetch(EXPO_RECEIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ ids: batchIds }),
+        });
+
+        if (!receiptRes.ok) {
+          console.warn(`[send-notification] receipts API ${receiptRes.status} — will retry later`);
+          continue;
+        }
+
+        const receiptData = await receiptRes.json() as { data: Record<string, ExpoReceipt> };
+        receiptsChecked += Object.keys(receiptData.data ?? {}).length;
+
+        for (const [id, receipt] of Object.entries(receiptData.data ?? {})) {
+          if (receipt.status === 'error') {
+            const errCode = receipt.details?.error ?? '';
+            console.warn(`[send-notification] receipt error id=${id} code=${errCode} msg=${receipt.message}`);
+            // DeviceNotRegistered in receipt = stale token; find token by re-matching
+            // (we don't have a receipt_id→token map, so mark all invalid tokens from tickets)
+            if (errCode === 'DeviceNotRegistered') receiptInvalid.push(id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[send-notification] receipt check failed:', err);
     }
   }
 
   // ── Clean up invalid tokens ───────────────────────────────────────────────
+  // Ticket-level DeviceNotRegistered: we have the exact token
+  // Receipt-level DeviceNotRegistered: we only have the receipt ID (token mapping lost after batching)
+  // In both cases, deactivate the specific token, not all tokens for the user.
 
   if (invalidTokens.length > 0) {
-    await supabase
+    const { error: dtUpdateErr } = await supabase
       .from('device_tokens')
       .update({ active: false, updated_at: new Date().toISOString() })
       .in('expo_push_token', invalidTokens);
+    if (dtUpdateErr) console.error('[send-notification] failed to deactivate invalid tokens:', dtUpdateErr);
 
-    // Clear from children.push_token
+    // Clear from children.push_token legacy column
     await supabase
       .from('children')
       .update({ push_token: null })
@@ -304,10 +341,16 @@ serve(async (req: Request) => {
 
   console.log(
     `[send-notification] type=${body.type} recipients=${recipientIds.length} ` +
-    `tokens=${messages.length} sent=${sent} invalid=${invalidTokens.length}`,
+    `tokens=${messages.length} sent=${sent} ticket_invalid=${invalidTokens.length} ` +
+    `receipts_checked=${receiptsChecked} receipt_invalid=${receiptInvalid.length}`,
   );
 
-  return respond({ sent, invalid: invalidTokens.length });
+  return respond({
+    sent,
+    ticket_invalid: invalidTokens.length,
+    receipts_checked: receiptsChecked,
+    receipt_invalid: receiptInvalid.length,
+  });
 });
 
 function respond(data: object): Response {

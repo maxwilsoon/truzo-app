@@ -27,34 +27,77 @@ export async function registerPushToken(
   sessionToken?: string,
   deviceId?: string,
 ): Promise<string | null> {
-  if (!Device.isDevice) return null;
+  if (!Device.isDevice) {
+    if (__DEV__) console.log('[Push] not a physical device — skipping registration');
+    return null;
+  }
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     (Constants as any).easConfig?.projectId;
+
+  if (__DEV__) {
+    console.log('[Push] registerPushToken —',
+      'platform:', Platform.OS,
+      '| userType:', userType,
+      '| userId prefix:', userId.slice(0, 8),
+      '| projectId present:', !!projectId,
+      '| deviceId present:', !!deviceId,
+      '| sessionToken present:', !!sessionToken,
+    );
+  }
+
   if (!projectId) {
-    if (__DEV__) console.warn('[Truzo] No Expo project ID — push notifications disabled.');
+    if (__DEV__) console.warn('[Push] EAS projectId missing — push notifications disabled. Check app.json extra.eas.projectId.');
     return null;
   }
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
+
+  if (__DEV__) console.log('[Push] existing permission status:', existing);
+
   if (existing !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    if (__DEV__) console.log('[Push] permission after request:', finalStatus);
   }
-  if (finalStatus !== 'granted') return null;
+
+  if (finalStatus !== 'granted') {
+    if (__DEV__) console.warn('[Push] permission denied — no push token will be registered. Status:', finalStatus);
+    return null;
+  }
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-    });
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+      if (__DEV__) console.log('[Push] Android notification channel created (importance=MAX)');
+    } catch (e) {
+      if (__DEV__) console.warn('[Push] Android channel setup failed:', e);
+    }
   }
 
   try {
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = tokenData.data;
+    const tokenObtained = !!token && token.length > 0;
+
+    if (__DEV__) {
+      console.log('[Push] Expo push token obtained:', tokenObtained,
+        '| format:', token?.startsWith('ExponentPushToken[') ? 'ExponentPushToken' :
+                    token?.startsWith('ExpoPushToken[')      ? 'ExpoPushToken' : 'unknown',
+        '| suffix: ...', token?.slice(-4) ?? 'n/a',
+      );
+    }
+
+    if (!tokenObtained) {
+      if (__DEV__) console.warn('[Push] getExpoPushTokenAsync returned empty token');
+      return null;
+    }
 
     if (userType === 'parent') {
       await db.registerParentDeviceToken(
@@ -62,9 +105,10 @@ export async function registerPushToken(
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
+      if (__DEV__) console.log('[Push] parent token registered — RPC success');
     } else {
       if (!sessionToken || !deviceId) {
-        if (__DEV__) console.warn('[Truzo] registerPushToken: child path requires sessionToken + deviceId');
+        if (__DEV__) console.warn('[Push] child registration requires sessionToken + deviceId — both must be present');
         return null;
       }
       await db.registerChildDeviceToken(
@@ -75,6 +119,7 @@ export async function registerPushToken(
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
+      if (__DEV__) console.log('[Push] child token registered — RPC success');
     }
 
     _currentPushToken    = token;
@@ -83,8 +128,14 @@ export async function registerPushToken(
     _currentSessionToken = sessionToken ?? null;
     _currentDeviceId     = deviceId ?? null;
     return token;
-  } catch (e) {
-    if (__DEV__) console.warn('[Truzo] Push token registration failed:', e);
+  } catch (e: any) {
+    // Never treat a push registration failure as fatal — the login must succeed regardless.
+    if (__DEV__) {
+      console.warn('[Push] registration failed —',
+        'error:', e?.message ?? String(e),
+        '| code:', e?.code ?? 'n/a',
+      );
+    }
     return null;
   }
 }
@@ -102,6 +153,14 @@ export async function deregisterCurrentPushToken(): Promise<void> {
   const sessToken = _currentSessionToken;
   const devId     = _currentDeviceId;
 
+  if (__DEV__) {
+    console.log('[Push] deregisterCurrentPushToken —',
+      'userType:', userType,
+      '| userId prefix:', userId?.slice(0, 8) ?? 'null',
+      '| token suffix: ...', token.slice(-4),
+    );
+  }
+
   // Clear state before the async call so a second concurrent deregister is a no-op.
   _currentPushToken    = null;
   _currentUserId       = null;
@@ -111,9 +170,13 @@ export async function deregisterCurrentPushToken(): Promise<void> {
 
   if (userType === 'parent') {
     await db.deregisterParentDeviceToken(token);
+    if (__DEV__) console.log('[Push] parent token deregistered');
   } else {
     if (userId && sessToken && devId) {
       await db.deregisterChildDeviceToken(token, userId, sessToken, devId);
+      if (__DEV__) console.log('[Push] child token deregistered');
+    } else {
+      if (__DEV__) console.warn('[Push] deregister: missing userId/sessToken/devId — skipping RPC');
     }
   }
 }
