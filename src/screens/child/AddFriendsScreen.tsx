@@ -62,15 +62,27 @@ export const AddFriendsScreen: React.FC = () => {
       setError('');
       try {
         if (!childId || !childSessionToken || !childDeviceId) {
+          if (__DEV__) console.log('[Search] missing session — childId:', !!childId, 'token:', !!childSessionToken, 'device:', !!childDeviceId);
           setResults([]);
           setLoading(false);
           return;
         }
+        if (__DEV__) console.log('[Search] childId:', childId.slice(0, 8), 'token present:', !!childSessionToken, 'deviceId present:', !!childDeviceId);
         const rows = await db.searchChildren(q, childId, childSessionToken, childDeviceId);
         setResults(rows);
         if (rows.length === 0) setError(`No users found for "${q}"`);
-      } catch {
-        setError('Search failed. Check your connection.');
+      } catch (e: any) {
+        const msg: string = e?.message ?? '';
+        if (__DEV__) console.log('[Search] failed — msg:', msg);
+        if (msg === 'invalid_child_session' || msg === 'child_session_revoked') {
+          setError('Your session has expired. Please log out and log in again.');
+        } else if (msg === 'child_session_expired') {
+          setError('Your session has expired. Please log out and log in again.');
+        } else if (msg === 'permission_denied') {
+          setError('Search unavailable. Please log out and log in again.');
+        } else {
+          setError('Search failed. Check your connection.');
+        }
       } finally {
         setLoading(false);
       }

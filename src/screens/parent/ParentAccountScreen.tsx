@@ -13,6 +13,7 @@ import { navigationRef } from '../../navigation';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 
 const BRAND = '#2E7D32';
 
@@ -122,7 +123,10 @@ export const ParentAccountScreen: React.FC = () => {
 
   const initial = (parent.firstName || parent.displayName || 'P').charAt(0).toUpperCase();
 
-  const doLogout = () => navigationRef.reset({ index: 0, routes: [{ name: 'WhoIsLoggingIn' }] });
+  const doLogout = () => {
+    supabase.auth.signOut().catch(() => {});
+    navigationRef.reset({ index: 0, routes: [{ name: 'WhoIsLoggingIn' }] });
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

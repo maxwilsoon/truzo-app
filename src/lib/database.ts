@@ -202,7 +202,15 @@ export const db = {
       p_session_token: sessionToken,
       p_device_id:     deviceId,
     });
-    if (error) throw new Error('search error: ' + error.message);
+    if (error) {
+      if (__DEV__) console.log('[Search] RPC error — code:', error.code, 'msg:', error.message);
+      const msg = error.message ?? '';
+      if (msg.includes('invalid_child_session'))  throw new Error('invalid_child_session');
+      if (msg.includes('child_session_expired'))  throw new Error('child_session_expired');
+      if (msg.includes('child_session_revoked'))  throw new Error('child_session_revoked');
+      if (error.code === '42501')                 throw new Error('permission_denied');
+      throw error;
+    }
     return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string; avatar_url: string | null; trust_score: number }>;
   },
 

@@ -86,17 +86,22 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
     } else if (mode === 'confirm') {
       if (next === pinToConfirm) {
         // Send raw PIN to set_parent_passcode RPC; bcrypt is computed server-side.
-        try { await savePasscodeToDb(next); } catch { /* DB save best-effort */ }
-        setParent(p => ({ ...p, passcodeCreated: true }));
-        setTimeout(async () => {
-          if (onSuccess === 'ParentTabs') {
-            // Login-time PIN creation: run Safety Pool guard before granting dashboard access.
-            await navigateToParentDash(navigation, userId);
-          } else {
-            // Onboarding PIN creation: proceed to Safety Pool setup (required step).
-            navigation.navigate('SafetyPool');
-          }
-        }, 150);
+        // Do NOT navigate or mark passcodeCreated until the DB write succeeds.
+        try {
+          await savePasscodeToDb(next);
+          setParent(p => ({ ...p, passcodeCreated: true }));
+          setTimeout(async () => {
+            if (onSuccess === 'ParentTabs') {
+              await navigateToParentDash(navigation, userId);
+            } else {
+              navigation.navigate('SafetyPool');
+            }
+          }, 150);
+        } catch (e: any) {
+          if (__DEV__) console.log('[Passcode] PIN save failed — code:', e?.code, 'msg:', e?.message);
+          setCode('');
+          setThrottleMsg('Could not save PIN. Please check your connection and try again.');
+        }
       } else {
         shake();
       }

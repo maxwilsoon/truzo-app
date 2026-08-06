@@ -6,6 +6,7 @@ import { setLastParentForPasscode, getLastParentForPasscode, getDeviceId } from 
 import { saveChildSession, getChildSession, clearChildSession } from '../lib/childSession';
 import { deregisterCurrentPushToken } from '../lib/notifications';
 import { navigationRef } from '../navigation';
+import { supabase } from '../lib/supabase';
 
 export type CardNetwork = 'visa' | 'mastercard' | 'amex' | 'other';
 
@@ -458,7 +459,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const savePasscodeToDb = async (pin: string) => {
-    if (!userId) return;
+    if (!userId) {
+      if (__DEV__) console.log('[Passcode] savePasscodeToDb: userId null — cannot write to DB');
+      throw new Error('no_user_id');
+    }
     await db.setParentPasscode(userId, pin);
   };
 
@@ -821,6 +825,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetSession = async () => {
+    await supabase.auth.signOut().catch(() => {});
     await deregisterCurrentPushToken().catch(() => {});
     clearSessionState(childIdRef.current, childSessionToken);
 
