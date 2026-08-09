@@ -26,6 +26,7 @@ interface NotificationRequest {
   recipient_type?: string;
   sender_id?: string;
   sender_name?: string;
+  actor_id?: string;   // user_id of the person who performed the action; filtered from recipients
   data?: {
     amount?: number;
     request_id?: string;
@@ -123,6 +124,10 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
                body: `You missed your ${amount} repayment to ${sender}. Your parent has been notified.`,
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
+    case 'parent_transfer':
+      return { ...base, title: '💚 Money received!', body: `${sender} sent you £${amount.replace('£', '')}`,
+               data: { type: req.type, screen: 'Home' } };
+
     default:
       return null;
   }
@@ -154,12 +159,16 @@ serve(async (req: Request) => {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  // Resolve recipient IDs to a flat array
-  const recipientIds: string[] = body.recipient_ids?.length
+  // Resolve recipient IDs to a flat array, then strip the actor.
+  // Defense-in-depth: the DB helpers already remove actor_id before the HTTP call,
+  // but we also filter here so a direct call cannot bypass the rule.
+  const actorId: string | undefined = body.actor_id || body.sender_id;
+  const recipientIds: string[] = (body.recipient_ids?.length
     ? body.recipient_ids
     : body.recipient_id
     ? [body.recipient_id]
-    : [];
+    : []
+  ).filter(id => id !== actorId);
 
   if (recipientIds.length === 0) {
     return respond({ sent: 0, reason: 'no_recipients' });
