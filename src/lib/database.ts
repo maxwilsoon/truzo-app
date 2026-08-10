@@ -187,10 +187,27 @@ export const db = {
   },
 
   async setParentPasscode(userId: string, pin: string): Promise<void> {
+    if (__DEV__) {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[Passcode] setParentPasscode pre-flight:', {
+        sessionExists: !!session,
+        sessionUserId: session?.user?.id ?? null,
+        pParentId:     userId,
+        idsMatch:      session?.user?.id === userId,
+      });
+    }
     const { error } = await supabase.rpc('set_parent_passcode', {
       p_parent_id: userId,
       p_pin:       pin,
     });
+    if (__DEV__ && error) {
+      console.log('[Passcode] set_parent_passcode RPC error:', {
+        code:    error.code,
+        message: error.message,
+        details: error.details,
+        hint:    error.hint,
+      });
+    }
     if (error) throw error;
   },
 

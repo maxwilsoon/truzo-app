@@ -459,6 +459,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const savePasscodeToDb = async (pin: string) => {
+    if (__DEV__) {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[Passcode] savePasscodeToDb:', {
+        userId:        userId ? userId.slice(0, 8) + '…' : null,
+        sessionExists: !!session,
+        sessionUid:    session?.user?.id ? session.user.id.slice(0, 8) + '…' : null,
+        passcodeCreated: parent.passcodeCreated,
+      });
+    }
     if (!userId) {
       if (__DEV__) console.log('[Passcode] savePasscodeToDb: userId null — cannot write to DB');
       throw new Error('no_user_id');

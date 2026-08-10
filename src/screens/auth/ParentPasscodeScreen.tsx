@@ -100,7 +100,22 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
         } catch (e: any) {
           if (__DEV__) console.log('[Passcode] PIN save failed — code:', e?.code, 'msg:', e?.message);
           setCode('');
-          setThrottleMsg('Could not save PIN. Please check your connection and try again.');
+          const msg: string = e?.message ?? '';
+          const code: string = e?.code ?? '';
+          if (msg === 'no_user_id' || msg === 'unauthorized' || code === 'unauthorized') {
+            setThrottleMsg('Please sign in with your email again.');
+            setTimeout(() => navigation.navigate('ParentEmailLogin'), 1800);
+          } else if (msg.includes('rate_limit_exceeded') || code === 'rate_limit_exceeded') {
+            setThrottleMsg('Too many attempts. Please wait 30 minutes before trying again.');
+          } else if (msg.includes('invalid_pin_format') || code === 'invalid_pin_format') {
+            setThrottleMsg('PIN must be exactly 6 digits.');
+          } else if (msg.includes('weak_pin') || code === 'weak_pin') {
+            setThrottleMsg('That PIN is too simple. Please choose a less predictable 6-digit PIN.');
+          } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('connection')) {
+            setThrottleMsg('Could not save PIN. Please check your connection and try again.');
+          } else {
+            setThrottleMsg('Could not save PIN. Please try again.');
+          }
         }
       } else {
         shake();
