@@ -144,6 +144,7 @@ interface AppContextType {
   activeRequests: ActiveRequest[];
   setActiveRequests: React.Dispatch<React.SetStateAction<ActiveRequest[]>>;
   activityFeed: ActivityItem[];
+  activityFetching: boolean;
   addActivity: (item: ActivityItem) => void;
   removeActivity: (id: string) => void;
   frozenAccount: boolean;
@@ -206,6 +207,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [transactions, setTransactions] = useState<Transaction[]>(defaultTransactions);
   const [activeRequests, setActiveRequests] = useState<ActiveRequest[]>(defaultRequests);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>(defaultActivity);
+  const [activityFetching, setActivityFetching] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   const [child, setChild] = useState<ChildProfile>({
@@ -294,8 +296,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { password: _stripped, ...safeChildCache } = cachedChild as any;
         setChild(c => ({ ...c, ...safeChildCache }));
         if (cachedChild.childId) {
-          setChildId(cachedChild.childId);
           hydratedChildId = cachedChild.childId;
+          // Do NOT call setChildId here — defer until session token and device ID are
+          // also loaded, so React 18 can batch all three into one render.  If setChildId
+          // fires first, the polling effect triggers before the refs are populated and
+          // the first poll() call silently skips (token/devId still null).
         }
       }
       if (cachedUserId) {
@@ -308,23 +313,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const secureParentId = await getLastParentForPasscode();
         if (secureParentId) setUserId(secureParentId);
       }
-      // Load session token from SecureStore (never from AsyncStorage).
-      // The server is always authoritative — a stale token will be rejected at first use.
+      // Load session token and device ID before touching childId state so all three
+      // state updates can be batched into one render (React 18 automatic batching).
+      // This guarantees the polling effect's first poll() call sees populated refs.
       let hydratedSessionToken: string | null = null;
       if (hydratedChildId) {
         const stored = await getChildSession(hydratedChildId);
-        if (stored?.token) {
-          setChildSessionToken(stored.token);
-          hydratedSessionToken = stored.token;
-        }
+        if (stored?.token) hydratedSessionToken = stored.token;
       }
-      // Load device ID (stable per-install, SecureStore-backed).
       const devId = await getDeviceId();
-      setChildDeviceId(devId);
       hydrated.current = true;
-      // Re-register push token after hydration — covers Metro reload, app cold start,
-      // and any restart where the JS module state was reset and _currentPushToken is null.
-      // Best-effort: if the session is expired the RPC rejects it; login will re-register.
+      // Batch all three synchronously — React 18 merges into one render.
+      // Ref sync effects (childIdRef, childSessionTokenRef, childDeviceIdRef) run in
+      // declaration order before the polling effect, so refs are all populated before
+      // the first poll() fires.
+      if (hydratedChildId) setChildId(hydratedChildId);
+      if (hydratedSessionToken) setChildSessionToken(hydratedSessionToken);
+      setChildDeviceId(devId);
       if (hydratedChildId && hydratedSessionToken && devId) {
         registerPushToken(hydratedChildId, 'child', hydratedSessionToken, devId).catch(() => {});
       }
@@ -544,6 +549,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Poll every 5 seconds while a child is logged in — picks up new friend requests, circle changes, and resolved sent requests
   useEffect(() => {
     if (!childId) return;
+    setActivityFetching(true); // show loading until first DB response
+    let firstFetchDone = false;
     const seenRequestIds = new Set<string>();
     const seenResolvedIds = new Set<string>();
     const seenFundedIds = new Set<string>();
@@ -598,7 +605,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       //    a) DB-written items from counterparty RPCs appear without re-login.
       //    b) Optimistic items added this tick (before this fetch resolved) are not lost.
       //    Sorted by created_at DESC so newest is always first regardless of RPC order.
+      if (__DEV__) console.log('[Activity] fetchStart — childId:', childId.slice(0, 8));
       db.getActivityFeed(childId, token, devId).then(items => {
+        if (__DEV__) console.log('[Activity] fetchSuccess count:', items.length);
+        if (!firstFetchDone) { firstFetchDone = true; setActivityFetching(false); }
+
         const dbIds = new Set(items.map(i => i.id));
 
         // Track every ID that has ever appeared in a DB response.
@@ -649,7 +660,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return tb - ta;
           });
         });
-      }).catch(onPollError);
+      }).catch(e => {
+        if (__DEV__) console.warn('[Activity] fetchError —', String((e as any)?.message ?? e), '| code:', (e as any)?.code ?? 'n/a');
+        if (!firstFetchDone) { firstFetchDone = true; setActivityFetching(false); }
+        onPollError(e);
+      });
 
       // 0a. Transaction history from DB (live for both parties)
       db.getChildTransactions(childId, token, devId).then(txs => {
@@ -841,6 +856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Reset per-session refs so the next child login starts with a clean slate.
       persistedActivityIdsRef.current = new Set();
       activeRequestIdsRef.current = null;
+      setActivityFetching(false);
     };
   }, [childId]);
 
@@ -871,6 +887,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setUserId(null);
     setActivityFeed([]);
+    setActivityFetching(false);
     setTransactions([]);
     setActiveRequests([]);
     setCircle([]);
@@ -911,7 +928,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       circle, setCircle,
       transactions,
       activeRequests, setActiveRequests,
-      activityFeed, addActivity, removeActivity,
+      activityFeed, activityFetching, addActivity, removeActivity,
       frozenAccount, setFrozenAccount,
       parentDebt, setParentDebt,
       adjustTrustScore,

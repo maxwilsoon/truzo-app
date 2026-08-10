@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -83,7 +83,7 @@ const parseActivity = (text: string): { title: string; sub?: string } => {
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { child, circle, frozenAccount, parentDebt, activityFeed, activeRequests, setRepayHighlightId } = useApp();
+  const { child, circle, frozenAccount, parentDebt, activityFeed, activityFetching, activeRequests, setRepayHighlightId } = useApp();
   const [showAllActivity, setShowAllActivity] = useState(false);
 
   // Activity feed — circle-visible events sorted newest first
@@ -222,7 +222,9 @@ export const HomeScreen: React.FC = () => {
         {/* Outer wrapper carries shadow; inner clips border-radius */}
         <View style={s.cardOuter}>
           <View style={s.cardInner}>
-            {circleActivity.length === 0 ? (
+            {activityFetching ? (
+              <ActivityIndicator color={colors.primary} style={{ paddingVertical: 24 }} />
+            ) : circleActivity.length === 0 ? (
               <Text style={s.emptyMsg}>No recent activity yet</Text>
             ) : (
               (showAllActivity ? circleActivity : circleActivity.slice(0, 6)).map((a, idx, arr) => {

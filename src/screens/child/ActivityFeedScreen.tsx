@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +15,7 @@ const typeColors: Record<string, string> = {
 
 export const ActivityFeedScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { activityFeed } = useApp();
+  const { activityFeed, activityFetching } = useApp();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -43,9 +43,9 @@ export const ActivityFeedScreen: React.FC = () => {
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No activity yet</Text>
-          </View>
+          activityFetching
+            ? <ActivityIndicator color={colors.primary} style={{ padding: 48 }} />
+            : <View style={styles.empty}><Text style={styles.emptyText}>No activity yet</Text></View>
         }
         ListFooterComponent={<View style={{ height: 24 }} />}
       />
