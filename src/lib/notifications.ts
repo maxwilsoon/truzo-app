@@ -1,22 +1,29 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import Constants from 'expo-constants';
 import { db } from './database';
 
-// Foreground suppression: setNotificationHandler is ONLY called when the app is open.
-// Background and closed-app notifications are delivered by the OS directly and are
-// unaffected by this handler. Setting everything to false prevents the OS from
-// showing a system alert/banner while the user is actively using the app — the
-// in-app banner in AppNavigator handles foreground events instead.
+// setNotificationHandler is called when the app receives a push notification.
+// On iOS it is only called in the foreground (the OS delivers directly when
+// backgrounded). On Android the JS process stays alive in the background, so
+// the handler fires even when the app is minimised — we must return
+// shouldShowAlert:true in that state so the system banner appears.
+//
+// Rule: suppress the system notification only when the app is active (foreground);
+// let the OS show it in all other states. The in-app banner (AppNavigator) handles
+// the foreground case instead.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: false,
-    shouldShowList: false,
-  }),
+  handleNotification: async () => {
+    const isForeground = AppState.currentState === 'active';
+    return {
+      shouldShowAlert: !isForeground,
+      shouldPlaySound: !isForeground,
+      shouldSetBadge: false,
+      shouldShowBanner: !isForeground,
+      shouldShowList:  !isForeground,
+    };
+  },
 });
 
 // Per-session registration state — cleared on deregister.
@@ -87,24 +94,32 @@ export async function registerPushToken(
     }
   }
 
+  // Stage 1: obtain Expo push token from Expo's service.
+  let token: string;
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    const token = tokenData.data;
-    const tokenObtained = !!token && token.length > 0;
+    token = tokenData.data;
 
     if (__DEV__) {
-      console.log('[Push] tokenExists:', tokenObtained,
+      console.log('[Push] tokenExists:', !!token && token.length > 0,
         '| format:', token?.startsWith('ExponentPushToken[') ? 'ExponentPushToken' :
                     token?.startsWith('ExpoPushToken[')      ? 'ExpoPushToken' : 'unknown',
         '| suffix: ...', token?.slice(-4) ?? 'n/a',
       );
     }
 
-    if (!tokenObtained) {
+    if (!token || token.length === 0) {
       if (__DEV__) console.warn('[Push] getExpoPushTokenAsync returned empty token');
       return null;
     }
+  } catch (e: any) {
+    // Token fetch fails when: EAS project not found, permission revoked, network error.
+    if (__DEV__) console.warn('[Push] getExpoPushTokenAsync FAILED —', e?.message ?? String(e), '| code:', e?.code ?? 'n/a');
+    return null;
+  }
 
+  // Stage 2: register the token in the DB.
+  try {
     if (userType === 'parent') {
       if (__DEV__) console.log('[Push] registrationAttempt — userType: parent | platform:', Platform.OS);
       await db.registerParentDeviceToken(
@@ -129,23 +144,18 @@ export async function registerPushToken(
       );
       if (__DEV__) console.log('[Push] registrationSuccess — child token active in device_tokens');
     }
-
-    _currentPushToken    = token;
-    _currentUserId       = userId;
-    _currentUserType     = userType;
-    _currentSessionToken = sessionToken ?? null;
-    _currentDeviceId     = deviceId ?? null;
-    return token;
   } catch (e: any) {
-    // Never treat a push registration failure as fatal — the login must succeed regardless.
-    if (__DEV__) {
-      console.warn('[Push] registrationError —',
-        'error:', e?.message ?? String(e),
-        '| code:', e?.code ?? 'n/a',
-      );
-    }
+    // DB registration failure — never block the login flow, but log clearly.
+    if (__DEV__) console.warn('[Push] DB registrationError —', e?.message ?? String(e), '| code:', e?.code ?? 'n/a');
     return null;
   }
+
+  _currentPushToken    = token;
+  _currentUserId       = userId;
+  _currentUserType     = userType;
+  _currentSessionToken = sessionToken ?? null;
+  _currentDeviceId     = deviceId ?? null;
+  return token;
 }
 
 /**
