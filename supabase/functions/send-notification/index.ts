@@ -66,10 +66,6 @@ interface DeviceTokenRow {
   user_id: string;
 }
 
-interface ChildRow {
-  id: string;
-  push_token: string | null;
-}
 
 // ── Notification content builder ──────────────────────────────────────────────
 
@@ -200,22 +196,6 @@ serve(async (req: Request) => {
   }
   for (const row of dtRows ?? []) {
     if (row.expo_push_token) tokenSet.add(row.expo_push_token);
-  }
-
-  // Fallback: legacy children.push_token for users not yet in device_tokens
-  if (recipientType === 'child') {
-    const { data: childRows, error: childErr } = await supabase
-      .from('children')
-      .select('id, push_token')
-      .in('id', recipientIds)
-      .not('push_token', 'is', null) as { data: ChildRow[] | null; error: unknown };
-
-    if (childErr) {
-      console.error('[send-notification] children fallback query error:', childErr);
-    }
-    for (const row of childRows ?? []) {
-      if (row.push_token) tokenSet.add(row.push_token);
-    }
   }
 
   if (tokenSet.size === 0) {
