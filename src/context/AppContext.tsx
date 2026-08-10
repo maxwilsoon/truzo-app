@@ -4,7 +4,7 @@ import { db } from '../lib/database';
 import { fmtAmt } from '../lib/utils';
 import { setLastParentForPasscode, getLastParentForPasscode, getDeviceId } from '../lib/biometrics';
 import { saveChildSession, getChildSession, clearChildSession } from '../lib/childSession';
-import { deregisterCurrentPushToken } from '../lib/notifications';
+import { deregisterCurrentPushToken, registerPushToken } from '../lib/notifications';
 import { navigationRef } from '../navigation';
 import { supabase } from '../lib/supabase';
 
@@ -310,14 +310,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       // Load session token from SecureStore (never from AsyncStorage).
       // The server is always authoritative — a stale token will be rejected at first use.
+      let hydratedSessionToken: string | null = null;
       if (hydratedChildId) {
         const stored = await getChildSession(hydratedChildId);
-        if (stored?.token) setChildSessionToken(stored.token);
+        if (stored?.token) {
+          setChildSessionToken(stored.token);
+          hydratedSessionToken = stored.token;
+        }
       }
       // Load device ID (stable per-install, SecureStore-backed).
       const devId = await getDeviceId();
       setChildDeviceId(devId);
       hydrated.current = true;
+      // Re-register push token after hydration — covers Metro reload, app cold start,
+      // and any restart where the JS module state was reset and _currentPushToken is null.
+      // Best-effort: if the session is expired the RPC rejects it; login will re-register.
+      if (hydratedChildId && hydratedSessionToken && devId) {
+        registerPushToken(hydratedChildId, 'child', hydratedSessionToken, devId).catch(() => {});
+      }
     };
     hydrate();
   }, []);

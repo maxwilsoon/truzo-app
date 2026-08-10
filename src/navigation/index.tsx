@@ -46,6 +46,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 import { getDeviceId } from '../lib/biometrics';
 import { saveChildSession } from '../lib/childSession';
+import { registerPushToken } from '../lib/notifications';
 import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 
 export const AppNavigator = () => {
@@ -114,6 +115,9 @@ export const AppNavigator = () => {
       if (session_token) {
         saveChildSession(row.id, session_token, session_expires_at ?? '').catch(() => {});
         setChildSessionToken(session_token);
+        // Re-register push token on every DEV auto-login — covers Metro reload where
+        // the JS module state was reset and token may be active=false in device_tokens.
+        registerPushToken(row.id, 'child', session_token, deviceId).catch(() => {});
       }
       db.getCircle(row.id, session_token, deviceId).then(members => {
         setCircle(members.map(m => ({

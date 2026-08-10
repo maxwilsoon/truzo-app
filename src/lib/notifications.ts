@@ -65,11 +65,12 @@ export async function registerPushToken(
   if (existing !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
-    if (__DEV__) console.log('[Push] permission after request:', finalStatus);
   }
 
+  if (__DEV__) console.log('[Push] permission:', finalStatus);
+
   if (finalStatus !== 'granted') {
-    if (__DEV__) console.warn('[Push] permission denied — no push token will be registered. Status:', finalStatus);
+    if (__DEV__) console.warn('[Push] permission denied — no push token will be registered');
     return null;
   }
 
@@ -92,7 +93,7 @@ export async function registerPushToken(
     const tokenObtained = !!token && token.length > 0;
 
     if (__DEV__) {
-      console.log('[Push] Expo push token obtained:', tokenObtained,
+      console.log('[Push] tokenExists:', tokenObtained,
         '| format:', token?.startsWith('ExponentPushToken[') ? 'ExponentPushToken' :
                     token?.startsWith('ExpoPushToken[')      ? 'ExpoPushToken' : 'unknown',
         '| suffix: ...', token?.slice(-4) ?? 'n/a',
@@ -105,17 +106,19 @@ export async function registerPushToken(
     }
 
     if (userType === 'parent') {
+      if (__DEV__) console.log('[Push] registrationAttempt — userType: parent | platform:', Platform.OS);
       await db.registerParentDeviceToken(
         token,
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
-      if (__DEV__) console.log('[Push] parent token registered — RPC success');
+      if (__DEV__) console.log('[Push] registrationSuccess — parent token active in device_tokens');
     } else {
       if (!sessionToken || !deviceId) {
         if (__DEV__) console.warn('[Push] child registration requires sessionToken + deviceId — both must be present');
         return null;
       }
+      if (__DEV__) console.log('[Push] registrationAttempt — userType: child | platform:', Platform.OS, '| userId prefix:', userId.slice(0, 8));
       await db.registerChildDeviceToken(
         userId,
         sessionToken,
@@ -124,7 +127,7 @@ export async function registerPushToken(
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
-      if (__DEV__) console.log('[Push] child token registered — RPC success');
+      if (__DEV__) console.log('[Push] registrationSuccess — child token active in device_tokens');
     }
 
     _currentPushToken    = token;
@@ -136,7 +139,7 @@ export async function registerPushToken(
   } catch (e: any) {
     // Never treat a push registration failure as fatal — the login must succeed regardless.
     if (__DEV__) {
-      console.warn('[Push] registration failed —',
+      console.warn('[Push] registrationError —',
         'error:', e?.message ?? String(e),
         '| code:', e?.code ?? 'n/a',
       );
