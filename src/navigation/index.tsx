@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -46,11 +46,17 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 import { getDeviceId } from '../lib/biometrics';
 import { saveChildSession } from '../lib/childSession';
+import { InAppNotificationBanner } from '../components/InAppNotificationBanner';
 
 export const AppNavigator = () => {
   const { setChild, setChildId, setParent, setIsChildLoggedIn, setCircle, setPendingRequests, setChildSessionToken } = useApp();
   const [navReady, setNavReady] = useState(false);
   const notifSubRef = useRef<Notifications.EventSubscription | null>(null);
+
+  // In-app banner: shown instead of system notification when the app is open.
+  type BannerData = { key: number; title: string; body: string; data?: Record<string, any> };
+  const [banner, setBanner] = useState<BannerData | null>(null);
+  const bannerKeyRef = useRef(0);
 
   // Dev-only auto-login: reads credentials from EXPO_PUBLIC_DEV_CHILD_USERNAME /
   // EXPO_PUBLIC_DEV_CHILD_PASSWORD in your local .env.local (gitignored).
@@ -164,7 +170,36 @@ export const AppNavigator = () => {
     return () => { notifSubRef.current?.remove(); notifSubRef.current = null; };
   }, [navReady]);
 
+  // Foreground notification listener — fires when the app is open and a push arrives.
+  // The system notification has been suppressed (setNotificationHandler in notifications.ts),
+  // so we show an in-app banner instead.
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener(notification => {
+      const { title, body, data } = notification.request.content;
+      if (!title && !body) return;
+      bannerKeyRef.current += 1;
+      setBanner({
+        key:   bannerKeyRef.current,
+        title: title ?? '',
+        body:  body  ?? '',
+        data:  (data ?? {}) as Record<string, any>,
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
+  const handleBannerPress = (data?: Record<string, any>) => {
+    if (!data?.screen || !navigationRef.isReady()) return;
+    switch (data.screen) {
+      case 'Circle': navigationRef.navigate('ChildTabs' as never); break;
+      case 'Home':   navigationRef.navigate('ChildTabs' as never); break;
+      case 'Borrow': navigationRef.navigate('ChildTabs' as never); break;
+      default: break;
+    }
+  };
+
   return (
+    <View style={{ flex: 1 }}>
     <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
       <Stack.Navigator
         initialRouteName="Carousel"
@@ -209,5 +244,16 @@ export const AppNavigator = () => {
         <Stack.Screen name="BiometricLogin" component={BiometricLoginScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade', gestureEnabled: false }} />
       </Stack.Navigator>
     </NavigationContainer>
+    {banner && (
+      <InAppNotificationBanner
+        key={banner.key}
+        title={banner.title}
+        body={banner.body}
+        data={banner.data}
+        onDismiss={() => setBanner(null)}
+        onPress={handleBannerPress}
+      />
+    )}
+    </View>
   );
 };

@@ -4,13 +4,18 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { db } from './database';
 
+// Foreground suppression: setNotificationHandler is ONLY called when the app is open.
+// Background and closed-app notifications are delivered by the OS directly and are
+// unaffected by this handler. Setting everything to false prevents the OS from
+// showing a system alert/banner while the user is actively using the app — the
+// in-app banner in AppNavigator handles foreground events instead.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
+    shouldShowAlert: false,
+    shouldPlaySound: false,
     shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldShowBanner: false,
+    shouldShowList: false,
   }),
 });
 
