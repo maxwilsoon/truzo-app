@@ -299,47 +299,49 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
               </TouchableOpacity>
             )
           }
-        </ScrollView>
 
-        <View style={styles.footer}>
-          {!!loginError && (
-            <View style={styles.loginErrorBanner}>
-              <Text style={styles.loginErrorText}>{loginError}</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.btn, (!canContinue || loading) && styles.btnDisabled]}
-            onPress={login}
-            disabled={!canContinue || loading}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color="#1F2937" />
-              : <Text style={styles.btnText}>Continue</Text>
-            }
-          </TouchableOpacity>
+          <View style={{ flex: 1, minHeight: 24 }} />
 
-          {/* Shown only after the cached child has previously declined Face ID —
-              lets them opt in later without being prompted automatically. */}
-          {showBioSetupLink && (
+          <View style={styles.footer}>
+            {!!loginError && (
+              <View style={styles.loginErrorBanner}>
+                <Text style={styles.loginErrorText}>{loginError}</Text>
+              </View>
+            )}
             <TouchableOpacity
-              style={styles.bioSetupLink}
-              onPress={async () => {
-                if (childId) await clearBiometricDeclined(childId);
-                setShowBioSetupLink(false);
-                Alert.alert(
-                  'Face ID',
-                  "You'll be asked to set up Face ID after you sign in.",
-                  [{ text: 'OK' }],
-                );
-              }}
-              activeOpacity={0.7}
+              style={[styles.btn, (!canContinue || loading) && styles.btnDisabled]}
+              onPress={login}
+              disabled={!canContinue || loading}
+              activeOpacity={0.85}
             >
-              <Ionicons name="finger-print" size={16} color={GREEN_DARK} style={{ marginRight: 6 }} />
-              <Text style={styles.bioSetupLinkText}>Set up Face ID</Text>
+              {loading
+                ? <ActivityIndicator color="#1F2937" />
+                : <Text style={styles.btnText}>Continue</Text>
+              }
             </TouchableOpacity>
-          )}
-        </View>
+
+            {/* Shown only after the cached child has previously declined Face ID —
+                lets them opt in later without being prompted automatically. */}
+            {showBioSetupLink && (
+              <TouchableOpacity
+                style={styles.bioSetupLink}
+                onPress={async () => {
+                  if (childId) await clearBiometricDeclined(childId);
+                  setShowBioSetupLink(false);
+                  Alert.alert(
+                    'Face ID',
+                    "You'll be asked to set up Face ID after you sign in.",
+                    [{ text: 'OK' }],
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="finger-print" size={16} color={GREEN_DARK} style={{ marginRight: 6 }} />
+                <Text style={styles.bioSetupLinkText}>Set up Face ID</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -348,7 +350,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: BG },
   back:   { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
 
   sessionBanner: { backgroundColor: '#FFF3CD', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#FBBF24' },
   sessionBannerText: { color: '#92400E', fontSize: 14, fontWeight: '600', textAlign: 'center' },
@@ -374,7 +376,7 @@ const styles = StyleSheet.create({
   forgotLink: { color: GREEN_DARK, fontSize: 14, fontWeight: '600', marginBottom: 24 },
   errorText:  { color: '#FF3B30', fontSize: 13, marginBottom: 20 },
 
-  footer: { paddingHorizontal: 24, paddingBottom: 16, paddingTop: 8, backgroundColor: BG },
+  footer: { paddingBottom: 16, paddingTop: 8 },
   btn: {
     backgroundColor: GREEN,
     borderRadius: 50,

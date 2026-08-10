@@ -253,20 +253,22 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
           {field('phone', "Child's phone number", phone, setPhone, {
             keyboardType: 'phone-pad',
           })}
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.btn, !canContinue && styles.btnDisabled]}
-            onPress={handleContinue}
-            disabled={!canContinue}
-            activeOpacity={0.85}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.btnText}>Continue</Text>}
-          </TouchableOpacity>
-        </View>
+          <View style={{ flex: 1, minHeight: 24 }} />
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.btn, !canContinue && styles.btnDisabled]}
+              onPress={handleContinue}
+              disabled={!canContinue}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.btnText}>Continue</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -274,7 +276,7 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
   gap:    { height: 14 },
 
   title: { fontSize: 32, fontWeight: '800', color: '#1C1C1E', marginBottom: 8 },
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
   hintText:  { fontSize: 13, color: '#8E8E93', marginTop: 5 },
   errorText: { fontSize: 13, color: '#FF3B30', marginTop: 5 },
 
-  footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
+  footer: { paddingBottom: 12, paddingTop: 8 },
   btn: {
     backgroundColor: GREEN,
     borderRadius: 50,

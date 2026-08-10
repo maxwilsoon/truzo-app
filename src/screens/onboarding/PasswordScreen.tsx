@@ -89,19 +89,20 @@ export const PasswordScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           {!!confirmError && <Text style={styles.errorText}>{confirmError}</Text>}
 
-        </ScrollView>
+          <View style={{ flex: 1, minHeight: 24 }} />
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.btn, !canContinue && styles.btnDisabled]}
-            onPress={proceed}
-            disabled={!canContinue}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.btn, !canContinue && styles.btnDisabled]}
+              onPress={proceed}
+              disabled={!canContinue}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.btnText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -109,7 +110,7 @@ export const PasswordScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
 
   title: { fontSize: 32, fontWeight: '800', color: '#1C1C1E', marginBottom: 6 },
   sub:   { fontSize: 16, color: '#3C3C43', marginBottom: 28, lineHeight: 22 },
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   input:      { flex: 1, fontSize: 17, color: '#1C1C1E' },
   errorText:  { color: '#FF3B30', fontSize: 13, marginTop: -8, marginBottom: 12, marginLeft: 4 },
 
-  footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
+  footer: { paddingBottom: 12, paddingTop: 8 },
   btn: {
     backgroundColor: GREEN,
     borderRadius: 50,

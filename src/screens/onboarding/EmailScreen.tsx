@@ -92,10 +92,11 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.legalText}>
             Truzo is a peer-to-peer lending platform for young people, supervised and backed by parents.
           </Text>
-        </ScrollView>
 
-        {/* Footer */}
-        <View style={styles.footer}>
+          <View style={{ flex: 1, minHeight: 24 }} />
+
+          {/* Footer */}
+          <View style={styles.footer}>
           <Text style={styles.consent}>
             By pressing "Continue", you agree to the Truzo{' '}
             <Text style={styles.link}>terms and conditions</Text>
@@ -114,6 +115,7 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continue</Text>}
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -121,7 +123,7 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
 
   title: { fontSize: 32, fontWeight: '800', color: '#1C1C1E', marginBottom: 6 },
   sub:   { fontSize: 16, color: '#3C3C43', marginBottom: 28, lineHeight: 22 },
@@ -143,11 +145,9 @@ const styles = StyleSheet.create({
   legalText: { fontSize: 13, color: '#8E8E93', lineHeight: 19, marginTop: 8 },
 
   footer: {
-    paddingHorizontal: 24,
     paddingBottom: 12,
     paddingTop: 8,
     gap: 14,
-    backgroundColor: BG,
   },
   consent: { fontSize: 13, color: '#8E8E93', textAlign: 'center', lineHeight: 19 },
   link:    { color: GREEN_DARK, fontWeight: '600' },

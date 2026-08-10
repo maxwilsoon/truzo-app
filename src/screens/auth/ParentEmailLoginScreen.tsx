@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
-  TextInput, TouchableOpacity, ActivityIndicator, Alert,
+  TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,6 +119,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
       </TouchableOpacity>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.sub}>Sign in with your parent account email and password.</Text>
@@ -160,6 +161,8 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
           {!!error && <Text style={styles.errorText}>{error}</Text>}
         </View>
 
+        <View style={{ flex: 1, minHeight: 8 }} />
+
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btn, (!canContinue || loading) && styles.btnDisabled]}
@@ -173,6 +176,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
             }
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -181,7 +185,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: BG },
   back:    { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
+  content: { paddingHorizontal: 24, paddingTop: 16 },
 
   title: { fontSize: 28, fontWeight: '800', color: '#1C1C1E', marginBottom: 10 },
   sub:   { fontSize: 16, color: '#3C3C43', lineHeight: 24, marginBottom: 32 },

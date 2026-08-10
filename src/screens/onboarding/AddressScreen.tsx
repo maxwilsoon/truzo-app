@@ -118,21 +118,23 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
               )}
             </View>
           ))}
-        </ScrollView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.btn, !canContinue && styles.btnDisabled]}
-            onPress={() => {
-              setParent(p => ({ ...p, firstName: firstName.trim(), lastName: lastName.trim() }));
-              navigation.navigate('Verifying');
-            }}
-            disabled={!canContinue}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.btnText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={{ flex: 1, minHeight: 24 }} />
+
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.btn, !canContinue && styles.btnDisabled]}
+              onPress={() => {
+                setParent(p => ({ ...p, firstName: firstName.trim(), lastName: lastName.trim() }));
+                navigation.navigate('Verifying');
+              }}
+              disabled={!canContinue}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.btnText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -140,7 +142,7 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
 
   title: { fontSize: 32, fontWeight: '800', color: '#1C1C1E', marginBottom: 8 },
   sub:   { fontSize: 16, color: '#3C3C43', lineHeight: 23, marginBottom: 32 },
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
 
   hint: { fontSize: 13, color: '#8E8E93', marginLeft: 4, marginBottom: 18 },
 
-  footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8, backgroundColor: BG },
+  footer: { paddingBottom: 12, paddingTop: 8 },
   btn: {
     backgroundColor: GREEN,
     borderRadius: 50,

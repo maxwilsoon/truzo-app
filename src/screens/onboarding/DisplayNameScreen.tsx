@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView,
-  Platform, TextInput, TouchableOpacity,
+  Platform, TextInput, TouchableOpacity, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +26,7 @@ export const DisplayNameScreen: React.FC<Props> = ({ navigation }) => {
       <StepProgress current={5} total={8} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <Text style={styles.title}>Your display name</Text>
           <Text style={styles.sub}>This is what your child and their circle will see you as.</Text>
@@ -43,6 +44,8 @@ export const DisplayNameScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
+        <View style={{ flex: 1, minHeight: 8 }} />
+
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.btn, !name.trim() && styles.btnDisabled]}
@@ -56,6 +59,7 @@ export const DisplayNameScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.btnText}>Continue</Text>
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -63,7 +67,7 @@ export const DisplayNameScreen: React.FC<Props> = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: BG },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
+  content: { paddingHorizontal: 24, paddingTop: 20 },
 
   title: { fontSize: 32, fontWeight: '800', color: '#1C1C1E', marginBottom: 6 },
   sub:   { fontSize: 16, color: '#3C3C43', marginBottom: 28, lineHeight: 23 },
