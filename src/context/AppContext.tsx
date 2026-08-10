@@ -459,8 +459,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const savePasscodeToDb = async (pin: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
     if (__DEV__) {
-      const { data: { session } } = await supabase.auth.getSession();
       console.log('[Passcode] savePasscodeToDb:', {
         userId:        userId ? userId.slice(0, 8) + '…' : null,
         sessionExists: !!session,
@@ -471,6 +471,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userId) {
       if (__DEV__) console.log('[Passcode] savePasscodeToDb: userId null — cannot write to DB');
       throw new Error('no_user_id');
+    }
+    // Session absent means the request will be sent with the ANON KEY, which has no
+    // EXECUTE grant on set_parent_passcode — fail early with a clear error rather than
+    // letting PostgREST return a confusing 42501 permission-denied response.
+    if (!session) {
+      if (__DEV__) console.log('[Passcode] savePasscodeToDb: no Supabase session — cannot write to DB');
+      throw new Error('no_session');
     }
     await db.setParentPasscode(userId, pin);
   };

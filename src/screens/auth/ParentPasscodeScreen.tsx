@@ -102,7 +102,7 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
           setCode('');
           const msg: string = e?.message ?? '';
           const code: string = e?.code ?? '';
-          if (msg === 'no_user_id' || msg === 'unauthorized' || code === 'unauthorized') {
+          if (msg === 'no_user_id' || msg === 'no_session' || msg === 'unauthorized' || code === 'unauthorized' || code === '42501') {
             setThrottleMsg('Please sign in with your email again.');
             setTimeout(() => navigation.navigate('ParentEmailLogin'), 1800);
           } else if (msg.includes('rate_limit_exceeded') || code === 'rate_limit_exceeded') {
