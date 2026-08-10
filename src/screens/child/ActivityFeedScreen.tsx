@@ -43,7 +43,7 @@ export const ActivityFeedScreen: React.FC = () => {
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
-          activityFetching
+          activityFetching && activityFeed.length === 0
             ? <ActivityIndicator color={colors.primary} style={{ padding: 48 }} />
             : <View style={styles.empty}><Text style={styles.emptyText}>No activity yet</Text></View>
         }

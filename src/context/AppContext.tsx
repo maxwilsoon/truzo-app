@@ -313,20 +313,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const secureParentId = await getLastParentForPasscode();
         if (secureParentId) setUserId(secureParentId);
       }
-      // Load session token and device ID before touching childId state so all three
-      // state updates can be batched into one render (React 18 automatic batching).
-      // This guarantees the polling effect's first poll() call sees populated refs.
-      let hydratedSessionToken: string | null = null;
-      if (hydratedChildId) {
-        const stored = await getChildSession(hydratedChildId);
-        if (stored?.token) hydratedSessionToken = stored.token;
-      }
-      const devId = await getDeviceId();
+      // Load session token, device ID, and cached activity feed in parallel.
+      // All three state updates are deferred until here so React 18 can batch them
+      // into one render — refs are populated before the first poll() fires.
+      const [stored, devId, cachedActivity] = await Promise.all([
+        hydratedChildId ? getChildSession(hydratedChildId) : Promise.resolve(null),
+        getDeviceId(),
+        hydratedChildId ? cache.loadActivityFeed(hydratedChildId) : Promise.resolve(null),
+      ]);
+      const hydratedSessionToken = (stored as any)?.token ?? null;
       hydrated.current = true;
-      // Batch all three synchronously — React 18 merges into one render.
-      // Ref sync effects (childIdRef, childSessionTokenRef, childDeviceIdRef) run in
-      // declaration order before the polling effect, so refs are all populated before
-      // the first poll() fires.
+      // Batch all state updates synchronously — React 18 merges into one render.
+      if (cachedActivity?.length) setActivityFeed(cachedActivity as ActivityItem[]);
       if (hydratedChildId) setChildId(hydratedChildId);
       if (hydratedSessionToken) setChildSessionToken(hydratedSessionToken);
       setChildDeviceId(devId);
@@ -654,11 +652,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             return true; // genuine not-yet-persisted optimistic item, keep it
           });
-          return [...optimistic, ...dbMapped].sort((a, b) => {
+          const merged = [...optimistic, ...dbMapped].sort((a, b) => {
             const ta = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
             const tb = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
             return tb - ta;
           });
+          // Persist merged feed so it survives app close/reopen and logout/login
+          cache.saveActivityFeed(childId, merged).catch(() => {});
+          return merged;
         });
       }).catch(e => {
         if (__DEV__) console.warn('[Activity] fetchError —', String((e as any)?.message ?? e), '| code:', (e as any)?.code ?? 'n/a');

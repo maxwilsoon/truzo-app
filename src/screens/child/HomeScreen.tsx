@@ -222,7 +222,7 @@ export const HomeScreen: React.FC = () => {
         {/* Outer wrapper carries shadow; inner clips border-radius */}
         <View style={s.cardOuter}>
           <View style={s.cardInner}>
-            {activityFetching ? (
+            {activityFetching && circleActivity.length === 0 ? (
               <ActivityIndicator color={colors.primary} style={{ paddingVertical: 24 }} />
             ) : circleActivity.length === 0 ? (
               <Text style={s.emptyMsg}>No recent activity yet</Text>

@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
-  PARENT:  '@truzo/parent',
-  CHILD:   '@truzo/child',
-  USER_ID: '@truzo/userId',
+  PARENT:   '@truzo/parent',
+  CHILD:    '@truzo/child',
+  USER_ID:  '@truzo/userId',
+  ACTIVITY: (childId: string) => `@truzo/activity/${childId}`,
 } as const;
 
 // AsyncStorage can throw "Native module is null, cannot access legacy storage"
@@ -35,11 +36,14 @@ async function safeClear(keys: string[]): Promise<void> {
 }
 
 export const cache = {
-  saveParent:  (data: object)  => safeSave(KEYS.PARENT,  JSON.stringify(data)),
-  loadParent:  <T>()           => safeLoad<T>(KEYS.PARENT),
-  saveChild:   (data: object)  => safeSave(KEYS.CHILD,   JSON.stringify(data)),
-  loadChild:   <T>()           => safeLoad<T>(KEYS.CHILD),
-  saveUserId:  (id: string)    => safeSave(KEYS.USER_ID, JSON.stringify(id)),
-  loadUserId:  ()              => safeLoad<string>(KEYS.USER_ID),
-  clear:       ()              => safeClear(Object.values(KEYS)),
+  saveParent:       (data: object)                  => safeSave(KEYS.PARENT,  JSON.stringify(data)),
+  loadParent:       <T>()                           => safeLoad<T>(KEYS.PARENT),
+  saveChild:        (data: object)                  => safeSave(KEYS.CHILD,   JSON.stringify(data)),
+  loadChild:        <T>()                           => safeLoad<T>(KEYS.CHILD),
+  saveUserId:       (id: string)                    => safeSave(KEYS.USER_ID, JSON.stringify(id)),
+  loadUserId:       ()                              => safeLoad<string>(KEYS.USER_ID),
+  saveActivityFeed: (childId: string, items: object[]) =>
+    safeSave(KEYS.ACTIVITY(childId), JSON.stringify(items)),
+  loadActivityFeed: (childId: string)               => safeLoad<any[]>(KEYS.ACTIVITY(childId)),
+  clear:            ()                              => safeClear(Object.values(KEYS).filter(v => typeof v === 'string') as string[]),
 };
