@@ -26,7 +26,7 @@
       }
     },
     "android": {
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "pan",
       "package": "com.truzo.app",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",

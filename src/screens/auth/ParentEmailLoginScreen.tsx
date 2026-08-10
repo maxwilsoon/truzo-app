@@ -118,7 +118,7 @@ export const ParentEmailLoginScreen: React.FC<Props> = ({ navigation }) => {
         <Ionicons name="chevron-back" size={26} color="#1C1C1E" />
       </TouchableOpacity>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <Text style={styles.title}>Welcome back</Text>

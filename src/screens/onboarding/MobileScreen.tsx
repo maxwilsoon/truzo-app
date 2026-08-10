@@ -66,7 +66,7 @@ export const MobileScreen: React.FC<Props> = ({ navigation }) => {
       <BackButton />
       <StepProgress current={3} total={8} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           <Text style={styles.title}>Mobile number</Text>

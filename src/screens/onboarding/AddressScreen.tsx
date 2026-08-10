@@ -81,7 +81,7 @@ export const AddressScreen: React.FC<Props> = ({ navigation }) => {
       <BackButton />
       <StepProgress current={8} total={8} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
