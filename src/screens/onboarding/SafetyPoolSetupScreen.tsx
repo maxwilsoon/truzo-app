@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, ScrollView,
@@ -8,7 +8,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import { useApp } from '../../context/AppContext';
 
@@ -17,7 +16,6 @@ const PRESETS = [25, 50, 100, 200];
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'SafetyPool'>;
-  route: RouteProp<RootStackParamList, 'SafetyPool'>;
 };
 
 function describeAmountError(msg: string): string {
@@ -27,18 +25,8 @@ function describeAmountError(msg: string): string {
   return msg;
 }
 
-export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { setupSafetyPool, topUpSafetyPool, parent } = useApp();
-
-  // required=true means this screen is a mandatory gate before dashboard access.
-  // Hide the back button and disable swipe-to-dismiss so the parent must complete setup.
-  const required = route.params?.required ?? false;
-
-  useEffect(() => {
-    if (required) {
-      navigation.setOptions({ gestureEnabled: false });
-    }
-  }, [required]);
+export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation }) => {
+  const { setupSafetyPool } = useApp();
 
   const [raw, setRaw] = useState('');
   const [saving, setSaving] = useState(false);
@@ -55,13 +43,7 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation, route }) =>
     }
     setSaving(true);
     try {
-      if (required && parent.safetyPoolLimit > 0) {
-        // Pool was previously funded but is now depleted — add to the existing limit.
-        await topUpSafetyPool(amount);
-      } else {
-        // First-time setup (onboarding or first login when limit=0).
-        await setupSafetyPool(amount);
-      }
+      await setupSafetyPool(amount);
       navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'ParentTabs' }] }));
     } catch (e: any) {
       Alert.alert('Error', describeAmountError(e.message ?? 'Could not save Safety Pool. Please try again.'));
@@ -74,17 +56,12 @@ export const SafetyPoolSetupScreen: React.FC<Props> = ({ navigation, route }) =>
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
-          {required ? (
-            // No back button when this screen is a mandatory gate.
-            <View style={{ width: 40 }} />
-          ) : (
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Ionicons name="chevron-back" size={28} color="#1A1A3E" />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="chevron-back" size={28} color="#1A1A3E" />
+          </TouchableOpacity>
         </View>
         <ScrollView
           contentContainerStyle={styles.scroll}
