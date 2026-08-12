@@ -1,29 +1,20 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform, AppState } from 'react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { db } from './database';
 
-// setNotificationHandler is called when the app receives a push notification.
-// On iOS it is only called in the foreground (the OS delivers directly when
-// backgrounded). On Android the JS process stays alive in the background, so
-// the handler fires even when the app is minimised — we must return
-// shouldShowAlert:true in that state so the system banner appears.
-//
-// Rule: suppress the system notification only when the app is active (foreground);
-// let the OS show it in all other states. The in-app banner (AppNavigator) handles
-// the foreground case instead.
+// Always show system notifications — let the OS handle display in all app states.
+// On iOS this shows the native banner even when the app is in the foreground.
+// On Android the system notification channel (importance=MAX) controls presentation.
 Notifications.setNotificationHandler({
-  handleNotification: async () => {
-    const isForeground = AppState.currentState === 'active';
-    return {
-      shouldShowAlert: !isForeground,
-      shouldPlaySound: !isForeground,
-      shouldSetBadge: false,
-      shouldShowBanner: !isForeground,
-      shouldShowList:  !isForeground,
-    };
-  },
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList:  true,
+  }),
 });
 
 // Confirmed registration state — set only after the DB call succeeds.
