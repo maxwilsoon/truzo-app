@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
+import { UserSafetySheet, SafetyTarget } from '../../components/UserSafetySheet';
 
 type SearchResult = {
   id: string;
@@ -28,6 +29,7 @@ export const AddFriendsScreen: React.FC = () => {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [safetyTarget, setSafetyTarget] = useState<SafetyTarget | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // circleIds: already in each other's circles (accepted)
@@ -232,6 +234,16 @@ export const AddFriendsScreen: React.FC = () => {
                           <Text style={styles.addBtnText}>Add</Text>
                         </TouchableOpacity>
                       )}
+
+                      {/* ⋯ safety menu */}
+                      <TouchableOpacity
+                        style={styles.moreBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => setSafetyTarget({ id: user.id, displayName: user.display_name, username: user.username })}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="ellipsis-vertical" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
                     </View>
                   );
                 })}
@@ -249,6 +261,19 @@ export const AddFriendsScreen: React.FC = () => {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      <UserSafetySheet
+        visible={safetyTarget !== null}
+        target={safetyTarget}
+        childId={childId}
+        sessionToken={childSessionToken}
+        deviceId={childDeviceId}
+        onClose={() => setSafetyTarget(null)}
+        onBlockSuccess={(id) => {
+          setResults(prev => prev.filter(r => r.id !== id));
+          setSafetyTarget(null);
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -322,6 +347,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F0FDF4',
   },
   inCircleBtnText: { fontSize: 14, fontWeight: '700', color: '#16A34A' },
+
+  moreBtn: {
+    padding: 6, marginLeft: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   emptyCard: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyEmoji: { fontSize: 40 },

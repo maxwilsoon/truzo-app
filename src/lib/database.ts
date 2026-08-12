@@ -758,4 +758,63 @@ export const db = {
     });
     if (error) throw new Error(error.message);
   },
+
+  // ── M049: Block & Report ────────────────────────────────────────────────────
+
+  /** Block a user. Silently declines any pending circle requests and removes
+   *  active friendship. Funded loans are preserved (financial obligation survives). */
+  async blockUser(
+    blockerId: string, sessionToken: string, deviceId: string, blockedId: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('block_user', {
+      p_blocker_id:    blockerId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+      p_blocked_id:    blockedId,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Remove a previously placed block. */
+  async unblockUser(
+    blockerId: string, sessionToken: string, deviceId: string, blockedId: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('unblock_user', {
+      p_blocker_id:    blockerId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+      p_blocked_id:    blockedId,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Submit a report against another user.
+   *  Duplicate (same reporter + reported + reason) is silently ignored server-side. */
+  async reportUser(
+    reporterId: string, sessionToken: string, deviceId: string,
+    reportedId: string, reason: string, description?: string,
+  ): Promise<void> {
+    const { error } = await supabase.rpc('report_user', {
+      p_reporter_id:   reporterId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+      p_reported_id:   reportedId,
+      p_reason:        reason,
+      p_description:   description ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  /** Returns the list of users blocked by the caller. */
+  async getBlockedUsers(
+    childId: string, sessionToken: string, deviceId: string,
+  ): Promise<Array<{ id: string; display_name: string; username: string; avatar_emoji: string }>> {
+    const { data, error } = await supabase.rpc('get_blocked_users', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string }>;
+  },
 };

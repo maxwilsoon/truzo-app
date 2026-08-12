@@ -13,6 +13,7 @@ import { colors } from '../../theme/colors';
 import { ActiveRequest, useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { ConfirmSheet } from '../../components/ConfirmSheet';
+import { UserSafetySheet, SafetyTarget } from '../../components/UserSafetySheet';
 import { fmtAmt } from '../../lib/utils';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,7 +45,8 @@ export const CircleScreen: React.FC = () => {
     id: string; displayName: string; username: string;
     avatarEmoji: string; profileImageUrl?: string; trustScore: number;
   } | null>(null);
-  const [showHistory,    setShowHistory]      = useState(false);
+  const [safetyTarget, setSafetyTarget] = useState<SafetyTarget | null>(null);
+  const [showHistory,  setShowHistory]  = useState(false);
   const [reqTab,          setReqTab]          = useState<'toFund' | 'pending'>('toFund');
   const [showAllToFund,   setShowAllToFund]   = useState(false);
   const [loanHistory, setLoanHistory] = useState<Array<{
@@ -414,6 +416,14 @@ export const CircleScreen: React.FC = () => {
                     </TouchableOpacity>
                     <TouchableOpacity style={s.declineBtn} onPress={() => handleDeclineRequest(req.requestId)} activeOpacity={0.85}>
                       <Text style={s.declineText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.moreBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => setSafetyTarget({ id: req.id, displayName: req.displayName, username: req.username })}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={18} color="#9CA3AF" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -809,7 +819,7 @@ export const CircleScreen: React.FC = () => {
 
             <View style={s.sheetDivider} />
 
-            {/* Destructive secondary action */}
+            {/* Remove from Circle */}
             <TouchableOpacity
               style={s.removeBtn}
               activeOpacity={0.8}
@@ -819,6 +829,20 @@ export const CircleScreen: React.FC = () => {
             >
               <Ionicons name="person-remove-outline" size={18} color={colors.error} />
               <Text style={s.removeBtnText}>Remove from Circle</Text>
+            </TouchableOpacity>
+
+            {/* Block */}
+            <TouchableOpacity
+              style={s.safetyBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (!selectedFriend) return;
+                setSafetyTarget({ id: selectedFriend.id, displayName: selectedFriend.displayName, username: selectedFriend.username });
+                setSelectedFriend(null);
+              }}
+            >
+              <Ionicons name="ban-outline" size={18} color="#DC2626" />
+              <Text style={[s.safetyBtnText, { color: '#DC2626' }]}>Block or Report</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -848,6 +872,21 @@ export const CircleScreen: React.FC = () => {
         confirmColor="#16A34A"
         onConfirm={confirmRepay}
         onCancel={() => setRepayingRequest(null)}
+      />
+
+      {/* ── USER SAFETY SHEET (block / report) ─────────────────── */}
+      <UserSafetySheet
+        visible={safetyTarget !== null}
+        target={safetyTarget}
+        childId={childId}
+        sessionToken={childSessionToken}
+        deviceId={childDeviceId}
+        onClose={() => setSafetyTarget(null)}
+        onBlockSuccess={(blockedId) => {
+          setCircle(prev => prev.filter(m => m.id !== blockedId));
+          setPendingRequests(prev => prev.filter(r => r.id !== blockedId));
+          setSafetyTarget(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -1034,4 +1073,16 @@ const s = StyleSheet.create({
 
   removeBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderWidth: 1.5, borderColor: colors.error, borderRadius: 14, paddingVertical: 15 },
   removeBtnText: { fontSize: 15, fontWeight: '700', color: colors.error },
+  safetyBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 14, backgroundColor: '#FEF2F2',
+    marginTop: 8,
+  },
+  safetyBtnText: { fontSize: 15, fontWeight: '700' },
+  moreBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
 });
