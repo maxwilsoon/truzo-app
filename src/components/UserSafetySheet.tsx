@@ -79,7 +79,15 @@ export const UserSafetySheet: React.FC<Props> = ({
       onBlockSuccess(target.id);
       handleClose();
     } catch (e: any) {
-      Alert.alert('Error', 'Could not block this user. Please try again.');
+      const msg: string = e?.message ?? '';
+      if (msg.includes('active_loan_outstanding')) {
+        Alert.alert(
+          'Outstanding loan',
+          `You can't block ${target.displayName} while you have an active loan between you. Repay or receive repayment first.`,
+        );
+      } else {
+        Alert.alert('Error', 'Could not block this user. Please try again.');
+      }
     }
   };
 
