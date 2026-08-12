@@ -26,12 +26,22 @@ Notifications.setNotificationHandler({
   },
 });
 
-// Per-session registration state — cleared on deregister.
+// Confirmed registration state — set only after the DB call succeeds.
 let _currentPushToken:    string | null = null;
 let _currentUserId:       string | null = null;
 let _currentUserType:     'child' | 'parent' | null = null;
 let _currentSessionToken: string | null = null;
 let _currentDeviceId:     string | null = null;
+
+// Pre-registration state — set as soon as the Expo token is obtained, before the
+// DB call.  Used by deregisterCurrentPushToken so that logout can still mark the
+// token inactive even when the DB registration previously failed (e.g. network
+// error).  The next registerPushToken call overwrites these unconditionally.
+let _rawExpoToken:    string | null = null;
+let _rawUserId:       string | null = null;
+let _rawUserType:     'child' | 'parent' | null = null;
+let _rawSessionToken: string | null = null;
+let _rawDeviceId:     string | null = null;
 
 export async function registerPushToken(
   userId: string,
@@ -118,6 +128,13 @@ export async function registerPushToken(
     return null;
   }
 
+  // Store pre-registration state so logout can deregister even if Stage 2 fails.
+  _rawExpoToken    = token;
+  _rawUserId       = userId;
+  _rawUserType     = userType;
+  _rawSessionToken = sessionToken ?? null;
+  _rawDeviceId     = deviceId ?? null;
+
   // Stage 2: register the token in the DB.
   try {
     if (userType === 'parent') {
@@ -160,31 +177,41 @@ export async function registerPushToken(
 
 /**
  * Deactivates the push token registered during the current session.
- * Propagates errors to the caller (resetSession awaits this before revoking
- * the child session, so the session must still be valid when this runs).
+ * Falls back to the pre-registration (_raw*) state when DB registration
+ * previously failed, so logout reliably marks the token inactive even in
+ * that case.  Propagates errors to the caller (resetSession awaits this
+ * before revoking the child session, so the session must still be valid).
  */
 export async function deregisterCurrentPushToken(): Promise<void> {
-  if (!_currentPushToken || !_currentUserType) return;
-  const token     = _currentPushToken;
-  const userId    = _currentUserId;
-  const userType  = _currentUserType;
-  const sessToken = _currentSessionToken;
-  const devId     = _currentDeviceId;
+  // Prefer confirmed state; fall back to pre-registration state.
+  const token     = _currentPushToken    ?? _rawExpoToken;
+  const userId    = _currentUserId       ?? _rawUserId;
+  const userType  = _currentUserType     ?? _rawUserType;
+  const sessToken = _currentSessionToken ?? _rawSessionToken;
+  const devId     = _currentDeviceId     ?? _rawDeviceId;
+
+  if (!token || !userType) return;
 
   if (__DEV__) {
     console.log('[Push] deregisterCurrentPushToken —',
       'userType:', userType,
       '| userId prefix:', userId?.slice(0, 8) ?? 'null',
       '| token suffix: ...', token.slice(-4),
+      '| source:', _currentPushToken ? 'confirmed' : 'pre-registration fallback',
     );
   }
 
-  // Clear state before the async call so a second concurrent deregister is a no-op.
+  // Clear both state layers before the async call so a concurrent deregister is a no-op.
   _currentPushToken    = null;
   _currentUserId       = null;
   _currentUserType     = null;
   _currentSessionToken = null;
   _currentDeviceId     = null;
+  _rawExpoToken        = null;
+  _rawUserId           = null;
+  _rawUserType         = null;
+  _rawSessionToken     = null;
+  _rawDeviceId         = null;
 
   if (userType === 'parent') {
     await db.deregisterParentDeviceToken(token);
