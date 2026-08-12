@@ -43,6 +43,49 @@ let _rawUserType:     'child' | 'parent' | null = null;
 let _rawSessionToken: string | null = null;
 let _rawDeviceId:     string | null = null;
 
+/**
+ * Obtains the Expo push token for this device without registering it in the
+ * database. Returns null when push is unavailable (not a physical device, EAS
+ * project not configured, permissions denied, or Expo token service error).
+ *
+ * Use this to pre-fetch the token before making a credential-verified DB call
+ * (e.g. register_parent_push_token_passcode) that does not require a Supabase
+ * Auth session.
+ */
+export async function getExpoPushToken(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+
+  const projectId =
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    (Constants as any).easConfig?.projectId;
+  if (!projectId) return null;
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let finalStatus = existing;
+  if (existing !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') return null;
+
+  if (Platform.OS === 'android') {
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    } catch {}
+  }
+
+  try {
+    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function registerPushToken(
   userId: string,
   userType: 'child' | 'parent' = 'child',
@@ -138,19 +181,19 @@ export async function registerPushToken(
   // Stage 2: register the token in the DB.
   try {
     if (userType === 'parent') {
-      if (__DEV__) console.log('[Push] registrationAttempt — userType: parent | platform:', Platform.OS);
+      if (__DEV__) console.log('[ParentPush] registrationAttempt — platform:', Platform.OS);
       await db.registerParentDeviceToken(
         token,
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
-      if (__DEV__) console.log('[Push] registrationSuccess — parent token active in device_tokens');
+      if (__DEV__) console.log('[ParentPush] registrationSuccess — parent token active in device_tokens');
     } else {
       if (!sessionToken || !deviceId) {
-        if (__DEV__) console.warn('[Push] child registration requires sessionToken + deviceId — both must be present');
+        if (__DEV__) console.warn('[ChildPush] child registration requires sessionToken + deviceId — both must be present');
         return null;
       }
-      if (__DEV__) console.log('[Push] registrationAttempt — userType: child | platform:', Platform.OS, '| userId prefix:', userId.slice(0, 8));
+      if (__DEV__) console.log('[ChildPush] registrationAttempt — platform:', Platform.OS, '| userId prefix:', userId.slice(0, 8));
       await db.registerChildDeviceToken(
         userId,
         sessionToken,
@@ -159,11 +202,21 @@ export async function registerPushToken(
         Platform.OS,
         Constants.expoConfig?.version ?? undefined,
       );
-      if (__DEV__) console.log('[Push] registrationSuccess — child token active in device_tokens');
+      if (__DEV__) console.log('[ChildPush] registrationSuccess — child token active in device_tokens');
     }
   } catch (e: any) {
-    // DB registration failure — never block the login flow, but log clearly.
-    if (__DEV__) console.warn('[Push] DB registrationError —', e?.message ?? String(e), '| code:', e?.code ?? 'n/a');
+    const msg: string = e?.message ?? String(e);
+    const prefix = userType === 'parent' ? '[ParentPush]' : '[ChildPush]';
+    if (__DEV__) console.warn(`${prefix} DB registrationError —`, msg, '| code:', (e as any)?.code ?? 'n/a');
+    // Re-throw child session errors so AppContext can route to login and clear the
+    // stale SecureStore token. Parent errors are non-fatal (best-effort registration).
+    if (userType === 'child' && (
+      msg.includes('child_session_revoked') ||
+      msg.includes('child_session_expired') ||
+      msg.includes('invalid_child_session')
+    )) {
+      throw e;
+    }
     return null;
   }
 

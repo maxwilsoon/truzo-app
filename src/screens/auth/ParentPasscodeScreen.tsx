@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Vibration,
+  View, Text, StyleSheet, TouchableOpacity, Vibration, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,7 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
 import { getLastParentForPasscode } from '../../lib/biometrics';
-import { registerPushToken } from '../../lib/notifications';
+import { getExpoPushToken } from '../../lib/notifications';
 
 const GREEN_DARK = '#3D7A45';
 const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
@@ -126,7 +126,16 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
       try {
         const ok = await db.verifyParentPasscode(userId ?? '', next);
         if (ok) {
-          if (userId) registerPushToken(userId, 'parent').catch(() => {});
+          // Register push token using the PIN as credential (no Supabase Auth session
+          // needed — this is the cold-start / app-restart path where the JWT is gone).
+          if (userId) {
+            const pin = next; // capture before async gap
+            getExpoPushToken()
+              .then(expoToken => {
+                if (expoToken) return db.registerParentPushTokenWithPasscode(userId, pin, expoToken, Platform.OS);
+              })
+              .catch(() => {}); // best-effort
+          }
           setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
         } else {
           shake();

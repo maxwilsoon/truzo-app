@@ -273,14 +273,48 @@ export const db = {
   },
 
   async registerParentDeviceToken(expoPushToken: string, platform?: string, appVersion?: string): Promise<void> {
+    if (__DEV__) {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[ParentAuth] sessionExists:', !!session,
+        '| sessionValid:', !!(session?.access_token),
+        '| uidPrefix:', session?.user?.id?.slice(0, 8) ?? 'null');
+    }
     const { error } = await supabase.rpc('register_parent_device_token', {
       p_expo_push_token: expoPushToken,
       p_platform:        platform ?? null,
       p_app_version:     appVersion ?? null,
     });
     if (error) {
-      if (__DEV__) console.warn('[Truzo] register_parent_device_token error:', error.message);
+      if (__DEV__) console.warn('[ParentPush] registrationError (session path) —', error.message);
+      throw new Error(error.message);
     }
+  },
+
+  /**
+   * Registers a parent push token using a verified PIN instead of a Supabase Auth
+   * session. Use this in the PIN-login flow (cold start / app restart) where the
+   * Supabase JWT is no longer in memory.  Returns true if the token was registered,
+   * false if the PIN is wrong. Throws 'rate_limit_exceeded' on too many attempts.
+   */
+  async registerParentPushTokenWithPasscode(
+    parentId: string, pin: string, expoPushToken: string,
+    platform?: string, appVersion?: string,
+  ): Promise<boolean> {
+    if (__DEV__) console.log('[ParentPush] registrationAttempt (passcode path) — platform:', platform ?? Platform.OS);
+    const { data, error } = await supabase.rpc('register_parent_push_token_passcode', {
+      p_parent_id:       parentId,
+      p_pin:             pin,
+      p_expo_push_token: expoPushToken,
+      p_platform:        platform ?? null,
+      p_app_version:     appVersion ?? null,
+    });
+    if (error) {
+      if (__DEV__) console.warn('[ParentPush] registrationError (passcode path) —', error.message);
+      if (error.message?.includes('rate_limit_exceeded')) throw new Error('rate_limit_exceeded');
+      return false;
+    }
+    if (__DEV__) console.log('[ParentPush] registrationSuccess (passcode path) — registered:', !!data);
+    return !!data;
   },
 
   async registerChildDeviceToken(
@@ -295,7 +329,7 @@ export const db = {
       p_platform:        platform ?? null,
       p_app_version:     appVersion ?? null,
     });
-    if (error) throw new Error('register_child_device_token error: ' + error.message);
+    if (error) throw new Error(error.message);
   },
 
   async deregisterParentDeviceToken(expoPushToken: string): Promise<void> {

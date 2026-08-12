@@ -329,7 +329,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (hydratedSessionToken) setChildSessionToken(hydratedSessionToken);
       setChildDeviceId(devId);
       if (hydratedChildId && hydratedSessionToken && devId) {
-        registerPushToken(hydratedChildId, 'child', hydratedSessionToken, devId).catch(() => {});
+        if (__DEV__) {
+          console.log('[ChildAuth] sessionExists:', true,
+            '| sessionIdPrefix:', hydratedSessionToken.slice(0, 8),
+            '| deviceId present:', !!devId);
+        }
+        registerPushToken(hydratedChildId, 'child', hydratedSessionToken, devId)
+          .catch((e: any) => {
+            const msg: string = e?.message ?? '';
+            if (
+              msg.includes('child_session_revoked') ||
+              msg.includes('child_session_expired') ||
+              msg.includes('invalid_child_session')
+            ) {
+              // Stale session in SecureStore — clear it and route to login.
+              // handleSessionErrorRef calls clearSessionState which calls clearChildSession.
+              handleSessionErrorRef.current(msg);
+            }
+          });
       }
     };
     hydrate();
@@ -743,24 +760,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resolved.forEach(req => {
           if (!seenResolvedIds.has(req.request_id)) {
             seenResolvedIds.add(req.request_id);
-            if (resolvedFirstDone) {
-              if (req.status === 'accepted') {
-                addActivity({
-                  id: `resolved_${req.request_id}`,
-                  emoji: '✅',
-                  text: `${req.display_name.split(' ')[0]} accepted your friend request`,
-                  time: 'Just now',
-                  type: 'joined' as const,
-                });
-              } else {
-                addActivity({
-                  id: `resolved_${req.request_id}`,
-                  emoji: '❌',
-                  text: `${req.display_name.split(' ')[0]} declined your friend request`,
-                  time: 'Just now',
-                  type: 'request' as const,
-                });
-              }
+            if (resolvedFirstDone && req.status === 'accepted') {
+              addActivity({
+                id: `resolved_${req.request_id}`,
+                emoji: '✅',
+                text: `${req.display_name.split(' ')[0]} accepted your friend request`,
+                time: 'Just now',
+                type: 'joined' as const,
+              });
             }
           }
         });

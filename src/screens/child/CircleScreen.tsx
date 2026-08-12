@@ -46,7 +46,8 @@ export const CircleScreen: React.FC = () => {
     avatarEmoji: string; profileImageUrl?: string; trustScore: number;
   } | null>(null);
   const [safetyTarget, setSafetyTarget] = useState<SafetyTarget | null>(null);
-  const [showHistory,  setShowHistory]  = useState(false);
+  const [showHistory,       setShowHistory]       = useState(false);
+  const [showAllFriendReqs, setShowAllFriendReqs] = useState(false);
   const [reqTab,          setReqTab]          = useState<'toFund' | 'pending'>('toFund');
   const [showAllToFund,   setShowAllToFund]   = useState(false);
   const [loanHistory, setLoanHistory] = useState<Array<{
@@ -392,42 +393,61 @@ export const CircleScreen: React.FC = () => {
         {pendingRequests.length > 0 && (
           <View style={s.cardOuter}>
             <View style={s.cardInner}>
-              <View style={s.cardHeaderRow}>
-                <View style={s.cardTitleRow}>
-                  <Ionicons name="person-add-outline" size={18} color="#2E7D32" />
-                  <Text style={s.cardTitle}>Friend Requests</Text>
-                  <View style={s.countBadge}><Text style={s.countBadgeText}>{pendingRequests.length}</Text></View>
+
+              {/* Compact header */}
+              <View style={s.frHeader}>
+                <Ionicons name="person-add-outline" size={14} color="#2E7D32" />
+                <Text style={s.frHeaderTitle}>Friend Requests</Text>
+                <View style={s.countBadge}>
+                  <Text style={s.countBadgeText}>{pendingRequests.length}</Text>
                 </View>
               </View>
-              {pendingRequests.map((req, idx) => (
-                <View key={req.requestId} style={[s.reqRow, idx < pendingRequests.length - 1 && s.rowDivider]}>
-                  <View style={s.reqAvatar}>
+
+              {/* Request rows — first only, or all if expanded */}
+              {(showAllFriendReqs ? pendingRequests : pendingRequests.slice(0, 1)).map((req, idx, arr) => (
+                <View key={req.requestId} style={[s.frReqRow, idx < arr.length - 1 && s.rowDivider]}>
+                  <View style={s.frReqAvatar}>
                     {req.profileImageUrl
-                      ? <Image source={{ uri: req.profileImageUrl }} style={s.reqAvatarImg} resizeMode="cover" />
-                      : <Text style={{ fontSize: 22 }}>{req.avatarEmoji}</Text>}
+                      ? <Image source={{ uri: req.profileImageUrl }} style={s.frReqAvatarImg} resizeMode="cover" />
+                      : <Text style={{ fontSize: 18 }}>{req.avatarEmoji}</Text>}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.reqName}>{req.displayName} wants to join</Text>
-                    <Text style={s.reqSub}>@{req.username} · Score {req.trustScore}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.frReqName} numberOfLines={1}>{req.displayName}</Text>
+                    <Text style={s.frReqSub} numberOfLines={1}>@{req.username} · {req.trustScore} pts</Text>
                   </View>
                   <View style={s.frActions}>
                     <TouchableOpacity style={s.acceptBtn} onPress={() => handleAcceptRequest(req.requestId)} activeOpacity={0.85}>
                       <Text style={s.acceptText}>Accept</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={s.declineBtn} onPress={() => handleDeclineRequest(req.requestId)} activeOpacity={0.85}>
-                      <Text style={s.declineText}>Decline</Text>
-                    </TouchableOpacity>
                     <TouchableOpacity
-                      style={s.moreBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      onPress={() => setSafetyTarget({ id: req.id, displayName: req.displayName, username: req.username })}
+                      style={s.declineBtn}
+                      onPress={() => handleDeclineRequest(req.requestId)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="ellipsis-horizontal" size={18} color="#9CA3AF" />
+                      <Ionicons name="close" size={16} color="#6B7280" />
                     </TouchableOpacity>
                   </View>
                 </View>
               ))}
+
+              {/* View more / collapse toggle */}
+              {pendingRequests.length > 1 && (
+                <TouchableOpacity
+                  style={s.frViewAll}
+                  onPress={() => setShowAllFriendReqs(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.frViewAllText}>
+                    {showAllFriendReqs ? 'Show less' : `View ${pendingRequests.length - 1} more`}
+                  </Text>
+                  <Ionicons
+                    name={showAllFriendReqs ? 'chevron-up' : 'chevron-down'}
+                    size={13}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -979,12 +999,22 @@ const s = StyleSheet.create({
   reqTime:  { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   reqDue:   { fontSize: 11, color: '#9CA3AF' },
 
+  // Compact pending friend request card
+  frHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
+  frHeaderTitle: { fontSize: 13, fontWeight: '700', color: '#111827', flex: 1 },
+  frReqRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  frReqAvatar:   { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  frReqAvatarImg:{ width: 36, height: 36 },
+  frReqName:     { fontSize: 13, fontWeight: '600', color: '#111827' },
+  frReqSub:      { fontSize: 11, color: '#6B7280', marginTop: 1 },
+  frViewAll:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0F0F0' },
+  frViewAllText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+
   // Friend request accept/decline
-  frActions:  { flexDirection: 'row', gap: 8 },
-  acceptBtn:  { backgroundColor: '#2E7D32', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  frActions:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  acceptBtn:  { backgroundColor: '#2E7D32', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
   acceptText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  declineBtn: { backgroundColor: '#F3F4F6', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  declineText:{ fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  declineBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
 
   // Fund button — white background, purple border, pill-shaped
   fundBtn:     { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#FFFFFF' },

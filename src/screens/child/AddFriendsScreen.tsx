@@ -193,56 +193,41 @@ export const AddFriendsScreen: React.FC = () => {
             ) : results.length > 0 ? (
               <>
                 <Text style={styles.sectionLabel}>RESULTS FOR "{query.toUpperCase()}"</Text>
-                {results.map(user => {
+                {results.map((user, idx) => {
                   const state = getButtonState(user.id);
                   return (
-                    <View key={user.id} style={styles.userCard}>
+                    <View key={user.id} style={[styles.userRow, idx < results.length - 1 && styles.userRowDivider]}>
                       <View style={[styles.avatar, { backgroundColor: colorFor(user.id) }]}>
-                        <Text style={styles.avatarInitial}>{user.avatar_emoji}</Text>
+                        <Text style={styles.avatarEmoji}>{user.avatar_emoji}</Text>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.userName}>{user.display_name}</Text>
-                        <Text style={styles.userHandle}>@{user.username}</Text>
-                      </View>
-                      <View style={styles.trustCircle}>
-                        <Text style={styles.trustText}>{user.trust_score}</Text>
+                      <View style={styles.userInfo}>
+                        <Text style={styles.userName} numberOfLines={1}>{user.display_name}</Text>
+                        <Text style={styles.userHandle} numberOfLines={1}>@{user.username} · {user.trust_score} pts</Text>
                       </View>
 
                       {state === 'in_circle' && (
                         <View style={styles.inCircleBtn}>
-                          <Ionicons name="checkmark" size={14} color="#16A34A" />
                           <Text style={styles.inCircleBtnText}>Friends</Text>
                         </View>
                       )}
                       {state === 'requested' && (
-                        <TouchableOpacity
-                          style={styles.requestedBtn}
-                          onPress={() => handleCancel(user)}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="time-outline" size={14} color="#6B7280" />
+                        <TouchableOpacity style={styles.requestedBtn} onPress={() => handleCancel(user)} activeOpacity={0.7}>
                           <Text style={styles.requestedBtnText}>Requested</Text>
                         </TouchableOpacity>
                       )}
                       {state === 'none' && (
-                        <TouchableOpacity
-                          style={styles.addBtn}
-                          onPress={() => handleAdd(user)}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="person-add-outline" size={15} color="#2E7D32" />
+                        <TouchableOpacity style={styles.addBtn} onPress={() => handleAdd(user)} activeOpacity={0.8}>
                           <Text style={styles.addBtnText}>Add</Text>
                         </TouchableOpacity>
                       )}
 
-                      {/* ⋯ safety menu */}
                       <TouchableOpacity
                         style={styles.moreBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         onPress={() => setSafetyTarget({ id: user.id, displayName: user.display_name, username: user.username })}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="ellipsis-vertical" size={16} color="#9CA3AF" />
+                        <Ionicons name="ellipsis-vertical" size={15} color="#C4C4C4" />
                       </TouchableOpacity>
                     </View>
                   );
@@ -303,57 +288,39 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 16, color: '#1A1A3E', marginLeft: 4 },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16, gap: 10 },
+  scroll: { paddingTop: 8 },
 
   sectionLabel: {
-    fontSize: 12, fontWeight: '800', color: '#6B7280',
-    letterSpacing: 0.8, marginTop: 8, marginBottom: 2,
+    fontSize: 11, fontWeight: '700', color: '#9CA3AF',
+    letterSpacing: 0.6, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6,
   },
 
-  userCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#F9F8FF', borderRadius: 16,
-    padding: 14, borderWidth: 1, borderColor: '#E8F5E9',
+  // Flat row (Instagram style)
+  userRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 20, paddingVertical: 11, backgroundColor: '#fff',
   },
-  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 26 },
-  userName: { fontSize: 16, fontWeight: '700', color: '#1A1A3E' },
-  userHandle: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  userRowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F0F0F0' },
 
-  trustCircle: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2.5, borderColor: '#06B6D4', backgroundColor: '#ECFEFF',
-  },
-  trustText: { fontSize: 14, fontWeight: '800', color: '#06B6D4' },
+  avatar:     { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji:{ fontSize: 23 },
 
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#F1FAF2',
-  },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: '#2E7D32' },
+  userInfo:   { flex: 1, minWidth: 0 },
+  userName:   { fontSize: 14, fontWeight: '600', color: '#111827' },
+  userHandle: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
 
-  requestedBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F9FAFB',
-  },
-  requestedBtnText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  addBtn:         { backgroundColor: '#2E7D32', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 7 },
+  addBtnText:     { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  inCircleBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1.5, borderColor: '#BBF7D0', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#F0FDF4',
-  },
-  inCircleBtnText: { fontSize: 14, fontWeight: '700', color: '#16A34A' },
+  requestedBtn:     { backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  requestedBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
 
-  moreBtn: {
-    padding: 6, marginLeft: 2,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  inCircleBtn:     { backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  inCircleBtnText: { fontSize: 13, fontWeight: '600', color: '#374151' },
 
-  emptyCard: { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  moreBtn: { padding: 4, alignItems: 'center', justifyContent: 'center' },
+
+  emptyCard: { alignItems: 'center', paddingVertical: 48, gap: 10 },
   emptyEmoji: { fontSize: 40 },
-  emptyText: { fontSize: 15, color: '#9CA3AF', textAlign: 'center' },
+  emptyText: { fontSize: 15, color: '#9CA3AF', textAlign: 'center', paddingHorizontal: 32 },
 });
