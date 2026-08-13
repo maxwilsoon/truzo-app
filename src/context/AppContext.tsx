@@ -436,7 +436,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addActivity = (item: ActivityItem) => {
     const stamped = { ...item, createdAt: item.createdAt ?? new Date().toISOString() };
-    setActivityFeed(prev => [stamped, ...prev]);
+    setActivityFeed(prev => {
+      if (prev.some(a => a.id === stamped.id)) return prev;
+      return [stamped, ...prev];
+    });
   };
 
   const removeActivity = (id: string) => {
@@ -669,11 +672,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             return true; // genuine not-yet-persisted optimistic item, keep it
           });
-          const merged = [...optimistic, ...dbMapped].sort((a, b) => {
-            const ta = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
-            const tb = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
-            return tb - ta;
-          });
+          const seenIds = new Set<string>();
+          const merged = [...optimistic, ...dbMapped]
+            .sort((a, b) => {
+              const ta = a.createdAt ? new Date(a.createdAt).getTime() : Date.now();
+              const tb = b.createdAt ? new Date(b.createdAt).getTime() : Date.now();
+              return tb - ta;
+            })
+            .filter(a => {
+              if (seenIds.has(a.id)) return false;
+              seenIds.add(a.id);
+              return true;
+            });
           // Persist merged feed so it survives app close/reopen and logout/login
           cache.saveActivityFeed(childId, merged).catch(() => {});
           return merged;
