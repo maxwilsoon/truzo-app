@@ -279,9 +279,9 @@ export const CircleScreen: React.FC = () => {
       const amt = paidAmount ?? req.amount;
       setActiveRequests(prev => prev.filter(r => r.id !== req.id));
       setChild(c => ({ ...c, balance: c.balance - amt, borrowed: Math.max(0, c.borrowed - amt), trustScore: Math.min(100, c.trustScore + 5), points: c.points + 5, repaid: c.repaid + 1 }));
-      const funderUser = circle.find(m => m.id === req.fundedById)?.username ?? req.fundedByName ?? 'friend';
-      addActivity({ id: `repay_${req.id}`, emoji: '✅', text: `You repaid £${fmtAmt(amt)} to @${funderUser} · +5 pts`, time: 'Just now', type: 'repaid' });
-      addTransaction({ id: `t_repay_${Date.now()}`, type: 'repay', amount: -amt, description: `Repaid £${fmtAmt(amt)} to @${funderUser}`, date: 'Just now', counterparty: req.fundedByName, status: 'completed' });
+      const funderName = circle.find(m => m.id === req.fundedById)?.displayName ?? req.fundedByName ?? 'friend';
+      addActivity({ id: `repay_${req.id}`, emoji: '✅', text: `You repaid £${fmtAmt(amt)} to ${funderName}`, time: 'Just now', type: 'repaid' });
+      addTransaction({ id: `t_repay_${Date.now()}`, type: 'repay', amount: -amt, description: `Repaid £${fmtAmt(amt)} to ${funderName}`, date: 'Just now', counterparty: req.fundedByName, status: 'completed' });
       // Notification to funder delivered server-side via Edge Function
     } catch (e: any) {
       const msg: string = e.message ?? '';

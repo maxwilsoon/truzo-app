@@ -71,8 +71,8 @@ const parseActivity = (text: string): { title: string; sub?: string } => {
     const [, name, amt, reason] = reqM;
     return { title: `${name} requested ${amt}`, sub: reason ? reason.charAt(0).toUpperCase() + reason.slice(1) : undefined };
   }
-  // "You repaid £X to Name"
-  const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+)$/);
+  // "You repaid £X to Name" (strip any trailing " · ..." from old cached items)
+  const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+?)(?:\s+·.*)?$/);
   if (repM) return { title: `Repaid to ${repM[3]}`, sub: repM[2] };
   // "Name funded your request of £X"
   const funM = text.match(/^(.+?)\s+funded your request of\s+(£[\d,.]+)/);
