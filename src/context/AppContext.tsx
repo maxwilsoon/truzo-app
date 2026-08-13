@@ -754,7 +754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `req_${req.requestId}`,
                 emoji: '👋',
-                text: `${req.displayName.split(' ')[0]} wants to join your circle`,
+                text: `${req.displayName} wants to join your circle`,
                 time: 'Just now',
                 type: 'request' as const,
               });
@@ -774,7 +774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `resolved_${req.request_id}`,
                 emoji: '✅',
-                text: `${req.display_name.split(' ')[0]} accepted your friend request`,
+                text: `${req.display_name} accepted your friend request`,
                 time: 'Just now',
                 type: 'joined' as const,
               });
@@ -798,7 +798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `funded_${r.id}`,
                 emoji: '💚',
-                text: `${(r.funded_by_name ?? '').split(' ')[0]} funded your request of £${fmtAmt(Number(r.amount))}`,
+                text: `${r.funded_by_name ?? 'Someone'} funded your request of £${fmtAmt(Number(r.amount))}`,
                 time: 'Just now',
                 type: 'funded' as const,
               });
@@ -811,7 +811,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               addActivity({
                 id: `moneyreq_${r.id}`,
                 emoji: '💸',
-                text: `${r.from_name.split(' ')[0]} requested £${fmtAmt(Number(r.amount))}${r.reason?.trim() ? ` for ${r.reason.trim()}` : ''}`,
+                text: `${r.from_name} requested £${fmtAmt(Number(r.amount))}${r.reason?.trim() ? ` for ${r.reason.trim()}` : ''}`,
                 time: 'Just now',
                 type: 'request' as const,
               });

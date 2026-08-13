@@ -65,17 +65,38 @@ const getSubtitle = (score: number): string => {
 
 // Splits activity text into title + optional sub-line for two-line display.
 const parseActivity = (text: string): { title: string; sub?: string } => {
+  // "Name requested £X for reason"
   const reqM = text.match(/^(.+?)\s+requested\s+(£[\d,.]+)(?:\s+for\s+(.+))?$/);
   if (reqM) {
     const [, name, amt, reason] = reqM;
     return { title: `${name} requested ${amt}`, sub: reason ? reason.charAt(0).toUpperCase() + reason.slice(1) : undefined };
   }
+  // "You repaid £X to Name"
   const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+)$/);
-  if (repM) return { title: `${repM[1]} ${repM[3]}`, sub: repM[2] };
+  if (repM) return { title: `Repaid to ${repM[3]}`, sub: repM[2] };
+  // "Name funded your request of £X"
   const funM = text.match(/^(.+?)\s+funded your request of\s+(£[\d,.]+)/);
   if (funM) return { title: `${funM[1]} funded you`, sub: funM[2] };
   const funA = text.match(/^(.+?)\s+funded your request\b/);
   if (funA) { const a = text.match(/(£[\d,.]+)/); return { title: `${funA[1]} funded you`, sub: a?.[1] }; }
+  // "Name repaid you £X"
+  const repaidM = text.match(/^(.+?)\s+repaid you\s+(£[\d,.]+)/);
+  if (repaidM) return { title: `${repaidM[1]} repaid you`, sub: repaidM[2] };
+  // "Name accepted your friend request"
+  const acceptM = text.match(/^(.+?)\s+accepted your friend request$/);
+  if (acceptM) return { title: acceptM[1], sub: 'Accepted your friend request' };
+  // "Name wants to join your circle"
+  const joinM = text.match(/^(.+?)\s+wants to join your circle$/);
+  if (joinM) return { title: joinM[1], sub: 'Wants to join your circle' };
+  // "Name missed their £X repayment — -15 pts"
+  const missedM = text.match(/^(.+?)\s+missed their\s+(£[\d,.]+)\s+repayment/);
+  if (missedM) return { title: `${missedM[1]} missed repayment`, sub: `${missedM[2]} · -15 pts` };
+  // "Missed repayment · Safety Pool paid £X to Name · ..."  (borrower view)
+  const frozenM = text.match(/^Missed repayment · Safety Pool paid\s+(£[\d,.]+)\s+to\s+(.+?)\s+·/);
+  if (frozenM) return { title: 'Missed repayment', sub: `Safety Pool paid ${frozenM[1]} to ${frozenM[2]}` };
+  // "£X received from Safety Pool — Name defaulted"
+  const poolM = text.match(/^(£[\d,.]+)\s+received from Safety Pool/);
+  if (poolM) return { title: `${poolM[1]} from Safety Pool`, sub: 'Loan guarantee paid out' };
   return { title: text };
 };
 
@@ -104,7 +125,10 @@ export const HomeScreen: React.FC = () => {
   const dueLabel   = ownFunded ? repayDueLabel(ownFunded.repayByDate) : '';
   const isUrgent   = dueLabel.startsWith('Overdue') || dueLabel === 'Due today';
 
-  const getMember = (text: string) => circle.find(m => m.displayName && text.includes(m.displayName));
+  const getMember = (text: string) => circle.find(m =>
+    (m.displayName && text.includes(m.displayName)) ||
+    (m.username && text.includes('@' + m.username))
+  );
   const avatarBg  = (type: ActivityItem['type']) => {
     if (type === 'tier')   return colors.primary;
     if (type === 'joined') return colors.success;
