@@ -249,9 +249,9 @@ export const CircleScreen: React.FC = () => {
         trustScore: Math.min(100, c.trustScore + 2),
         points:     c.points     + 2,
       }));
-      const borrowerUser = circle.find(m => m.id === req.fromId)?.username ?? req.fromName;
-      addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to @${borrowerUser} · +2 pts`, time: 'Just now', type: 'funded' });
-      addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to @${borrowerUser}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
+      const borrowerName = circle.find(m => m.id === req.fromId)?.displayName ?? req.fromName;
+      addActivity({ id: `fund_${req.id}`, emoji: '💚', text: `£${fmtAmt(req.amount)} lent to ${borrowerName}`, time: 'Just now', type: 'funded' });
+      addTransaction({ id: `t_fund_${Date.now()}`, type: 'lend', amount: -req.amount, description: `£${fmtAmt(req.amount)} lent to ${borrowerName}`, date: 'Just now', counterparty: req.fromName, status: 'active' });
       // Notification to borrower delivered server-side via Edge Function
     } catch (e: any) {
       const msg: string = e.message ?? '';

@@ -74,6 +74,9 @@ const parseActivity = (text: string): { title: string; sub?: string } => {
   // "You repaid £X to Name" (strip any trailing " · ..." from old cached items)
   const repM = text.match(/^(You repaid)\s+(£[\d,.]+)\s+to\s+(.+?)(?:\s+·.*)?$/);
   if (repM) return { title: `Repaid to ${repM[3]}`, sub: repM[2] };
+  // "£X lent to Name" (strip any trailing " · ..." from old cached items)
+  const lentM = text.match(/^(£[\d,.]+)\s+lent to\s+(.+?)(?:\s+·.*)?$/);
+  if (lentM) return { title: `Lent to ${lentM[2]}`, sub: lentM[1] };
   // "Name funded your request of £X"
   const funM = text.match(/^(.+?)\s+funded your request of\s+(£[\d,.]+)/);
   if (funM) return { title: `${funM[1]} funded you`, sub: funM[2] };
