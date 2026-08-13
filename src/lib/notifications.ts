@@ -9,11 +9,10 @@ import { db } from './database';
 // On Android the system notification channel (importance=MAX) controls presentation.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
     shouldShowBanner: true,
-    shouldShowList:  true,
+    shouldShowList:   true,
+    shouldPlaySound:  true,
+    shouldSetBadge:   false,
   }),
 });
 

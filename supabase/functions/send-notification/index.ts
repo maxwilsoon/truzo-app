@@ -76,7 +76,7 @@ function fmtAmount(amount: number | undefined): string {
 }
 
 function buildMessage(token: string, req: NotificationRequest): ExpoMessage | null {
-  const sender = req.sender_name ?? 'Someone';
+  const sender = (req.sender_name ?? 'Someone').split(' ')[0];  // first name only
   const amount = fmtAmount(req.data?.amount);
 
   const base: Pick<ExpoMessage, 'to' | 'sound' | 'channelId'> = {
@@ -87,19 +87,19 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
 
   switch (req.type) {
     case 'friend_request':
-      return { ...base, title: '👋 New friend request', body: `${sender} wants to join your circle`,
+      return { ...base, title: '👋 New friend request', body: `${sender} wants to add you`,
                data: { type: req.type, screen: 'Circle', sender_id: req.sender_id } };
 
     case 'friend_accepted':
-      return { ...base, title: '✅ Friend request accepted', body: `${sender} accepted your friend request`,
+      return { ...base, title: '✅ Now friends!', body: `${sender} accepted your friend request`,
                data: { type: req.type, screen: 'Circle' } };
 
     case 'friend_declined':
-      return { ...base, title: 'Friend request declined', body: `${sender} didn't accept your request`,
+      return { ...base, title: 'Friend request declined', body: `${sender} declined your request`,
                data: { type: req.type, screen: 'Circle' } };
 
     case 'money_request':
-      return { ...base, title: `💸 ${sender} needs money`, body: `${sender} requested ${amount}`,
+      return { ...base, title: `💸 ${sender} needs money`, body: `${sender} is asking for ${amount}`,
                data: { type: req.type, screen: 'Circle', request_id: req.data?.request_id } };
 
     case 'money_funded':
@@ -107,12 +107,12 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'money_repaid':
-      return { ...base, title: '✅ Repayment received', body: `${sender} repaid you ${amount}`,
+      return { ...base, title: '✅ Repayment received', body: `${sender} paid back your ${amount}`,
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'loan_defaulted_lender':
       return { ...base, title: '🛡️ Safety Pool paid out',
-               body: `${sender} missed their repayment. You've been paid ${amount} from the Safety Pool.`,
+               body: `${sender} missed their repayment — you've been paid ${amount} from the Safety Pool`,
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'loan_defaulted_borrower':
@@ -121,7 +121,7 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
     case 'parent_transfer':
-      return { ...base, title: '💚 Money received!', body: `${sender} sent you £${amount.replace('£', '')}`,
+      return { ...base, title: '💚 Money received!', body: `Your parent sent you ${amount}`,
                data: { type: req.type, screen: 'Home' } };
 
     default:
