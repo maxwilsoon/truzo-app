@@ -34,7 +34,7 @@ const MastercardLogo: React.FC = () => (
 );
 
 export const WalletScreen: React.FC = () => {
-  const { child, transactions, activeRequests } = useApp();
+  const { child, transactions, activeRequests, frozenAccount } = useApp();
   const [showAll, setShowAll] = useState(false);
   const displayTx = showAll ? transactions : transactions.slice(0, 4);
 
@@ -47,8 +47,13 @@ export const WalletScreen: React.FC = () => {
     .filter(r => !r.isOwn && r.isFunded)
     .reduce((sum, r) => sum + r.amount, 0);
 
-  const handleCardAction = (label: string) =>
+  const handleCardAction = (label: string) => {
+    if (frozenAccount) {
+      Alert.alert('Account frozen', 'Your account is frozen. Repay your parent to unlock your card.');
+      return;
+    }
     Alert.alert(label, `${label} is coming soon.`);
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -62,14 +67,24 @@ export const WalletScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Frozen banner */}
+        {frozenAccount && (
+          <View style={s.frozenBanner}>
+            <Ionicons name="lock-closed" size={14} color="#991B1B" />
+            <Text style={s.frozenText}>
+              Account frozen — repay your parent to unlock your card and features.
+            </Text>
+          </View>
+        )}
+
         {/* Balance card */}
         <LinearGradient
-          colors={['#C8E8CB', '#93C999'] as const}
+          colors={frozenAccount ? ['#FEE2E2', '#FECACA'] as const : ['#C8E8CB', '#93C999'] as const}
           style={s.balanceCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <Text style={s.balanceLabel}>Your Balance</Text>
+          <Text style={s.balanceLabel}>{frozenAccount ? '🔒 Account Frozen' : 'Your Balance'}</Text>
           <Text style={s.balanceAmount}>£{fmtAmt(child.balance)}</Text>
           <View style={s.cardFooter}>
             <Text style={s.cardNumber}>•••• 4827</Text>
@@ -86,10 +101,14 @@ export const WalletScreen: React.FC = () => {
               onPress={() => handleCardAction(a.label)}
               activeOpacity={0.7}
             >
-              <View style={s.actionCircle}>
-                <Ionicons name={a.icon as any} size={22} color="#1A1A3E" />
+              <View style={[s.actionCircle, frozenAccount && s.actionCircleFrozen]}>
+                <Ionicons
+                  name={frozenAccount ? 'lock-closed-outline' : a.icon as any}
+                  size={22}
+                  color={frozenAccount ? '#9CA3AF' : '#1A1A3E'}
+                />
               </View>
-              <Text style={s.actionLabel}>{a.label}</Text>
+              <Text style={[s.actionLabel, frozenAccount && s.actionLabelFrozen]}>{a.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -178,6 +197,10 @@ const s = StyleSheet.create({
   mastercardWrap:   { flexDirection: 'row', alignItems: 'center' },
   mastercardCircle: { width: 28, height: 28, borderRadius: 14, opacity: 0.92 },
 
+  // Frozen banner
+  frozenBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  frozenText:   { flex: 1, fontSize: 13, color: '#991B1B', fontWeight: '600', lineHeight: 18 },
+
   // Card actions
   actionsCard: {
     flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center',
@@ -191,7 +214,9 @@ const s = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     alignItems: 'center', justifyContent: 'center',
   },
-  actionLabel: { fontSize: 12, fontWeight: '600', color: '#374151' },
+  actionLabel:        { fontSize: 12, fontWeight: '600', color: '#374151' },
+  actionCircleFrozen: { backgroundColor: '#F3F4F6' },
+  actionLabelFrozen:  { color: '#9CA3AF' },
 
   // Lending stats
   statsRow:     { flexDirection: 'row', gap: 12 },
