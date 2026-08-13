@@ -110,6 +110,10 @@ function buildMessage(token: string, req: NotificationRequest): ExpoMessage | nu
       return { ...base, title: '💸 Money sent', body: `You've lent ${amount} to ${sender}`,
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
 
+    case 'repayment_reminder':
+      return { ...base, title: '⏰ Repayment due tomorrow', body: `You have 24 hours to repay ${amount} to ${sender}`,
+               data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
+
     case 'money_repaid':
       return { ...base, title: '✅ Repayment received', body: `You received a ${amount} repayment from ${sender}`,
                data: { type: req.type, screen: 'Home', request_id: req.data?.request_id } };
