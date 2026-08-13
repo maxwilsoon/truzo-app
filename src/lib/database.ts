@@ -851,4 +851,31 @@ export const db = {
     if (error) throw new Error(error.message);
     return (data ?? []) as Array<{ id: string; display_name: string; username: string; avatar_emoji: string }>;
   },
+
+  // ── M062: Reward catalog & redemption ──────────────────────────────────────
+
+  async getGiftCardCatalog(
+    childId: string, sessionToken: string, deviceId: string,
+  ): Promise<Array<{ id: string; name: string; brand: string; cost_pts: number; sort_order: number }>> {
+    const { data, error } = await supabase.rpc('get_gift_card_catalog', {
+      p_child_id:      childId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
+    if (error) throw new Error('get_gift_card_catalog: ' + error.message);
+    return (data ?? []) as Array<{ id: string; name: string; brand: string; cost_pts: number; sort_order: number }>;
+  },
+
+  async redeemGiftCard(
+    childId: string, catalogId: string, sessionToken: string, deviceId: string,
+  ): Promise<{ redemption_id: string; reward_name: string; points_spent: number }> {
+    const { data, error } = await supabase.rpc('redeem_gift_card', {
+      p_child_id:      childId,
+      p_catalog_id:    catalogId,
+      p_session_token: sessionToken,
+      p_device_id:     deviceId,
+    });
+    if (error) throw new Error(error.message);
+    return data as { redemption_id: string; reward_name: string; points_spent: number };
+  },
 };

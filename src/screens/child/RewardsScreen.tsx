@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
@@ -6,16 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
+import { db } from '../../lib/database';
 
-// ─── Reward data ──────────────────────────────────────────────────────────────
+// ─── Catalog types ────────────────────────────────────────────────────────────
 
-const REWARDS = [
-  { id: 'r1', name: 'Amazon £10',      brand: 'amazon',  cost: 1000 },
-  { id: 'r2', name: 'Spotify Premium', brand: 'spotify', cost: 1000 },
-  { id: 'r3', name: 'Netflix £10',     brand: 'netflix', cost: 1500 },
-  { id: 'r4', name: 'Nike £10',        brand: 'nike',    cost: 1500 },
-  { id: 'r5', name: 'Xbox £10',        brand: 'xbox',    cost: 500  },
-  { id: 'r6', name: "McDonald's £5",   brand: 'mcdonalds', cost: 500 },
+type CatalogItem = { id: string; name: string; brand: string; cost_pts: number; sort_order: number };
+
+const FALLBACK_CATALOG: CatalogItem[] = [
+  { id: 'r5', name: 'Xbox £10',        brand: 'xbox',      cost_pts: 500,  sort_order: 1 },
+  { id: 'r6', name: "McDonald's £5",   brand: 'mcdonalds', cost_pts: 500,  sort_order: 2 },
+  { id: 'r1', name: 'Amazon £10',      brand: 'amazon',    cost_pts: 1000, sort_order: 3 },
+  { id: 'r2', name: 'Spotify Premium', brand: 'spotify',   cost_pts: 1000, sort_order: 4 },
+  { id: 'r3', name: 'Netflix £10',     brand: 'netflix',   cost_pts: 1500, sort_order: 5 },
+  { id: 'r4', name: 'Nike £10',        brand: 'nike',      cost_pts: 1500, sort_order: 6 },
 ];
 
 // ─── Brand logo ───────────────────────────────────────────────────────────────
@@ -82,22 +85,49 @@ const fmtPts = (n: number) =>
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const RewardsScreen: React.FC = () => {
-  const { child } = useApp();
+  const { child, childId, childSessionToken, childDeviceId } = useApp();
+  const [catalog, setCatalog] = useState<CatalogItem[]>(FALLBACK_CATALOG);
 
-  const handleRedeem = (name: string, cost: number) => {
-    if (child.points < cost) {
+  useEffect(() => {
+    if (!childId || !childSessionToken || !childDeviceId) return;
+    db.getGiftCardCatalog(childId, childSessionToken, childDeviceId)
+      .then(items => { if (items.length > 0) setCatalog(items); })
+      .catch(() => { /* keep fallback catalog */ });
+  }, [childId, childSessionToken, childDeviceId]);
+
+  const handleRedeem = (id: string, name: string, costPts: number) => {
+    if (child.points < costPts) {
       Alert.alert(
         'Not enough points',
-        `You need ${fmtPts(cost)} pts to redeem ${name}. You currently have ${fmtPts(child.points)} pts.`,
+        `You need ${fmtPts(costPts)} pts to redeem ${name}. You currently have ${fmtPts(child.points)} pts.`,
       );
       return;
     }
     Alert.alert(
       `Redeem ${name}`,
-      `Use ${fmtPts(cost)} of your ${fmtPts(child.points)} pts?`,
+      `Use ${fmtPts(costPts)} of your ${fmtPts(child.points)} pts?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Redeem', onPress: () => Alert.alert('Coming soon', 'Reward redemption is coming soon!') },
+        {
+          text: 'Redeem',
+          onPress: async () => {
+            try {
+              await db.redeemGiftCard(
+                childId ?? '', id, childSessionToken ?? '', childDeviceId ?? '',
+              );
+              Alert.alert('Redeemed!', `Your ${name} reward is being processed. We'll be in touch soon!`);
+            } catch (err: any) {
+              const msg: string = err?.message ?? '';
+              if (msg.includes('insufficient_points')) {
+                Alert.alert('Not enough points', 'Your points balance is not sufficient for this reward.');
+              } else if (msg.includes('account_frozen')) {
+                Alert.alert('Account frozen', 'Your account is currently frozen. Please contact support.');
+              } else {
+                Alert.alert('Something went wrong', 'Please try again in a moment.');
+              }
+            }
+          },
+        },
       ],
     );
   };
@@ -128,18 +158,18 @@ export const RewardsScreen: React.FC = () => {
 
         {/* ── 2-COLUMN GRID ── */}
         <View style={s.grid}>
-          {REWARDS.map(r => {
-            const locked = child.points < r.cost;
+          {catalog.map(r => {
+            const locked = child.points < r.cost_pts;
             return (
               <TouchableOpacity
                 key={r.id}
                 style={[s.rewardCard, locked && s.rewardCardLocked]}
-                onPress={() => handleRedeem(r.name, r.cost)}
+                onPress={() => handleRedeem(r.id, r.name, r.cost_pts)}
                 activeOpacity={0.82}
               >
                 <BrandLogo brand={r.brand} />
                 <Text style={s.rewardName} numberOfLines={2}>{r.name}</Text>
-                <Text style={s.rewardPts}>{fmtPts(r.cost)} pts</Text>
+                <Text style={s.rewardPts}>{fmtPts(r.cost_pts)} pts</Text>
               </TouchableOpacity>
             );
           })}
