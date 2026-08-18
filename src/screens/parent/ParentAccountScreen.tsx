@@ -34,7 +34,7 @@ const MenuItem = ({
 
 export const ParentAccountScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { parent, setParent, userId } = useApp();
+  const { parent, setParent, userId, childId } = useApp();
   const [uploading, setUploading] = useState(false);
 
   const pickFromLibrary = async () => {
@@ -215,6 +215,65 @@ export const ParentAccountScreen: React.FC = () => {
           />
         </View>
 
+        {/* ── DEV ONLY: log Supabase access token to Metro console ── */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={async () => {
+              const { data, error } = await supabase.auth.getSession();
+              if (error) {
+                console.log('Session error:', error);
+              } else {
+                console.log('ACCESS TOKEN:', data.session?.access_token);
+              }
+            }}
+          >
+            <Text style={styles.devButtonText}>DEV: Log access token</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ── DEV ONLY: invoke create-stripe-payment-intent Edge Function ── */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={async () => {
+              if (!childId) {
+                console.log('[DEV] stripe test: childId not set — log in as parent first');
+                return;
+              }
+              console.log('[DEV] stripe test: invoking create-stripe-payment-intent with child_id:', childId);
+              const { data, error } = await supabase.functions.invoke(
+                'create-stripe-payment-intent',
+                {
+                  body: {
+                    child_id: childId,
+                    amount:   1000,
+                    purpose:  'child_wallet',
+                  },
+                },
+              );
+              console.log('[DEV] stripe test data:', data ?? null);
+              if (error) {
+                console.log('[DEV] stripe test error name:',    error.name ?? null);
+                console.log('[DEV] stripe test error message:', error.message ?? null);
+                // FunctionsHttpError carries the raw Response on error.context
+                const ctx = (error as any).context;
+                if (ctx) {
+                  console.log('[DEV] stripe test HTTP status:', ctx.status ?? null);
+                  try {
+                    const body = await ctx.clone().text();
+                    console.log('[DEV] stripe test response body:', body);
+                  } catch {
+                    console.log('[DEV] stripe test response body: (could not read)');
+                  }
+                }
+              }
+            }}
+          >
+            <Text style={styles.devButtonText}>DEV: Test Stripe Edge Function</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.version}>Truzo v1.0.0 · © 2025</Text>
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -296,4 +355,14 @@ const styles = StyleSheet.create({
   menuValue:    { fontSize: 14, color: colors.textSecondary, marginRight: 4 },
 
   version: { textAlign: 'center', fontSize: 13, color: colors.textLight },
+
+  devButton: {
+    backgroundColor: '#FFF3CD',
+    borderWidth: 1,
+    borderColor: '#FFC107',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  devButtonText: { fontSize: 13, fontWeight: '700', color: '#856404' },
 });

@@ -5,15 +5,20 @@ if (Platform.OS !== 'web') {
 
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { AppProvider } from './src/context/AppContext';
 import { AppNavigator } from './src/navigation';
+
+const STRIPE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <AppNavigator />
-      </AppProvider>
+      <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.app.truzo">
+        <AppProvider>
+          <AppNavigator />
+        </AppProvider>
+      </StripeProvider>
     </SafeAreaProvider>
   );
 }

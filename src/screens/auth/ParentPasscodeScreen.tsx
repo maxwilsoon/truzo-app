@@ -11,6 +11,7 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../lib/database';
 import { navigateToParentDash } from '../../lib/parentAccessGuard';
 import { getLastParentForPasscode } from '../../lib/biometrics';
+import { supabase } from '../../lib/supabase';
 import { getExpoPushToken } from '../../lib/notifications';
 
 const GREEN_DARK = '#3D7A45';
@@ -124,22 +125,43 @@ export const ParentPasscodeScreen: React.FC<Props> = ({ navigation, route }) => 
     } else {
       // Enter mode — verify PIN server-side; the hash never leaves the DB.
       try {
-        const ok = await db.verifyParentPasscode(userId ?? '', next);
-        if (ok) {
-          // Register push token using the PIN as credential (no Supabase Auth session
-          // needed — this is the cold-start / app-restart path where the JWT is gone).
-          if (userId) {
-            const pin = next; // capture before async gap
-            getExpoPushToken()
-              .then(expoToken => {
-                if (expoToken) return db.registerParentPushTokenWithPasscode(userId, pin, expoToken, Platform.OS);
-              })
-              .catch(() => {}); // best-effort
+        // Call the Edge Function: verifies PIN and returns a real Supabase JWT.
+        // This establishes a proper Auth session so Edge Functions (e.g. Stripe)
+        // work without requiring an email+password login.
+        const { data: pinData, error: pinFnErr } = await supabase.functions.invoke(
+          'parent-pin-login',
+          { body: { parent_id: userId, pin: next } },
+        );
+
+        if (pinFnErr || !pinData?.access_token) {
+          const msg: string = pinData?.error ?? pinFnErr?.message ?? '';
+          if (msg.includes('rate_limit_exceeded')) {
+            setCode('');
+            setThrottleMsg('Too many failed attempts. Please wait 5 minutes before trying again.');
+          } else if (msg === 'invalid_credentials') {
+            shake();
+          } else {
+            shake();
           }
-          setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
-        } else {
-          shake();
+          return;
         }
+
+        // Establish the Supabase Auth session from the returned JWT.
+        await supabase.auth.setSession({
+          access_token:  pinData.access_token,
+          refresh_token: pinData.refresh_token,
+        });
+
+        // Register push token (fire-and-forget).
+        if (userId) {
+          const pin = next;
+          getExpoPushToken()
+            .then(expoToken => {
+              if (expoToken) return db.registerParentPushTokenWithPasscode(userId, pin, expoToken, Platform.OS);
+            })
+            .catch(() => {});
+        }
+        setTimeout(async () => { await navigateToParentDash(navigation, userId); }, 150);
       } catch (e: any) {
         if (String(e?.message).includes('rate_limit_exceeded')) {
           setCode('');

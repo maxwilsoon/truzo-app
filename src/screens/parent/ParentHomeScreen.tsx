@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useStripe } from '@stripe/stripe-react-native';
 import { colors, getTierInfo } from '../../theme/colors';
 import { TrustScoreRing } from '../../components/TrustScoreRing';
-import { PaymentSheet } from '../../components/PaymentSheet';
 import { MoneySheet } from '../../components/MoneySheet';
 import { useApp } from '../../context/AppContext';
-import { db } from '../../lib/database';
+import { supabase } from '../../lib/supabase';
 import { fmtAmt } from '../../lib/utils';
+
 
 function describeAmountError(msg: string): string {
   if (msg.includes('amount_below_minimum')) return 'Amount must be at least £0.50.';
@@ -19,15 +20,17 @@ function describeAmountError(msg: string): string {
 }
 
 export const ParentHomeScreen: React.FC = () => {
-  const { child, parent, setParent, setChild, addActivity, addTransaction, frozenAccount, parentDebt, repayParent, userId, childId, activityFeed, topUpSafetyPool, saveAllowanceToDb } = useApp();
+  const { child, parent, setChild, addActivity, frozenAccount, parentDebt, repayParent, childId, activityFeed, saveAllowanceToDb } = useApp();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
   const [topUpVisible, setTopUpVisible] = useState(false);
   const [allowanceVisible, setAllowanceVisible] = useState(false);
   const [sendMoneyVisible, setSendMoneyVisible] = useState(false);
-  const [topUpPaymentVisible, setTopUpPaymentVisible] = useState(false);
-  const [topUpPaymentAmount, setTopUpPaymentAmount] = useState(0);
-  const [sendPaymentVisible, setSendPaymentVisible] = useState(false);
-  const [sendPaymentAmount, setSendPaymentAmount] = useState(0);
-  const [sending, setSending] = useState(false);
+
+  // Stripe state (shared by both send-money and safety-pool flows)
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeProcessing, setStripeProcessing] = useState(false);
+  const [stripeProcessingLabel, setStripeProcessingLabel] = useState('');
   const tier = getTierInfo(child.trustScore);
   const poolPercent = (parent.safetyPoolUsed / parent.safetyPoolLimit) * 100;
 
@@ -61,6 +64,118 @@ export const ParentHomeScreen: React.FC = () => {
     .map(a => ({ ...a, text: toParentText(a.text) }));
 
   const parentActivity = showAllActivity ? parentActivityFeed : parentActivityFeed.slice(0, 3);
+
+  // ── Stripe payments ──────────────────────────────────────────────────────
+  // Shared handler for both child wallet top-up and safety pool top-up.
+  // NEVER calls parentSendToChild or directly updates any balance.
+  // All balance updates happen via the Stripe webhook → stripe_complete_topup().
+  const initiateStripeTopUp = async (
+    amountGbp: number,
+    purpose: 'child_wallet' | 'safety_pool' = 'child_wallet',
+  ) => {
+    if (!childId) {
+      Alert.alert('Error', 'No child account linked. Please contact support.');
+      return;
+    }
+
+    setStripeLoading(true);
+    try {
+      // 1. Create PaymentIntent on the server — returns client_secret only
+      const amountPence = Math.round(amountGbp * 100);
+      console.log('[Stripe] invoking create-stripe-payment-intent', { amountPence, childId, purpose });
+      const { data, error: fnError } = await supabase.functions.invoke(
+        'create-stripe-payment-intent',
+        { body: { child_id: childId, amount: amountPence, purpose } },
+      );
+
+      if (fnError || !data?.client_secret) {
+        console.log('[Stripe] edge function error', fnError?.message, JSON.stringify(data));
+        Alert.alert('Payment error', `Could not start payment: ${fnError?.message ?? 'no client_secret'}`);
+        if (purpose === 'safety_pool') setTopUpVisible(true);
+        else setSendMoneyVisible(true);
+        return;
+      }
+      console.log('[Stripe] got client_secret, initialising PaymentSheet');
+
+      // 2. Prepare Stripe PaymentSheet
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: 'Truzo',
+        paymentIntentClientSecret: data.client_secret,
+        returnURL: 'truzo://stripe-return',
+      });
+
+      if (initError) {
+        console.log('[Stripe] initPaymentSheet error', initError.code, initError.message);
+        Alert.alert('Payment error', `Could not prepare payment: ${initError.message}`);
+        if (purpose === 'safety_pool') setTopUpVisible(true);
+        else setSendMoneyVisible(true);
+        return;
+      }
+      console.log('[Stripe] PaymentSheet ready, presenting');
+
+      // 3. Present the native Stripe PaymentSheet.
+      // Dismiss the loading modal first and wait for its fade animation to
+      // complete — presenting the PaymentSheet while a modal is animating out
+      // causes it to flash and crash on iOS.
+      setStripeLoading(false);
+      await new Promise<void>(resolve => setTimeout(resolve, 350));
+      const { error: presentError } = await presentPaymentSheet();
+      console.log('[Stripe] presentPaymentSheet returned', presentError?.code, presentError?.message);
+
+      if (presentError?.code === 'Canceled') {
+        if (purpose === 'safety_pool') setTopUpVisible(true);
+        else setSendMoneyVisible(true);
+        return;
+      }
+
+      if (presentError) {
+        Alert.alert('Payment failed', 'Your payment could not be completed. Please try again.');
+        if (purpose === 'safety_pool') setTopUpVisible(true);
+        else setSendMoneyVisible(true);
+        return;
+      }
+
+      // 4. PaymentSheet authorised — show processing card and re-fetch after
+      // a short delay to pick up the webhook update.
+      setStripeProcessingLabel(
+        purpose === 'safety_pool'
+          ? 'Your Safety Pool will update in a moment.'
+          : `${child.displayName}'s balance will update in a moment once the payment is confirmed.`,
+      );
+      setStripeProcessing(true);
+      setTimeout(async () => {
+        try {
+          if (purpose === 'safety_pool') {
+            const { data: row } = await supabase
+              .from('parents')
+              .select('safety_pool_limit')
+              .eq('id', parent.id ?? childId)
+              .single();
+            if (row?.safety_pool_limit !== undefined) {
+              // AppContext doesn't expose a setParent for this field directly;
+              // the updated value will appear on next navigation/refresh.
+            }
+          } else {
+            const { data: row } = await supabase
+              .from('children')
+              .select('wallet_balance')
+              .eq('id', childId)
+              .single();
+            if (row?.wallet_balance !== undefined) {
+              setChild(c => ({ ...c, balance: row.wallet_balance }));
+            }
+          }
+        } catch { /* balance will refresh on next login or manual pull */ }
+        setStripeProcessing(false);
+      }, 4000);
+
+    } catch {
+      Alert.alert('Payment error', 'An unexpected error occurred. Please try again.');
+      setSendMoneyVisible(true);
+    } finally {
+      setStripeLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -223,18 +338,17 @@ export const ParentHomeScreen: React.FC = () => {
         <View style={{ height: 24 }} />
       </ScrollView>
 
-      {/* Top up safety pool */}
+      {/* Top up safety pool — real Stripe card payment */}
       <MoneySheet
         visible={topUpVisible}
         title="Top up Safety Pool"
         subtitle={`Current pool: £${parent.safetyPoolLimit} · £${parent.safetyPoolUsed} used`}
-        confirmLabel="Pay with Apple Pay"
+        confirmLabel="Pay by card"
         isPayment
         onClose={() => setTopUpVisible(false)}
         onConfirm={amt => {
-          setTopUpPaymentAmount(amt);
           setTopUpVisible(false);
-          setTopUpPaymentVisible(true);
+          initiateStripeTopUp(amt, 'safety_pool');
         }}
       />
 
@@ -243,68 +357,44 @@ export const ParentHomeScreen: React.FC = () => {
         visible={sendMoneyVisible}
         title={`Send to ${child.displayName}`}
         subtitle="Added directly to their wallet balance"
-        confirmLabel="Pay with Apple Pay"
+        confirmLabel="Pay by card"
         isPayment
         onClose={() => setSendMoneyVisible(false)}
         onConfirm={amt => {
-          setSendPaymentAmount(amt);
           setSendMoneyVisible(false);
-          setSendPaymentVisible(true);
+          initiateStripeTopUp(amt);
         }}
       />
 
-      {/* Apple Pay — top up safety pool */}
-      <PaymentSheet
-        visible={topUpPaymentVisible}
-        amount={topUpPaymentAmount}
-        description="Top up Safety Pool"
-        onSuccess={() => {
-          topUpSafetyPool(topUpPaymentAmount).catch((e: any) => {
-            Alert.alert('Top-up failed', describeAmountError(e?.message ?? 'Could not update Safety Pool. Please try again.'));
-          });
-          setTopUpPaymentVisible(false);
-        }}
-        onCancel={() => {
-          setTopUpPaymentVisible(false);
-          setTopUpVisible(true);
-        }}
-      />
 
-      {/* Apple Pay — send money to child */}
-      <PaymentSheet
-        visible={sendPaymentVisible}
-        amount={sendPaymentAmount}
-        description={`Send to ${child.displayName}`}
-        onSuccess={async () => {
-          setSending(true);
-          try {
-            if (userId && childId) {
-              await db.parentSendToChild(userId, childId, sendPaymentAmount, parent.displayName);
-            }
-            setChild(c => ({ ...c, balance: c.balance + sendPaymentAmount }));
-            const amtStr = Math.floor(sendPaymentAmount) === sendPaymentAmount
-              ? Math.floor(sendPaymentAmount).toString()
-              : sendPaymentAmount.toFixed(2);
-            addTransaction({
-              id: `tx_send_${Date.now()}`,
-              type: 'parent_transfer',
-              amount: sendPaymentAmount,
-              description: `${parent.displayName} sent you £${amtStr}`,
-              date: 'Just now',
-              status: 'completed',
-            });
-          } catch (e: any) {
-            Alert.alert('Send failed', describeAmountError(e?.message ?? 'Could not send money. Please try again.'));
-          } finally {
-            setSending(false);
-            setSendPaymentVisible(false);
-          }
-        }}
-        onCancel={() => {
-          setSendPaymentVisible(false);
-          setSendMoneyVisible(true);
-        }}
-      />
+      {/* Stripe loading overlay — plain View, not a Modal, so it doesn't
+          block iOS from presenting the native Stripe PaymentSheet */}
+      {stripeLoading && (
+        <View style={[styles.stripeOverlay, StyleSheet.absoluteFillObject]}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.stripeOverlayText}>Preparing payment…</Text>
+        </View>
+      )}
+
+      {/* Stripe processing modal — shown after PaymentSheet success */}
+      <Modal visible={stripeProcessing} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.stripeOverlay}>
+          <View style={styles.stripeProcessingCard}>
+            <View style={styles.stripeSuccessCircle}>
+              <Ionicons name="checkmark" size={32} color="#fff" />
+            </View>
+            <Text style={styles.stripeProcessingTitle}>Payment submitted</Text>
+            <Text style={styles.stripeProcessingBody}>{stripeProcessingLabel}</Text>
+            <TouchableOpacity
+              style={styles.stripeDoneBtn}
+              onPress={() => setStripeProcessing(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.stripeDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Set weekly allowance */}
       <MoneySheet
@@ -373,4 +463,28 @@ const styles = StyleSheet.create({
   activityIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   activityText: { fontSize: 14, fontWeight: '500', color: colors.text, lineHeight: 20 },
   activityTime: { fontSize: 12, color: colors.textLight, marginTop: 2 },
+
+  // Stripe payment overlays
+  stripeOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center', justifyContent: 'center', gap: 16,
+  },
+  stripeOverlayText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  stripeProcessingCard: {
+    backgroundColor: '#fff', borderRadius: 24,
+    padding: 28, marginHorizontal: 32,
+    alignItems: 'center', gap: 14,
+  },
+  stripeSuccessCircle: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#30D158',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stripeProcessingTitle: { fontSize: 20, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  stripeProcessingBody: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  stripeDoneBtn: {
+    marginTop: 4, backgroundColor: '#2E7D32',
+    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 36,
+  },
+  stripeDoneBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });

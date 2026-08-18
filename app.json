@@ -76,6 +76,13 @@
         {
           "faceIDPermission": "Truzo uses Face ID to let you log in quickly and securely."
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.app.truzo",
+          "enableGooglePay": false
+        }
       ]
     ],
     "extra": {

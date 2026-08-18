@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { decode as base64Decode } from 'base64-arraybuffer';
+import { saveParentRefreshToken } from './biometrics';
 
 interface OnboardingParams {
   email:    string;
@@ -51,8 +52,10 @@ export const db = {
     // in-memory token). signInWithPassword immediately after guarantees the client
     // holds a valid JWT before the RLS-protected inserts below.
     // insert_child uses auth.uid() for parent_id — a missing session causes not_authenticated.
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: p.email, password: p.password });
+    const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email: p.email, password: p.password });
     if (signInErr) throw new Error('account_created_but_login_failed: ' + signInErr.message);
+    const refreshToken = signInData.session?.refresh_token;
+    if (refreshToken) saveParentRefreshToken(userId, refreshToken).catch(() => {});
 
     const { error: parentErr } = await supabase.from('parents').insert({
       id:                        userId,
@@ -672,6 +675,8 @@ export const db = {
     const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password });
     if (authErr || !authData.user) return null;
     const userId = authData.user.id;
+    const refreshToken = authData.session?.refresh_token;
+    if (refreshToken) saveParentRefreshToken(userId, refreshToken).catch(() => {});
     const { data: parentData } = await supabase
       .from('parents')
       .select('id, first_name, last_name, display_name, mobile, address, safety_pool_limit, safety_pool_used, weekly_allowance, allowance_frequency, allowance_next_payment, allowance_active, passcode_created, marketing_notifications, profile_image_url')
