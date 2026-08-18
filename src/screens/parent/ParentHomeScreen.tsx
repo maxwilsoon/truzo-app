@@ -20,12 +20,11 @@ function describeAmountError(msg: string): string {
 }
 
 export const ParentHomeScreen: React.FC = () => {
-  const { child, parent, setChild, addActivity, frozenAccount, parentDebt, repayParent, childId, activityFeed, saveAllowanceToDb } = useApp();
+  const { child, parent, setChild, addActivity, frozenAccount, parentDebt, repayParent, childId, activityFeed } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [topUpVisible, setTopUpVisible] = useState(false);
-  const [allowanceVisible, setAllowanceVisible] = useState(false);
-  const [sendMoneyVisible, setSendMoneyVisible] = useState(false);
+const [sendMoneyVisible, setSendMoneyVisible] = useState(false);
 
   // Stripe state (shared by both send-money and safety-pool flows)
   const [stripeLoading, setStripeLoading] = useState(false);
@@ -292,14 +291,10 @@ export const ParentHomeScreen: React.FC = () => {
 
         {/* Quick actions */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => setAllowanceVisible(true)}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Coming Soon', 'Automatic allowances are coming in a future update.')}>
             <View style={styles.actionIcon}><Ionicons name="wallet-outline" size={24} color="#2E7D32" /></View>
             <Text style={styles.actionLabel}>Set Allowance</Text>
-            <Text style={styles.actionValue}>
-              {parent.allowanceActive
-                ? `£${parent.weeklyAllowance}/${parent.allowanceFrequency === 'fortnightly' ? '2wk' : parent.allowanceFrequency === 'monthly' ? 'mo' : 'wk'}`
-                : 'Not set'}
-            </Text>
+            <Text style={styles.actionValue}>Coming soon</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => setSendMoneyVisible(true)}>
             <View style={styles.actionIcon}><Ionicons name="send-outline" size={24} color="#2E7D32" /></View>
@@ -396,20 +391,6 @@ export const ParentHomeScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Set weekly allowance */}
-      <MoneySheet
-        visible={allowanceVisible}
-        title="Weekly Allowance"
-        subtitle={`Currently £${parent.weeklyAllowance}/week · sent automatically`}
-        confirmLabel="Set"
-        amountSuffix="/week"
-        isPayment={false}
-        onClose={() => setAllowanceVisible(false)}
-        onConfirm={amt => {
-          saveAllowanceToDb(amt, parent.allowanceFrequency || 'weekly', null, true).catch(() => {});
-          setAllowanceVisible(false);
-        }}
-      />
     </SafeAreaView>
   );
 };
