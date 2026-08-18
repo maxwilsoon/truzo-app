@@ -132,7 +132,7 @@ export const ChildDetailsScreen: React.FC<Props> = ({ navigation }) => {
         Alert.alert('No connection', 'Please check your internet connection and try again.');
       } else {
         if (__DEV__) {
-          console.error('[Truzo] ChildDetails unclassified error:', {
+          console.error('[Breesh] ChildDetails unclassified error:', {
             message: err?.message,
             code:    err?.code,
             details: err?.details,

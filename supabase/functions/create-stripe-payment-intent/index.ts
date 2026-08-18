@@ -1,4 +1,4 @@
-// Truzo — create-stripe-payment-intent Edge Function
+// Breesh — create-stripe-payment-intent Edge Function
 //
 // Creates a Stripe PaymentIntent and records a pending stripe_topups row.
 // Supports two purposes:

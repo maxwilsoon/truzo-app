@@ -29,7 +29,7 @@ export type RootStackParamList = {
   PaymentMethods: undefined;
   ParentAccountDetails: undefined;
   ParentNotifications: undefined;
-  RateTruzo: undefined;
+  RateBreesh: undefined;
   BiometricSetup: undefined;
   BiometricLogin: undefined;
   ChildProfile: undefined;

@@ -19,7 +19,7 @@ const MONTH_FULL = ['January','February','March','April','May','June','July','Au
  */
 export function parseRepaymentDate(raw: string | null | undefined): Date | null {
   if (!raw) {
-    if (__DEV__) console.warn('[Truzo] repayByDate missing:', raw);
+    if (__DEV__) console.warn('[Breesh] repayByDate missing:', raw);
     return null;
   }
 
@@ -53,7 +53,7 @@ export function parseRepaymentDate(raw: string | null | undefined): Date | null 
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
-  if (__DEV__) console.warn('[Truzo] Could not parse repayByDate:', raw);
+  if (__DEV__) console.warn('[Breesh] Could not parse repayByDate:', raw);
   return null;
 }
 

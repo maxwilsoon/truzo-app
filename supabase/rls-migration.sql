@@ -1,5 +1,5 @@
 -- ============================================================
--- Truzo RLS Migration
+-- Breesh RLS Migration
 -- Run this in Supabase → SQL Editor.
 -- Enables Row Level Security on every table and creates scoped
 -- policies so only authenticated parents can access their data.

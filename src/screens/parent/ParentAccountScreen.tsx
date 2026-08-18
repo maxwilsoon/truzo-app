@@ -40,7 +40,7 @@ export const ParentAccountScreen: React.FC = () => {
   const pickFromLibrary = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Please allow Truzo to access your photo library in Settings.');
+      Alert.alert('Permission needed', 'Please allow Breesh to access your photo library in Settings.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -55,7 +55,7 @@ export const ParentAccountScreen: React.FC = () => {
   const pickFromCamera = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Please allow Truzo to access your camera in Settings.');
+      Alert.alert('Permission needed', 'Please allow Breesh to access your camera in Settings.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -191,7 +191,7 @@ export const ParentAccountScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>More</Text>
         <View style={styles.menuSection}>
           <MenuItem icon="help-circle-outline" label="Help Centre" onPress={() => {}} />
-          <MenuItem icon="star-outline" label="Rate Truzo" onPress={() => navigation.navigate('RateTruzo')} />
+          <MenuItem icon="star-outline" label="Rate Breesh" onPress={() => navigation.navigate('RateBreesh')} />
           <MenuItem icon="lock-closed-outline" label="Privacy Policy" onPress={() => {}} />
           <MenuItem icon="gift-outline" label="Refer a friend" onPress={() => {}} />
         </View>
@@ -215,7 +215,7 @@ export const ParentAccountScreen: React.FC = () => {
           />
         </View>
 
-        <Text style={styles.version}>Truzo v1.0.0 · © 2025</Text>
+        <Text style={styles.version}>Breesh v1.0.0 · © 2025</Text>
         <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>

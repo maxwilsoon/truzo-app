@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
-  PARENT:   '@truzo/parent',
-  CHILD:    '@truzo/child',
-  USER_ID:  '@truzo/userId',
-  ACTIVITY: (childId: string) => `@truzo/activity/${childId}`,
+  PARENT:   '@breesh/parent',
+  CHILD:    '@breesh/child',
+  USER_ID:  '@breesh/userId',
+  ACTIVITY: (childId: string) => `@breesh/activity/${childId}`,
 } as const;
 
 // AsyncStorage can throw "Native module is null, cannot access legacy storage"

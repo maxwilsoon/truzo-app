@@ -73,7 +73,7 @@ export const ProfileScreen: React.FC = () => {
         {/* Help, Rate, Privacy — grouped */}
         <View style={styles.menuGroup}>
           <MenuItem icon="help-circle-outline" label="Help Centre" onPress={() => {}} />
-          <MenuItem icon="star-outline" label="Rate Truzo" onPress={() => navigation.navigate('RateTruzo')} />
+          <MenuItem icon="star-outline" label="Rate Breesh" onPress={() => navigation.navigate('RateBreesh')} />
           <MenuItem icon="shield-outline" label="Privacy Policy" onPress={() => {}} last />
         </View>
 

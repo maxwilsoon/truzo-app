@@ -153,7 +153,7 @@ export const ParentAccountDetailsScreen: React.FC = () => {
         {/* Notice */}
         <View style={styles.notice}>
           <Ionicons name="shield-checkmark-outline" size={16} color={BRAND} />
-          <Text style={styles.noticeText}>To update any details, please contact Truzo support.</Text>
+          <Text style={styles.noticeText}>To update any details, please contact Breesh support.</Text>
         </View>
 
         <View style={{ height: 32 }} />

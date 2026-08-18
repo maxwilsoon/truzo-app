@@ -99,7 +99,7 @@ export const ParentNotificationsScreen: React.FC = () => {
             iconBg="#E8F5E9"
             iconColor={GREEN_DARK}
             title="Marketing emails"
-            subtitle="Offers, tips and Truzo news delivered to your inbox"
+            subtitle="Offers, tips and Breesh news delivered to your inbox"
             value={parent.marketingNotifications}
             onToggle={handleMarketingToggle}
           />

@@ -85,7 +85,7 @@ export const BiometricSetupScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.title}>Use Face ID for{'\n'}faster login?</Text>
 
         <Text style={styles.body}>
-          Securely sign in to your TRUZO account using Face ID or your device's biometrics.
+          Securely sign in to your BREESH account using Face ID or your device's biometrics.
         </Text>
       </View>
 

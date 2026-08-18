@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Truzo",
-    "slug": "truzo",
+    "name": "Breesh",
+    "slug": "breesh",
     "version": "1.0.0",
-    "scheme": "truzo",
+    "scheme": "breesh",
     "orientation": "portrait",
     "platforms": [
       "ios",
@@ -19,7 +19,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.truzo.app",
+      "bundleIdentifier": "com.breesh.app",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -27,7 +27,7 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
-      "package": "com.truzo.app",
+      "package": "com.breesh.app",
       "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
@@ -67,20 +67,20 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Truzo needs access to your photos so you can set a profile picture.",
-          "cameraPermission": "Truzo needs access to your camera so you can take a profile photo."
+          "photosPermission": "Breesh needs access to your photos so you can set a profile picture.",
+          "cameraPermission": "Breesh needs access to your camera so you can take a profile photo."
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Truzo uses Face ID to let you log in quickly and securely."
+          "faceIDPermission": "Breesh uses Face ID to let you log in quickly and securely."
         }
       ],
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.app.truzo",
+          "merchantIdentifier": "merchant.app.breesh",
           "enableGooglePay": false
         }
       ]

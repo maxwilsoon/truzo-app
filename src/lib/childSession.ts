@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 // SecureStore key format: ^[\w.-]+$ — use _ separator only.
-const sessionKey = (childId: string) => `truzo_child_session_${childId}`;
+const sessionKey = (childId: string) => `breesh_child_session_${childId}`;
 
 interface StoredSession {
   token: string;

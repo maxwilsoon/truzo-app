@@ -98,9 +98,9 @@ const [sendMoneyVisible, setSendMoneyVisible] = useState(false);
 
       // 2. Prepare Stripe PaymentSheet
       const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'Truzo',
+        merchantDisplayName: 'Breesh',
         paymentIntentClientSecret: data.client_secret,
-        returnURL: 'truzo://stripe-return',
+        returnURL: 'breesh://stripe-return',
       });
 
       if (initError) {

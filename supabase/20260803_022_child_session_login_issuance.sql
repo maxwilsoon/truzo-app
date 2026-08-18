@@ -9,7 +9,7 @@
 --   verifies ONLY:
 --     children WHERE id = p_child_id AND biometric_enabled = true AND last_device_id = p_device_id
 --
---   truzo_bio_token_{childId} in SecureStore holds a Math.random() string that is NEVER
+--   breesh_bio_token_{childId} in SecureStore holds a Math.random() string that is NEVER
 --   transmitted to the server. The DB has no knowledge of it. The server therefore issues
 --   a session token based solely on child UUID + device ID — neither of which is a secret.
 --
@@ -49,14 +49,14 @@
 --     Caller sends tokenHash to db.enableBiometric(childId, deviceId, tokenHash).
 --
 --   getBiometricTokenForChild(childId):
---     New helper — reads raw token from SecureStore truzo_bio_token_{childId}.
+--     New helper — reads raw token from SecureStore breesh_bio_token_{childId}.
 --
 --   db.biometricLoginChild(childId, deviceId):
 --     Reads rawToken = getBiometricTokenForChild(childId).
 --     If null → no biometric enrolled, reject before RPC call.
 --     Calls biometric_login_child(p_child_id, p_device_id, p_biometric_token = rawToken).
 --
---   Existing biometric setups (truzo_bio_token_{childId} holds old Math.random token):
+--   Existing biometric setups (breesh_bio_token_{childId} holds old Math.random token):
 --     biometric_login_child will fail (biometric_token_hash IS NULL → no row found → RETURN NULL).
 --     User is prompted to re-enroll biometric. This is correct and expected behaviour.
 --

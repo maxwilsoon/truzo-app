@@ -38,12 +38,12 @@ async function secureDel(key: string): Promise<void> {
 // leaks to Child B (even on the same device).
 // Separator is "_" — colon ":" is rejected by SecureStore key validation.
 
-const DEVICE_KEY        = 'truzo_device_id';
-const LAST_CHILD_KEY    = 'truzo_last_child';
-const LAST_PARENT_KEY   = 'truzo_last_parent_id';
-const tokenKey          = (childId: string) => `truzo_bio_token_${childId}`;
-const declinedKey       = (childId: string) => `truzo_bio_declined_${childId}`;
-const refreshTokenKey   = (userId: string) => `truzo_auth_refresh_${userId}`;
+const DEVICE_KEY        = 'breesh_device_id';
+const LAST_CHILD_KEY    = 'breesh_last_child';
+const LAST_PARENT_KEY   = 'breesh_last_parent_id';
+const tokenKey          = (childId: string) => `breesh_bio_token_${childId}`;
+const declinedKey       = (childId: string) => `breesh_bio_declined_${childId}`;
+const refreshTokenKey   = (userId: string) => `breesh_auth_refresh_${userId}`;
 
 // ─── Parent auth refresh token ────────────────────────────────────────────────
 // Stored after email login so PIN login can restore the Supabase Auth session.
@@ -70,7 +70,7 @@ export async function getDeviceId(): Promise<string> {
     // Web: persist a stable device ID in localStorage so it survives page
     // refreshes and is consistent across logins in the same browser profile.
     // Falls back to an ephemeral ID if localStorage is unavailable (private mode).
-    const WEB_DEVICE_KEY = 'truzo_web_device_id';
+    const WEB_DEVICE_KEY = 'breesh_web_device_id';
     try {
       const stored = localStorage.getItem(WEB_DEVICE_KEY);
       if (stored) return stored;

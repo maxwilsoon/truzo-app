@@ -1,5 +1,5 @@
 -- ============================================================
--- Truzo Admin Views
+-- Breesh Admin Views
 -- Run these in the Supabase SQL Editor (Dashboard → SQL Editor)
 -- They will appear as tables in the Table Editor for easy browsing.
 -- ============================================================

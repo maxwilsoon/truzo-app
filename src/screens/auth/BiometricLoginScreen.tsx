@@ -124,7 +124,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
         setErrorMsg('Face ID is no longer set up. Please sign in with your password.');
         return;
       }
-      const success = await promptBiometric('Unlock your TRUZO account');
+      const success = await promptBiometric('Unlock your BREESH account');
       if (__DEV__) console.log('[BiometricLogin] promptBiometric success=', success);
       if (!success) {
         setStatus('failed');
@@ -212,7 +212,7 @@ export const BiometricLoginScreen: React.FC<Props> = ({ navigation }) => {
               ? 'Authenticating…'
               : status === 'success'
                 ? 'Success! Signing you in…'
-                : 'Authenticate to sign in to your TRUZO account.'}
+                : 'Authenticate to sign in to your BREESH account.'}
           </Text>
         )}
       </View>

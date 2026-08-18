@@ -14,7 +14,7 @@
 WHERE username = lower(p_username) AND password = p_password
 ```
 
-The app caches the plain-text password in AsyncStorage (`@truzo/child`) and uses it for an offline fast-path check at `ChildLoginScreen.tsx:41`.
+The app caches the plain-text password in AsyncStorage (`@breesh/child`) and uses it for an offline fast-path check at `ChildLoginScreen.tsx:41`.
 
 ---
 

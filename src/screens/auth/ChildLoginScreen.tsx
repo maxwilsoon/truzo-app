@@ -245,7 +245,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
             Ask your parent or guardian for your login details.{' '}
             <Text
               style={styles.link}
-              onPress={() => Alert.alert('Login details', 'Ask your parent to open the Truzo app and go to your profile to find your login details.')}
+              onPress={() => Alert.alert('Login details', 'Ask your parent to open the Breesh app and go to your profile to find your login details.')}
             >
               How do I get my login details?
             </Text>
@@ -294,7 +294,7 @@ export const ChildLoginScreen: React.FC<Props> = ({ navigation, route }) => {
           {passwordError
             ? <Text style={styles.errorText}>{passwordError}</Text>
             : (
-              <TouchableOpacity onPress={() => Alert.alert('Forgot password?', 'Ask your parent to reset your password in the Truzo app.')}>
+              <TouchableOpacity onPress={() => Alert.alert('Forgot password?', 'Ask your parent to reset your password in the Breesh app.')}>
                 <Text style={styles.forgotLink}>Forgot password?</Text>
               </TouchableOpacity>
             )

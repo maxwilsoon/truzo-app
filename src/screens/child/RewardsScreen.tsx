@@ -76,7 +76,7 @@ const getMotivation = (pts: number): string => {
   if (pts >= 2000) return "You're crushing it! 🔥";
   if (pts >= 1000) return "You're doing amazing! 🚀";
   if (pts >= 500)  return "Great progress, keep going! ⭐";
-  return "Start earning TRUZO Points! 💪";
+  return "Start earning BREESH Points! 💪";
 };
 
 const fmtPts = (n: number) =>
@@ -139,7 +139,7 @@ export const RewardsScreen: React.FC = () => {
         {/* ── SUMMARY CARD ── */}
         <View style={s.summaryCard}>
           <View style={s.summaryLeft}>
-            <Text style={s.summaryLabel}>Your TRUZO Points</Text>
+            <Text style={s.summaryLabel}>Your BREESH Points</Text>
             <Text style={s.summaryPoints}>{fmtPts(child.points)}</Text>
             <Text style={s.summaryMotivation}>{getMotivation(child.points)}</Text>
           </View>

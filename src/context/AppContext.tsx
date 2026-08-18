@@ -425,7 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Persist: clear parent_debt, restore safety pool, unfreeze in DB
     if (childIdRef.current && userId) {
       db.confirmParentRepayment(childIdRef.current, userId).catch(err =>
-        console.warn('[Truzo] confirmParentRepayment failed:', err)
+        console.warn('[Breesh] confirmParentRepayment failed:', err)
       );
     }
   };

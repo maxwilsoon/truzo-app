@@ -90,7 +90,7 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Trust text */}
           <Text style={styles.legalText}>
-            Truzo is a peer-to-peer lending platform for young people, supervised and backed by parents.
+            Breesh is a peer-to-peer lending platform for young people, supervised and backed by parents.
           </Text>
 
           <View style={{ flex: 1, minHeight: 24 }} />
@@ -98,7 +98,7 @@ export const EmailScreen: React.FC<Props> = ({ navigation }) => {
           {/* Footer */}
           <View style={styles.footer}>
           <Text style={styles.consent}>
-            By pressing "Continue", you agree to the Truzo{' '}
+            By pressing "Continue", you agree to the Breesh{' '}
             <Text style={styles.link}>terms and conditions</Text>
             {', '}
             <Text style={styles.link}>cardholder agreement</Text>

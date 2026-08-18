@@ -37,7 +37,7 @@ import { ProfileScreen } from '../screens/child/ProfileScreen';
 import { PaymentMethodsScreen } from '../screens/parent/PaymentMethodsScreen';
 import { ParentAccountDetailsScreen } from '../screens/parent/ParentAccountDetailsScreen';
 import { ParentNotificationsScreen } from '../screens/parent/ParentNotificationsScreen';
-import { RateTruzoScreen } from '../screens/shared/RateTruzoScreen';
+import { RateBreeshScreen } from '../screens/shared/RateBreeshScreen';
 import { BiometricSetupScreen } from '../screens/auth/BiometricSetupScreen';
 import { BiometricLoginScreen } from '../screens/auth/BiometricLoginScreen';
 
@@ -209,7 +209,7 @@ export const AppNavigator = () => {
         <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         <Stack.Screen name="ParentAccountDetails" component={ParentAccountDetailsScreen} />
         <Stack.Screen name="ParentNotifications" component={ParentNotificationsScreen} />
-        <Stack.Screen name="RateTruzo" component={RateTruzoScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
+        <Stack.Screen name="RateBreesh" component={RateBreeshScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
         <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_bottom', gestureEnabled: false }} />
         <Stack.Screen name="BiometricLogin" component={BiometricLoginScreen} options={{ animation: Platform.OS === 'web' ? 'none' : 'fade', gestureEnabled: false }} />
       </Stack.Navigator>

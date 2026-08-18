@@ -1,4 +1,4 @@
--- Truzo money management migration
+-- Breesh money management migration
 -- Adds allowance persistence columns and atomic safety-pool top-up RPC
 
 ALTER TABLE parents

@@ -1,4 +1,4 @@
-# Truzo
+# Breesh
 
 A peer-to-peer lending app for teens, backed by a parent safety pool. Teens build a trust score by borrowing from friends and repaying on time. Parents maintain oversight and fund a safety net that covers every loan.
 
@@ -39,7 +39,7 @@ src/
     auth/         # WhoIsLoggingIn, ParentPasscode, ChildLogin
     child/        # Home, Circle, Wallet, Profile, TrustStats, RequestMoney…
     parent/       # ParentHome, ParentAccount, PaymentMethods, AccountDetails
-    shared/       # RateTruzo
+    shared/       # RateBreesh
   components/     # ConfirmSheet, MoneySheet, PaymentSheet, TrustScoreRing…
   theme/          # colors.ts — colour palette + getTierInfo()
 ```

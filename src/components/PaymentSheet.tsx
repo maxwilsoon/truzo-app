@@ -96,8 +96,8 @@ export const PaymentSheet: React.FC<Props> = ({
                 <Text style={{ fontSize: 18 }}>💜</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.merchantName}>Truzo</Text>
-                <Text style={styles.merchantSecure}>truzo.app · Secure payment</Text>
+                <Text style={styles.merchantName}>Breesh</Text>
+                <Text style={styles.merchantSecure}>breesh.app · Secure payment</Text>
               </View>
               <Ionicons name="lock-closed" size={14} color="#8E8E93" />
             </View>

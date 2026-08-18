@@ -14,7 +14,7 @@ const STRIPE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.app.truzo">
+      <StripeProvider publishableKey={STRIPE_KEY} merchantIdentifier="merchant.app.breesh">
         <AppProvider>
           <AppNavigator />
         </AppProvider>

@@ -1,4 +1,4 @@
-// Truzo – parent-pin-login Edge Function
+// Breesh – parent-pin-login Edge Function
 //
 // Verifies a parent's 6-digit PIN using the existing rate-limited
 // verify_parent_passcode DB function, then creates a real Supabase Auth

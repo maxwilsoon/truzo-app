@@ -15,7 +15,7 @@ const RATINGS = [
   { emoji: '😄', bg: '#3DB85C', label: 'Love it' },
 ];
 
-export const RateTruzoScreen: React.FC = () => {
+export const RateBreeshScreen: React.FC = () => {
   const navigation = useNavigation();
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);

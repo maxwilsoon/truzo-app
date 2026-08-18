@@ -76,7 +76,7 @@ export const db = {
     // The RPC uses auth.uid() for parent_id — a missing session causes not_authenticated.
     const { data: { session: preRpcSession } } = await supabase.auth.getSession();
     if (__DEV__) {
-      console.log('[Truzo] insert_child pre-flight:', {
+      console.log('[Breesh] insert_child pre-flight:', {
         rpc: 'insert_child',
         hasSession: !!preRpcSession,
         userId: preRpcSession?.user?.id ?? null,
@@ -102,7 +102,7 @@ export const db = {
     });
     if (childErr) {
       if (__DEV__) {
-        console.error('[Truzo] insert_child RPC error:', {
+        console.error('[Breesh] insert_child RPC error:', {
           message: childErr.message,
           code:    childErr.code,
           details: childErr.details,

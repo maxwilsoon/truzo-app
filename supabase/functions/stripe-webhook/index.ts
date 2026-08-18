@@ -1,4 +1,4 @@
-// Truzo – stripe-webhook Edge Function
+// Breesh – stripe-webhook Edge Function
 //
 // Receives Stripe events, verifies the signature, and for
 // payment_intent.succeeded calls stripe_complete_topup() to credit

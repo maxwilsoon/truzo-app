@@ -1,4 +1,4 @@
-// Truzo – send-notification Edge Function
+// Breesh – send-notification Edge Function
 //
 // Called by DB RPCs via pg_net when a social or financial event occurs.
 // Looks up device tokens, sends to Expo Push API, checks receipts, cleans up invalid tokens.
